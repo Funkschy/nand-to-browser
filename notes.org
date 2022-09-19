@@ -1,0 +1,45 @@
+#+title: Notes
+* TODOs
+** TODO VM Emulator [0/12]
+- [ ] alle commands implementieren
+- [ ] command parsing
+- [ ] funktionen erkennen die aufgerufen aber nicht deklariert werden
+- [ ] native stdlib implementieren
+  - [ ] Math
+  - [ ] String
+  - [ ] Array
+  - [ ] Output
+  - [ ] Screen
+  - [ ] Keyboard
+  - [ ] Memory
+  - [ ] Sys
+- [ ] unbekannte funktionen in stdlib suchen und adden falls nötig
+- [ ] Start der Ausführung bei Sys.init falls vorhanden
+- [ ] checken ob Funktionsname zu Klassennamen passt
+- [ ] Debug Infos für Funktionen
+- [ ] Debug Infos für lokale Label
+- [ ] Test Script runner
+- [ ] Erfolgreiche Ausführung verschiedener Projekt 9 Abgaben
+** TODO VM Frontend [0/24]
+- [ ] vm step aus frontend aufrufen
+- [ ] display speicher in canvas rendern
+- [ ] keyboard interaktion in vm speicher schreiben
+- [ ] Geschwindigkeitsregulation
+- [ ] Step Button
+- [ ] Run Button
+- [ ] Stop Button
+- [ ] Revert Button
+- [ ] Laden von User code
+- [ ] Anzeige des Bytecodes
+- [ ] Anzeige des Keyboard Inputs
+- [ ] Anzeige des Stacks
+- [ ] Anzeige des Call stacks
+- [ ] Anzeige der Statics
+- [ ] Anzeige der Locals
+- [ ] Anzeige der Arguments
+- [ ] Anzeige von This
+- [ ] Anzeige von That
+- [ ] Anzeige von Temp
+- [ ] Anzeige des globalen Stacks
+- [ ] Anzeige des globalen RAMS
+- [ ] Numberformat switcher
