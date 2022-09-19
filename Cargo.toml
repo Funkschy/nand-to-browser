@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Felix Schoeller <felix.schoeller@protonmail.com>"]
 description = "A Nand to Tetris Emulator implementation that can run in the browser"
-license = "MIT"
 license-file = "LICENSE"
 
 [dependencies]
