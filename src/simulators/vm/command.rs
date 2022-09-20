@@ -11,14 +11,14 @@ pub enum ByteCodeParseError {
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Segment {
-    Argument,
-    Local,
-    Static,
-    Constant,
-    This,
-    That,
-    Pointer,
-    Temp,
+    Argument = 0,
+    Local = 1,
+    Static = 2,
+    Constant = 3,
+    This = 4,
+    That = 5,
+    Pointer = 6,
+    Temp = 7,
 }
 
 impl FromStr for Segment {
@@ -42,26 +42,26 @@ impl FromStr for Segment {
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Instruction {
     // arithemetic commands (no arguments)
-    Add,
-    Sub,
-    Eq,
-    Gt,
-    Lt,
-    And,
-    Or,
-    Not,
-    Neg,
+    Add = 0,
+    Sub = 1,
+    Eq = 2,
+    Gt = 3,
+    Lt = 4,
+    And = 5,
+    Or = 6,
+    Not = 7,
+    Neg = 8,
     // memory access commands (8 bit segment + 16 bit index arguments)
-    Push,
-    Pop,
+    Push = 9,
+    Pop = 10,
     // programflow commands (16 bit symbol as argument)
-    Goto,
-    IfGoto,
+    Goto = 11,
+    IfGoto = 12,
     // function commands (16 bit symbol + 16 bit nargs/nlocals as arguments)
-    Function,
-    Call,
+    Function = 13,
+    Call = 14,
     // return (no arguments)
-    Return,
+    Return = 15,
 }
 
 #[repr(C)]
