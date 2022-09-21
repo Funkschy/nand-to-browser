@@ -1,8 +1,8 @@
 #+title: Notes
 * TODOs
-** TODO VM Emulator [0/12]
+** TODO VM Emulator [1/11]
 - [ ] alle commands implementieren
-- [ ] command parsing
+- [X] command parsing
 - [ ] funktionen erkennen die aufgerufen aber nicht deklariert werden
 - [ ] native stdlib implementieren
   - [ ] Math

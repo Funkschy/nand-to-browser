@@ -1,81 +1,32 @@
-use crate::definitions::*;
-use crate::simulators::vm::command::{Instruction, Opcode, Segment};
-use crate::simulators::vm::VM;
+use definitions::{ARG, LCL, THAT, THIS};
+use simulators::vm::VM;
+
+use parse::bytecode::{Parser, SourceFile};
 
 mod definitions;
+mod parse;
 mod simulators;
 
 fn main() {
-    // push constant 0
-    // pop local 0
-    // label LOOP
-    // push local 0
-    // push constant 10
-    // lt
-    // not
-    // if-goto END
-    // push local 0
-    // push constant 1
-    // add
-    // pop local 0
-    // goto LOOP
-    // label END
-    // goto END
+    let program = r#"
+        push constant 0
+        pop local 0
+        label LOOP
+        push local 0
+        push constant 10
+        lt
+        not
+        if-goto END
+        push local 0
+        push constant 1
+        add
+        pop local 0
+        goto LOOP
+        label END
+        goto END"#;
 
-    let bytecode = vec![
-        Opcode::instruction(Instruction::Push),
-        Opcode::segment(Segment::Constant),
-        Opcode::constant(0),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Pop),
-        Opcode::segment(Segment::Local),
-        Opcode::constant(0),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Push),
-        Opcode::segment(Segment::Local),
-        Opcode::constant(0),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Push),
-        Opcode::segment(Segment::Constant),
-        Opcode::constant(10),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Lt),
-        //
-        Opcode::instruction(Instruction::Not),
-        //
-        Opcode::instruction(Instruction::IfGoto),
-        Opcode::constant(37),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Push),
-        Opcode::segment(Segment::Local),
-        Opcode::constant(0),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Push),
-        Opcode::segment(Segment::Constant),
-        Opcode::constant(1),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Add),
-        //
-        Opcode::instruction(Instruction::Pop),
-        Opcode::segment(Segment::Local),
-        Opcode::constant(0),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Goto),
-        Opcode::constant(8),
-        Opcode::constant(0),
-        //
-        Opcode::instruction(Instruction::Goto),
-        Opcode::constant(37),
-        Opcode::constant(0),
-    ];
+    let mut parser = Parser::new(vec![SourceFile::new("Main.vm", program)]);
+    let bytecode = parser.parse().unwrap();
 
     let mut vm = VM::default();
     vm.load(bytecode);

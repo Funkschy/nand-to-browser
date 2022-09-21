@@ -1,6 +1,6 @@
 pub mod command;
 
-use crate::definitions::*;
+use crate::definitions::{Address, Word, ARG, LCL, MEM_SIZE, SP, THAT, THIS};
 use command::{Instruction, Opcode, Segment};
 
 pub struct VM {
@@ -124,7 +124,10 @@ impl VM {
     }
 
     pub fn step(&mut self) {
-        use Instruction::*;
+        use Instruction::{
+            Add, And, Call, Eq, Function, Goto, Gt, IfGoto, Lt, Neg, Not, Or, Pop, Push, Return,
+            Sub,
+        };
 
         let opcode = self.program[self.pc];
         let instr = opcode.try_into().unwrap();
@@ -169,7 +172,7 @@ impl VM {
             IfGoto => {
                 let instr = self.consume_short();
                 let condition = self.pop();
-                if condition != 0 {
+                if condition == 0 {
                     println!("jumping to {}", instr);
                     self.pc = instr as usize;
                 } else {

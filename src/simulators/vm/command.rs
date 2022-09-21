@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::fmt;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -41,7 +42,7 @@ impl FromStr for Segment {
 #[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Instruction {
-    // arithemetic commands (no arguments)
+    // arithmetic commands (no arguments)
     Add = 0,
     Sub = 1,
     Eq = 2,
@@ -54,11 +55,13 @@ pub enum Instruction {
     // memory access commands (8 bit segment + 16 bit index arguments)
     Push = 9,
     Pop = 10,
-    // programflow commands (16 bit symbol as argument)
+    // programflow commands (16 bit instruction address as argument)
     Goto = 11,
     IfGoto = 12,
-    // function commands (16 bit symbol + 16 bit nargs/nlocals as arguments)
+    // function commands
+    // 16 bit nlocals as arguments
     Function = 13,
+    // 16 bit instruction address + 16 bit nargs as arguments
     Call = 14,
     // return (no arguments)
     Return = 15,
@@ -81,6 +84,18 @@ impl Opcode {
     }
     pub fn constant(constant: u8) -> Self {
         Opcode { constant }
+    }
+}
+
+impl PartialEq for Opcode {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe { self.constant == other.constant }
+    }
+}
+
+impl fmt::Debug for Opcode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unsafe { write!(f, "{:#x}", self.constant) }
     }
 }
 
