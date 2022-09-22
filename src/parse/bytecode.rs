@@ -635,4 +635,204 @@ mod tests {
 
         assert_eq!(parsed_bytecode, expected_bytecode);
     }
+
+    #[test]
+    fn test_parse_basic_loop() {
+        let bytecode = r#"
+            // Computes the sum 1 + 2 + ... + argument[0] and pushes the
+            // result onto the stack. Argument[0] is initialized by the test
+            // script before this code starts running.
+            push constant 0
+            pop local 0         // initializes sum = 0
+            label LOOP_START
+            push argument 0
+            push local 0
+            add
+            pop local 0         // sum = sum + counter
+            push argument 0
+            push constant 1
+            sub
+            pop argument 0      // counter--
+            push argument 0
+            if-goto LOOP_START  // If counter != 0, goto LOOP_START
+            push local 0"#;
+
+        let programs = vec![SourceFile::new("BasicLoop.vm", bytecode)];
+        let mut parser = Parser::new(programs);
+        let code = parser.parse().unwrap();
+
+        assert_eq!(
+            code,
+            vec![
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Local),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Local),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Add),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Local),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(1),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Sub),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::IfGoto),
+                Opcode::constant(8),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Local),
+                Opcode::constant(0),
+                Opcode::constant(0),
+            ]
+        )
+    }
+
+    #[test]
+    fn test_parse_fib_element() {
+        let main = r#"
+            // Computes the n'th element of the Fibonacci series, recursively.
+            // n is given in argument[0].  Called by the Sys.init function
+            // (part of the Sys.vm file), which also pushes the argument[0]
+            // parameter before this code starts running.
+
+            function Main.fibonacci 0
+            push argument 0
+            push constant 2
+            lt                     // checks if n<2
+            if-goto IF_TRUE
+            goto IF_FALSE
+            label IF_TRUE          // if n<2, return n
+            push argument 0
+            return
+            label IF_FALSE         // if n>=2, returns fib(n-2)+fib(n-1)
+            push argument 0
+            push constant 2
+            sub
+            call Main.fibonacci 1  // computes fib(n-2)
+            push argument 0
+            push constant 1
+            sub
+            call Main.fibonacci 1  // computes fib(n-1)
+            add                    // returns fib(n-1) + fib(n-2)
+            return"#;
+
+        let sys = r#"
+            // Pushes a constant, say n, onto the stack, and calls the Main.fibonacii
+            // function, which computes the n'th element of the Fibonacci series.
+            // Note that by convention, the Sys.init function is called "automatically"
+            // by the bootstrap code.
+
+            function Sys.init 0
+            push constant 4
+            call Main.fibonacci 1   // computes the 4'th fibonacci element
+            label WHILE
+            goto WHILE              // loops infinitely"#;
+
+        let programs = vec![
+            SourceFile::new("Sys.vm", sys),
+            SourceFile::new("Main.vm", main),
+        ];
+        let mut parser = Parser::new(programs);
+        let code = parser.parse().unwrap();
+
+        assert_eq!(
+            code,
+            vec![
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(4),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(15),
+                Opcode::constant(0),
+                Opcode::constant(1),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Goto),
+                Opcode::constant(12),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(2),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Lt),
+                Opcode::instruction(Instruction::IfGoto),
+                Opcode::constant(33),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Goto),
+                Opcode::constant(38),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Return),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(2),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Sub),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(15),
+                Opcode::constant(0),
+                Opcode::constant(1),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Argument),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(1),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Sub),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(15),
+                Opcode::constant(0),
+                Opcode::constant(1),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Add),
+                Opcode::instruction(Instruction::Return),
+            ]
+        )
+    }
 }
