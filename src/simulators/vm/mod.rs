@@ -14,6 +14,7 @@ pub struct VM {
     // 16384-24575 memory mapped io
     memory: Box<[Word; MEM_SIZE]>,
 }
+
 macro_rules! tos_binary {
     ($vm:expr, $op:tt) => {{
         let sp = $vm.memory[SP] as Address;
@@ -173,10 +174,10 @@ impl VM {
                 let instr = self.consume_short();
                 let condition = self.pop();
                 if condition == 0 {
+                    self.pc += 1;
+                } else {
                     println!("jumping to {}", instr);
                     self.pc = instr as usize;
-                } else {
-                    self.pc += 1;
                 }
             }
             Function => unimplemented!(),
