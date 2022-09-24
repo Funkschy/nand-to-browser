@@ -180,9 +180,53 @@ impl VM {
                     self.pc = instr as usize;
                 }
             }
-            Function => unimplemented!(),
-            Return => unimplemented!(),
-            Call => unimplemented!(),
+            Function => {
+                let n_locals = self.consume_short();
+                for _ in 0..n_locals {
+                    self.push(0);
+                }
+                self.pc += 1;
+            }
+            Return => {
+                let frame = *self.mem(LCL) as Address;
+                // the return address
+                let ret = *self.mem(frame - 5) as Address;
+                // reposition the return value for the caller
+                *self.mem_indirect(ARG, 0) = self.pop();
+                // restore the stack for the caller
+                *self.mem(SP) = *self.mem(ARG) + 1;
+                *self.mem(THAT) = *self.mem(frame - 1);
+                *self.mem(THIS) = *self.mem(frame - 2);
+                *self.mem(ARG) = *self.mem(frame - 3);
+                *self.mem(LCL) = *self.mem(frame - 4);
+
+                self.pc = ret;
+            }
+            Call => {
+                let function = self.consume_short();
+                let n_args = self.consume_short();
+
+                dbg!(function);
+                dbg!(n_args);
+
+                let ret_addr = self.pc + 1;
+                self.push(ret_addr as i16);
+
+                let lcl = *self.mem(LCL);
+                self.push(lcl);
+                let arg = *self.mem(ARG);
+                self.push(arg);
+                let this = *self.mem(THIS);
+                self.push(this);
+                let that = *self.mem(THAT);
+                self.push(that);
+
+                let sp = *self.mem(SP);
+                *self.mem(ARG) = sp - n_args - 5;
+                *self.mem(LCL) = sp;
+
+                self.pc = function as usize;
+            }
         };
 
         if cfg!(test) {
@@ -657,5 +701,300 @@ mod tests {
         assert_eq!(2, *vm.mem(3003));
         assert_eq!(3, *vm.mem(3004));
         assert_eq!(5, *vm.mem(3005));
+    }
+
+    #[test]
+    fn fibonacci_element() {
+        let mut vm = VM::default();
+        *vm.mem(SP) = 261;
+
+        let main = r#"
+            // Computes the n'th element of the Fibonacci series, recursively.
+            // n is given in argument[0].  Called by the Sys.init function
+            // (part of the Sys.vm file), which also pushes the argument[0]
+            // parameter before this code starts running.
+
+            function Main.fibonacci 0
+            push argument 0
+            push constant 2
+            lt                     // checks if n<2
+            if-goto IF_TRUE
+            goto IF_FALSE
+            label IF_TRUE          // if n<2, return n
+            push argument 0
+            return
+            label IF_FALSE         // if n>=2, returns fib(n-2)+fib(n-1)
+            push argument 0
+            push constant 2
+            sub
+            call Main.fibonacci 1  // computes fib(n-2)
+            push argument 0
+            push constant 1
+            sub
+            call Main.fibonacci 1  // computes fib(n-1)
+            add                    // returns fib(n-1) + fib(n-2)
+            return"#;
+
+        let sys = r#"
+            // Pushes a constant, say n, onto the stack, and calls the Main.fibonacii
+            // function, which computes the n'th element of the Fibonacci series.
+            // Note that by convention, the Sys.init function is called "automatically"
+            // by the bootstrap code.
+
+            function Sys.init 0
+            push constant 4
+            call Main.fibonacci 1   // computes the 4'th fibonacci element
+            label WHILE
+            goto WHILE              // loops infinitely"#;
+
+        let programs = vec![
+            SourceFile::new("Sys.vm", sys),
+            SourceFile::new("Main.vm", main),
+        ];
+        let mut bytecode_parser = Parser::new(programs);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..110 {
+            vm.step();
+        }
+
+        assert_eq!(262, *vm.mem(0));
+        assert_eq!(3, *vm.mem(261));
+    }
+
+    #[test]
+    fn nested_call() {
+        let mut vm = VM::default();
+        *vm.mem(0) = 261;
+        *vm.mem(1) = 261;
+        *vm.mem(2) = 256;
+        *vm.mem(3) = -3;
+        *vm.mem(4) = -4;
+        *vm.mem(5) = -1; // test results
+        *vm.mem(6) = -1;
+        *vm.mem(256) = 1234; // fake stack frame from call Sys.init
+        *vm.mem(257) = -1;
+        *vm.mem(258) = -2;
+        *vm.mem(259) = -3;
+        *vm.mem(260) = -4;
+
+        for i in 261..=299 {
+            *vm.mem(i) = -1;
+        }
+
+        *vm.mem(SP) = 261;
+        *vm.mem(LCL) = 261;
+        *vm.mem(ARG) = 256;
+        *vm.mem(THIS) = 3000;
+        *vm.mem(THAT) = 4000;
+
+        let sys = r#"
+            // Sys.vm for NestedCall test.
+
+            // Sys.init()
+            //
+            // Calls Sys.main() and stores return value in temp 1.
+            // Does not return.  (Enters infinite loop.)
+
+            function Sys.init 0
+            push constant 4000	// test THIS and THAT context save
+            pop pointer 0
+            push constant 5000
+            pop pointer 1
+            call Sys.main 0
+            pop temp 1
+            label LOOP
+            goto LOOP
+
+            // Sys.main()
+            //
+            // Sets locals 1, 2 and 3, leaving locals 0 and 4 unchanged to test
+            // default local initialization to 0.  (RAM set to -1 by test setup.)
+            // Calls Sys.add12(123) and stores return value (135) in temp 0.
+            // Returns local 0 + local 1 + local 2 + local 3 + local 4 (456) to confirm
+            // that locals were not mangled by function call.
+
+            function Sys.main 5
+            push constant 4001
+            pop pointer 0
+            push constant 5001
+            pop pointer 1
+            push constant 200
+            pop local 1
+            push constant 40
+            pop local 2
+            push constant 6
+            pop local 3
+            push constant 123
+            call Sys.add12 1
+            pop temp 0
+            push local 0
+            push local 1
+            push local 2
+            push local 3
+            push local 4
+            add
+            add
+            add
+            add
+            return
+
+            // Sys.add12(int n)
+            //
+            // Returns n+12.
+
+            function Sys.add12 0
+            push constant 4002
+            pop pointer 0
+            push constant 5002
+            pop pointer 1
+            push argument 0
+            push constant 12
+            add
+            return"#;
+
+        let programs = vec![SourceFile::new("Sys.vm", sys)];
+        let mut bytecode_parser = Parser::new(programs);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..50 {
+            vm.step();
+        }
+
+        assert_eq!(261, *vm.mem(0));
+        assert_eq!(261, *vm.mem(1));
+        assert_eq!(256, *vm.mem(2));
+        assert_eq!(4000, *vm.mem(3));
+        assert_eq!(5000, *vm.mem(4));
+        assert_eq!(135, *vm.mem(5));
+        assert_eq!(246, *vm.mem(6));
+    }
+
+    #[test]
+    fn simple_function() {
+        let mut vm = VM::default();
+        *vm.mem(SP) = 317;
+        *vm.mem(LCL) = 317;
+        *vm.mem(ARG) = 310;
+        *vm.mem(THIS) = 3000;
+        *vm.mem(THAT) = 4000;
+        *vm.mem_indirect(ARG, 0) = 1234;
+        *vm.mem_indirect(ARG, 1) = 37;
+        *vm.mem_indirect(ARG, 2) = 9;
+        *vm.mem_indirect(ARG, 3) = 305;
+        *vm.mem_indirect(ARG, 4) = 300;
+        *vm.mem_indirect(ARG, 5) = 3010;
+        *vm.mem_indirect(ARG, 6) = 4010;
+
+        let sys = r#"
+            function SimpleFunction.test 2
+            push local 0
+            push local 1
+            add
+            not
+            push argument 0
+            add
+            push argument 1
+            sub
+            return"#;
+
+        let programs = vec![SourceFile::new("Sys.vm", sys)];
+        let mut bytecode_parser = Parser::new(programs);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..10 {
+            vm.step();
+        }
+
+        assert_eq!(311, *vm.mem(0));
+        assert_eq!(305, *vm.mem(1));
+        assert_eq!(300, *vm.mem(2));
+        assert_eq!(3010, *vm.mem(3));
+        assert_eq!(4010, *vm.mem(4));
+        assert_eq!(1196, *vm.mem(310));
+    }
+
+    #[test]
+    fn statics_test() {
+        let mut vm = VM::default();
+        *vm.mem(SP) = 261;
+
+        let sys = r#"
+            // Tests that different functions, stored in two different
+            // class files, manipulate the static segment correctly.
+            function Sys.init 0
+            push constant 6
+            push constant 8
+            call Class1.set 2
+            pop temp 0 // Dumps the return value
+            push constant 23
+            push constant 15
+            call Class2.set 2
+            pop temp 0 // Dumps the return value
+            call Class1.get 0
+            call Class2.get 0
+            label WHILE
+            goto WHILE
+            "#;
+
+        let class1 = r#"
+            // Stores two supplied arguments in static[0] and static[1].
+            function Class1.set 0
+            push argument 0
+            pop static 0
+            push argument 1
+            pop static 1
+            push constant 0
+            return
+
+            // Returns static[0] - static[1].
+            function Class1.get 0
+            push static 0
+            push static 1
+            sub
+            return
+            "#;
+
+        let class2 = r#"
+            // Stores two supplied arguments in static[0] and static[1].
+            function Class2.set 0
+            push argument 0
+            pop static 0
+            push argument 1
+            pop static 1
+            push constant 0
+            return
+
+            // Returns static[0] - static[1].
+            function Class2.get 0
+            push static 0
+            push static 1
+            sub
+            return
+            "#;
+
+        let programs = vec![
+            SourceFile::new("Sys.vm", sys),
+            SourceFile::new("Class1.vm", class1),
+            SourceFile::new("Class2.vm", class2),
+        ];
+        let mut bytecode_parser = Parser::new(programs);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..36 {
+            vm.step();
+        }
+
+        assert_eq!(263, *vm.mem(0));
+        assert_eq!(-2, *vm.mem(261));
+        assert_eq!(8, *vm.mem(262));
     }
 }
