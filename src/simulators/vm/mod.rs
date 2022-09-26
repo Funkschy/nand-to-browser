@@ -1,5 +1,6 @@
 pub mod command;
 
+use crate::definitions::SCREEN_START;
 use crate::definitions::{Address, Word, ARG, LCL, MEM_SIZE, SP, THAT, THIS};
 use command::{Instruction, Opcode, Segment};
 
@@ -98,8 +99,14 @@ impl VM {
         }
     }
 
+    pub fn display(&self) -> &[Word] {
+        &self.memory[SCREEN_START..(SCREEN_START + 8192)]
+    }
+
     pub fn load(&mut self, program: Vec<Opcode>) {
         self.program = program;
+        self.pc = 0;
+        // TODO: zero out memory
     }
 
     fn consume_segment(&mut self) -> Segment {
@@ -255,6 +262,8 @@ impl Default for VM {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::definitions::KBD;
+    use crate::definitions::SCREEN_START;
     use crate::parse::bytecode::*;
 
     #[test]
@@ -996,5 +1005,61 @@ mod tests {
         assert_eq!(263, *vm.mem(0));
         assert_eq!(-2, *vm.mem(261));
         assert_eq!(8, *vm.mem(262));
+    }
+
+    #[test]
+    fn display_thick_lines() {
+        let mut vm = VM::default();
+
+        let src = r#"
+            function Lines.init 0
+            call Lines.main 3
+            label END
+            goto END
+
+            function Lines.main 3
+            push constant 16384
+            pop local 2
+            push constant 8192
+            pop local 0
+            push constant 0
+            pop local 1
+            label WHILE_EXP0
+            push local 1
+            push local 0
+            lt
+            not
+            if-goto WHILE_END0
+            push local 1
+            push local 2
+            add
+            push constant 255
+            pop temp 0
+            pop pointer 1
+            push temp 0
+            pop that 0
+            push local 1
+            push constant 1
+            add
+            pop local 1
+            goto WHILE_EXP0
+            label WHILE_END0
+            push constant 0
+            return
+            "#;
+
+        let programs = vec![SourceFile::new("Lines.vm", src)];
+        let mut bytecode_parser = Parser::new(programs);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..500000 {
+            vm.step();
+        }
+
+        for &word in vm.display() {
+            assert_eq!(255, word);
+        }
     }
 }

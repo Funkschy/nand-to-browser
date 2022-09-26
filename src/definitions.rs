@@ -1,4 +1,5 @@
-pub const MEM_SIZE: usize = 24576;
+// see Definitions.java int the official implementation
+pub const MEM_SIZE: usize = 24577;
 pub const SCREEN_START: usize = 16384;
 pub const KBD: usize = 24576;
 
