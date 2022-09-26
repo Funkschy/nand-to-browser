@@ -1,0 +1,36 @@
+\subsection{Bytecode}
+
+Um die VM Cache-Effizient und damit schnell zu halten, ist es wichtig, ein günstiges Format für den internen Bytecode zu finden.
+Ein Enum zu benutzen, würde bewirken, dass zur Laufzeit alle Instruktionen die selbe Größe hätten. Dies wäre jedoch nicht sinnvoll, da nur manche Instruktionen Parameter benötigen.
+Es wäre eine Verschwendung von Arbeitsspeicher, wenn simple Add-Instruktionen die gleiche Größe hätten wie Call-Instruktionen.
+
+Somit macht es Sinn, Instruktionen mit verschiedenen Größen zu verwenden. Die VM konsumiert eine Instruktion und dann abhängig von dieser eine beliebige Anzahl an Parametern.
+Im Code ist dies mit einer Kombination aus Enums und Unions umgesetzt. Opcode ist ein Union, welches entweder eine Instruktion, ein Segment oder einen Acht-Bit Konstante sein kann. Die beiden Enums Instruction und Segment sind jeweils auch durch ein einziges Byte kodiert.
+
+\begin{lstlisting}
+  #[repr(u8)]
+  pub enum Segment {
+    Argument = 0,
+    Local = 1,
+    // ...
+  }
+
+  #[repr(u8)]
+  pub enum Instruction {
+    Add = 0,
+    Sub = 1,
+    // ...
+  }
+
+  #[repr(C)]
+  pub union Opcode {
+    instruction: Instruction,
+    segment: Segment,
+    constant: u8,
+  }
+\end{lstlisting}
+
+Mit diesem System verbrauchen Instruktionen nur genau soviel Speicher wie notwendig, was eine effizientere Cache-Auslastung und somit bessere Performance ermöglicht.
+
+\subsection{Parsing}
+Da die Anwendung eine Reihe an Parsern enthält, macht es Sinn gemeinsame Komponenten auszulagern.
