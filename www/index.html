@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Nand to Tetris</title>
+        <meta name="description" content="A Nand to Tetris Emulator implementation that can run in the browser">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <!-- TODO: Place favicon.ico in the root directory -->
+        <style>
+         #screen {
+             width: 80%;
+             image-rendering: -moz-crisp-edges;
+             image-rendering: -webkit-crisp-edges;
+             image-rendering: pixelated;
+             image-rendering: crisp-edges;
+
+             outline: black 3px solid;
+         }
+
+         #canvas-container {
+             justify-content: center;
+             margin-bottom: 10pt;
+         }
+
+         .vertical-container {
+             display: flex;
+             flex-direction: column
+         }
+
+         .horizontal-container {
+             display: flex;
+             flex-direction: row;
+             justify-content: center;
+         }
+
+        </style>
+    </head>
+    <body>
+        <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
+
+        <div class="vertical-container">
+            <div id="canvas-container" class="horizontal-container">
+                <canvas id="screen" width="512" height="265"></canvas>
+            </div>
+
+            <div class="horizontal-container">
+                <button id="start-button">Start</button>
+                <button id="stop-button">Stop</button>
+                <button id="step-button">Step</button>
+            </div>
+        </div>
+
+        <script src="./bootstrap.js"></script>
+    </body>
+</html>
