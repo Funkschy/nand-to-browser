@@ -1,9 +1,9 @@
 #+title: Notes
 * TODOs
-** TODO VM Emulator [1/11]
-- [ ] alle commands implementieren
+** TODO VM Emulator [3/12]
+- [X] alle commands implementieren
 - [X] command parsing
-- [ ] funktionen erkennen die aufgerufen aber nicht deklariert werden
+- [X] funktionen erkennen die aufgerufen aber nicht deklariert werden
 - [ ] native stdlib implementieren
   - [ ] Math
   - [ ] String
@@ -20,14 +20,15 @@
 - [ ] Debug Infos für lokale Label
 - [ ] Test Script runner
 - [ ] Erfolgreiche Ausführung verschiedener Projekt 9 Abgaben
-** TODO VM Frontend [0/24]
-- [ ] vm step aus frontend aufrufen
-- [ ] display speicher in canvas rendern
+- [ ] Ordentliches error handling
+** TODO VM Frontend [5/22]
+- [X] vm step aus frontend aufrufen
+- [X] display speicher in canvas rendern
 - [ ] keyboard interaktion in vm speicher schreiben
 - [ ] Geschwindigkeitsregulation
-- [ ] Step Button
-- [ ] Run Button
-- [ ] Stop Button
+- [X] Step Button
+- [X] Run Button
+- [X] Stop Button
 - [ ] Revert Button
 - [ ] Laden von User code
 - [ ] Anzeige des Bytecodes
