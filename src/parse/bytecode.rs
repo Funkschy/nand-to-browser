@@ -2,7 +2,7 @@ use super::{Spanned, StringLexer};
 use crate::simulators::vm::command::{ByteCodeParseError, Instruction, Opcode, Segment};
 use std::num::ParseIntError;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -18,7 +18,7 @@ pub enum ParseError<'src> {
     ExpectedSegment,
     ExpectedInt,
     InvalidToken,
-    UnresolvedSymbols(Vec<&'src str>),
+    UnresolvedSymbols(HashSet<&'src str>),
 }
 
 impl<'src> From<ByteCodeParseError> for ParseError<'src> {
@@ -412,7 +412,7 @@ impl<'src> Parser<'src> {
         }
 
         let mut opcodes = Vec::with_capacity(code.capacity());
-        let mut unresolved = Vec::new();
+        let mut unresolved = HashSet::new();
         for c in code {
             match c {
                 CodeEntry::Opcode(opcode) => opcodes.push(opcode),
@@ -422,7 +422,7 @@ impl<'src> Parser<'src> {
                         opcodes.push(Opcode::constant(first));
                         opcodes.push(Opcode::constant(second));
                     } else {
-                        unresolved.push(label);
+                        unresolved.insert(label);
                     }
                 }
             }
@@ -436,6 +436,7 @@ impl<'src> Parser<'src> {
     }
 }
 
+#[derive(Debug)]
 pub struct ParsedProgram {
     pub opcodes: Vec<Opcode>,
 }
@@ -449,6 +450,65 @@ impl ParsedProgram {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn parser_should_report_unresolved_labels() {
+        let main = r#"
+            function Main.main 0
+            push constant 12
+            call String.new 1
+            push constant 72
+            call String.appendChar 2
+            push constant 101
+            call String.appendChar 2
+            push constant 108
+            call String.appendChar 2
+            push constant 108
+            call String.appendChar 2
+            push constant 111
+            call String.appendChar 2
+            push constant 32
+            call String.appendChar 2
+            push constant 119
+            call String.appendChar 2
+            push constant 111
+            call String.appendChar 2
+            push constant 114
+            call String.appendChar 2
+            push constant 108
+            call String.appendChar 2
+            push constant 100
+            call String.appendChar 2
+            push constant 33
+            call String.appendChar 2
+            call Output.printString 1
+            pop temp 0
+            call Output.println 0
+            pop temp 0
+            push constant 0
+            return
+            "#;
+
+        let programs = vec![SourceFile::new("Main.vm", main)];
+        let mut parser = Parser::new(programs);
+        let result = parser.parse();
+
+        if let Err(ParseError::UnresolvedSymbols(symbols)) = result {
+            assert_eq!(
+                HashSet::from_iter([
+                    "String.new",
+                    "String.appendChar",
+                    "Output.printString",
+                    "Output.println"
+                ]),
+                symbols
+            );
+        } else {
+            assert_eq!(
+                true,
+                matches!(result, Err(ParseError::UnresolvedSymbols(_)))
+            );
+        }
+    }
 
     #[test]
     fn translate_simple_program() {
