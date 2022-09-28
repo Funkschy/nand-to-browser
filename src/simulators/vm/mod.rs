@@ -420,7 +420,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..25 {
             vm.step();
@@ -462,7 +462,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..15 {
             vm.step();
@@ -497,7 +497,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..11 {
             vm.step();
@@ -520,7 +520,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..3 {
             vm.step();
@@ -579,7 +579,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..38 {
             vm.step();
@@ -629,7 +629,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..33 {
             vm.step();
@@ -698,7 +698,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..73 {
             vm.step();
@@ -763,7 +763,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..110 {
             vm.step();
@@ -868,7 +868,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..50 {
             vm.step();
@@ -915,7 +915,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..10 {
             vm.step();
@@ -996,7 +996,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..36 {
             vm.step();
@@ -1052,7 +1052,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         for _ in 0..500000 {
             vm.step();

@@ -67,7 +67,7 @@ impl App {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program);
+        vm.load(program.opcodes);
 
         Self { vm }
     }
