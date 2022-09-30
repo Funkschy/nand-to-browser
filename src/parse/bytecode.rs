@@ -13,11 +13,16 @@ pub enum ParseError<'src> {
     UnexpectedEndOfFile,
     InvalidIntLiteral(ParseIntError),
     InvalidFileIndex,
+    InvalidFunctionIndex,
     Bytecode(ByteCodeParseError),
     ExpectedIdent,
     ExpectedSegment,
     ExpectedInt,
     InvalidToken,
+    UnresolvedLocalLabel {
+        label: String,
+        function_name: String,
+    },
     UnresolvedSymbols(HashSet<&'src str>),
 }
 
@@ -156,30 +161,48 @@ impl<'src> SourceFile<'src> {
 pub struct Parser<'src> {
     // the current sourcefile
     // source files are iterated in the order they're passed into new
-    index: usize,
+    module_index: usize,
     // the index of the current instruction
     // this is used for Label Commands, which hold a symbol with their own position in
     // the sourcecode as their value
     instruction_counter: u16,
     sources: Vec<SourceFile<'src>>,
-    symbols: SymbolTable,
+    // symbols that are available in every module (functions and statics)
+    global_symbols: SymbolTable,
+    // every entry represents the symbols in the current function (labels)
+    function_symbols: Vec<SymbolTable>,
 }
 
 impl<'src> Parser<'src> {
     pub fn new(sources: Vec<SourceFile<'src>>) -> Self {
         Self {
-            index: 0,
+            module_index: 0,
             instruction_counter: 0,
             sources,
-            symbols: SymbolTable::default(),
+            global_symbols: SymbolTable::default(),
+            function_symbols: vec![SymbolTable::default()],
         }
+    }
+
+    // TODO: refactor those 3 functions
+    fn function_symbols(&mut self) -> ParseResult<'src, &mut SymbolTable> {
+        self.function_symbols
+            .last_mut()
+            .ok_or(ParseError::InvalidFunctionIndex)
     }
 
     fn lexer(&mut self) -> ParseResult<'src, &mut Lexer<'src>> {
         self.sources
-            .get_mut(self.index)
+            .get_mut(self.module_index)
             .ok_or(ParseError::InvalidFileIndex)
             .map(|f| &mut f.lexer)
+    }
+
+    fn filename(&self) -> ParseResult<'src, &str> {
+        self.sources
+            .get(self.module_index)
+            .ok_or(ParseError::InvalidFileIndex)
+            .map(|s| s.name.as_str())
     }
 
     fn next_token(&mut self) -> ParseResult<'src, Token<'src>> {
@@ -187,8 +210,8 @@ impl<'src> Parser<'src> {
         match current_lexer.scan_token() {
             Err(ParseError::EndOfFile) => {
                 // try to continue with the next file
-                self.index += 1;
-                if self.index >= self.sources.len() {
+                self.module_index += 1;
+                if self.module_index >= self.sources.len() {
                     // no more files, so just return the error
                     Err(ParseError::EndOfFile)
                 } else {
@@ -222,14 +245,10 @@ impl<'src> Parser<'src> {
         let mut index = self.consume_int()?;
 
         if segment == Segment::Static {
-            let file_name = &self
-                .sources
-                .get(self.index)
-                .ok_or(ParseError::InvalidFileIndex)?
-                .name;
+            let file_name = self.filename()?;
             let symbol = format!("{}.{}", file_name, index);
 
-            index = self.symbols.lookup_or_insert(symbol) as i16;
+            index = self.global_symbols.lookup_or_insert(symbol) as i16;
         }
 
         Ok((segment, index))
@@ -245,28 +264,39 @@ impl<'src> Parser<'src> {
 
     fn consume_symbol(&mut self) -> ParseResult<'src, Result<Symbol, &'src str>> {
         let ident = self.consume_ident()?;
-        if let Some(symbol) = self.symbols.lookup(ident) {
-            // the label for this symbol was already parsed
+        if let Some(symbol) = self.function_symbols()?.lookup(ident) {
+            // the label for this symbol was already parsed in the current function
+            Ok(Ok(symbol))
+        } else if let Some(symbol) = self.global_symbols.lookup(ident) {
+            // the label for this symbol was already parsed in some module
             Ok(Ok(symbol))
         } else {
             Ok(Err(ident))
         }
     }
 
-    fn consume_label(&mut self) -> ParseResult<'src, Symbol> {
+    fn consume_label(&mut self, function_internal: bool) -> ParseResult<'src, &'src str> {
         let ident = self.consume_ident()?;
         let symbol = self.instruction_counter;
-        self.symbols.set(ident, symbol);
-        Ok(symbol)
+        // labels for ifs and such
+        if function_internal {
+            self.function_symbols()?.set(ident, symbol);
+        } else {
+            self.global_symbols.set(ident, symbol);
+        }
+        Ok(ident)
     }
 
     pub fn parse(&mut self) -> ParseResult<'src, ParsedProgram> {
         enum CodeEntry<'src> {
+            FunctionStart { n_locals: i16 },
             Opcode(Opcode),
-            WaitingForLabel(&'src str),
+            WaitingForGlobalLabel(&'src str),
+            WaitingForLocalLabel(&'src str),
         }
 
         let mut code: Vec<CodeEntry<'src>> = Vec::with_capacity(128);
+        let mut debug_symbols = HashMap::new();
 
         fn split_i16(value: i16) -> (u8, u8) {
             let values = value.to_le_bytes();
@@ -302,19 +332,52 @@ impl<'src> Parser<'src> {
             *inst_count += 2;
         }
 
-        fn wait_for<'src>(inst_count: &mut u16, code: &mut Vec<CodeEntry<'src>>, label: &'src str) {
-            code.push(CodeEntry::WaitingForLabel(label));
+        fn push_function(inst_count: &mut u16, code: &mut Vec<CodeEntry>, n_locals: i16) {
+            code.push(CodeEntry::FunctionStart { n_locals });
+            *inst_count += 3;
+        }
+
+        fn wait_for_global<'src>(
+            inst_count: &mut u16,
+            code: &mut Vec<CodeEntry<'src>>,
+            label: &'src str,
+        ) {
+            code.push(CodeEntry::WaitingForGlobalLabel(label));
             *inst_count += 2;
         }
+
+        fn wait_for_local<'src>(
+            inst_count: &mut u16,
+            code: &mut Vec<CodeEntry<'src>>,
+            label: &'src str,
+        ) {
+            code.push(CodeEntry::WaitingForLocalLabel(label));
+            *inst_count += 2;
+        }
+
+        #[derive(PartialEq, Eq)]
+        enum WaitKind {
+            Local,
+            Global,
+        }
+
+        use WaitKind::*;
 
         fn push_target<'src>(
             inst_count: &mut u16,
             code: &mut Vec<CodeEntry<'src>>,
             target: Result<Symbol, &'src str>,
+            kind: WaitKind,
         ) {
             match target {
                 Ok(addr) => push_u16(inst_count, code, addr),
-                Err(waiting_for) => wait_for(inst_count, code, waiting_for),
+                Err(waiting_for) => {
+                    if kind == Local {
+                        wait_for_local(inst_count, code, waiting_for)
+                    } else {
+                        wait_for_global(inst_count, code, waiting_for)
+                    }
+                }
             };
         }
 
@@ -346,26 +409,25 @@ impl<'src> Parser<'src> {
                         &mut code,
                         Instruction::IfGoto,
                     );
-                    push_target(&mut self.instruction_counter, &mut code, target);
+                    push_target(&mut self.instruction_counter, &mut code, target, Local);
                 }
                 Token::Identifier("goto") => {
                     let target = self.consume_symbol()?;
                     push_instr(&mut self.instruction_counter, &mut code, Instruction::Goto);
-                    push_target(&mut self.instruction_counter, &mut code, target);
+                    push_target(&mut self.instruction_counter, &mut code, target, Local);
                 }
                 Token::Identifier("label") => {
-                    self.consume_label()?;
+                    let _label = self.consume_label(true)?;
+                    // TODO: debug symbols for local labels
                 }
                 Token::Identifier("function") => {
-                    self.consume_label()?;
-                    let n_locals = self.consume_int()?;
+                    let label = self.consume_label(false)?;
+                    debug_symbols.insert(self.instruction_counter, label.to_owned());
 
-                    push_instr(
-                        &mut self.instruction_counter,
-                        &mut code,
-                        Instruction::Function,
-                    );
-                    push_i16(&mut self.instruction_counter, &mut code, n_locals);
+                    let n_locals = self.consume_int()?;
+                    self.function_symbols.push(SymbolTable::default());
+
+                    push_function(&mut self.instruction_counter, &mut code, n_locals);
                 }
                 Token::Identifier("return") => push_instr(
                     &mut self.instruction_counter,
@@ -377,7 +439,7 @@ impl<'src> Parser<'src> {
                     let n_args = self.consume_int()?;
 
                     push_instr(&mut self.instruction_counter, &mut code, Instruction::Call);
-                    push_target(&mut self.instruction_counter, &mut code, target);
+                    push_target(&mut self.instruction_counter, &mut code, target, Global);
                     push_i16(&mut self.instruction_counter, &mut code, n_args);
                 }
                 Token::Identifier("add") => {
@@ -413,11 +475,39 @@ impl<'src> Parser<'src> {
 
         let mut opcodes = Vec::with_capacity(code.capacity());
         let mut unresolved = HashSet::new();
+        let mut function_index = 0;
+        let mut function_offset = 0;
+
         for c in code {
             match c {
+                CodeEntry::FunctionStart { n_locals } => {
+                    function_index += 1;
+                    function_offset = opcodes.len();
+
+                    opcodes.push(Opcode::instruction(Instruction::Function));
+
+                    let (first, second) = split_i16(n_locals);
+                    opcodes.push(Opcode::constant(first));
+                    opcodes.push(Opcode::constant(second));
+                }
                 CodeEntry::Opcode(opcode) => opcodes.push(opcode),
-                CodeEntry::WaitingForLabel(label) => {
-                    if let Some(addr) = self.symbols.lookup(label) {
+                CodeEntry::WaitingForLocalLabel(label) => {
+                    if let Some(addr) = self.function_symbols[function_index].lookup(label) {
+                        let (first, second) = split_u16(addr);
+                        opcodes.push(Opcode::constant(first));
+                        opcodes.push(Opcode::constant(second));
+                    } else {
+                        return Err(ParseError::UnresolvedLocalLabel {
+                            label: label.to_string(),
+                            function_name: debug_symbols
+                                .get(&(function_offset as u16))
+                                .unwrap_or(&"unknown".to_string())
+                                .clone(),
+                        });
+                    }
+                }
+                CodeEntry::WaitingForGlobalLabel(label) => {
+                    if let Some(addr) = self.global_symbols.lookup(label) {
                         let (first, second) = split_u16(addr);
                         opcodes.push(Opcode::constant(first));
                         opcodes.push(Opcode::constant(second));
@@ -429,7 +519,7 @@ impl<'src> Parser<'src> {
         }
 
         if unresolved.is_empty() {
-            Ok(ParsedProgram::new(opcodes))
+            Ok(ParsedProgram::new(opcodes, debug_symbols))
         } else {
             Err(ParseError::UnresolvedSymbols(unresolved))
         }
@@ -439,11 +529,17 @@ impl<'src> Parser<'src> {
 #[derive(Debug)]
 pub struct ParsedProgram {
     pub opcodes: Vec<Opcode>,
+    // a map from positions in the bytecode to their corresponding names in the bytecode
+    // this is need to display infos in the UI (like the callstack) and for debugging the VM
+    pub debug_symbols: HashMap<Symbol, String>,
 }
 
 impl ParsedProgram {
-    pub fn new(opcodes: Vec<Opcode>) -> Self {
-        Self { opcodes }
+    pub fn new(opcodes: Vec<Opcode>, debug_symbols: HashMap<Symbol, String>) -> Self {
+        Self {
+            opcodes,
+            debug_symbols,
+        }
     }
 }
 
@@ -906,6 +1002,164 @@ mod tests {
                 Opcode::constant(1),
                 Opcode::constant(0),
                 Opcode::instruction(Instruction::Add),
+                Opcode::instruction(Instruction::Return),
+            ]
+        )
+    }
+    #[test]
+    fn test_statics_are_resolved_correctly_per_file() {
+        let class1 = r#"
+            push static 0
+            pop static 0
+            push static 1
+            pop static 0
+            pop static 1
+            "#;
+
+        let class2 = r#"
+            push static 0
+            pop static 0
+            push static 1
+            pop static 0
+            pop static 1
+            "#;
+
+        let class3 = r#"
+            push static 0
+            pop static 0
+            push static 1
+            pop static 0
+            pop static 1
+            "#;
+
+        let programs = vec![
+            SourceFile::new("Class1.vm", class1),
+            SourceFile::new("Class2.vm", class2),
+            SourceFile::new("Class3.vm", class3),
+        ];
+        let mut parser = Parser::new(programs);
+        let result = parser.parse().unwrap();
+
+        assert_eq!(
+            result.opcodes,
+            vec![
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(16),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(16),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(17),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(16),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(17),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(18),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(18),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(19),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(18),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(19),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(20),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(20),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(21),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(20),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(21),
+                Opcode::constant(0),
+            ]
+        )
+    }
+
+    #[test]
+    fn test_label_used_before_declaration() {
+        let src = r#"
+            function Main.main 0
+            if-goto IF_TRUE0
+            goto IF_FALSE0
+            label IF_TRUE0
+            goto IF_END0
+            label IF_FALSE0
+            label IF_END0
+            return
+            function Main.other 0
+            if-goto IF_TRUE0
+            goto IF_FALSE0
+            label IF_TRUE0
+            goto IF_END0
+            label IF_FALSE0
+            label IF_END0
+            return
+            "#;
+
+        let programs = vec![SourceFile::new("Main.vm", src)];
+        let mut parser = Parser::new(programs);
+        let result = parser.parse().unwrap();
+
+        assert_eq!(
+            result.opcodes,
+            vec![
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::IfGoto),
+                Opcode::constant(9),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Goto),
+                Opcode::constant(12),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Goto),
+                Opcode::constant(12),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Return),
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::IfGoto),
+                Opcode::constant(22),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Goto),
+                Opcode::constant(25),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Goto),
+                Opcode::constant(25),
+                Opcode::constant(0),
                 Opcode::instruction(Instruction::Return),
             ]
         )

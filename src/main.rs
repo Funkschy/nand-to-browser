@@ -29,7 +29,7 @@ fn main() {
     let bytecode = parser.parse().unwrap();
 
     let mut vm = VM::default();
-    vm.load(bytecode.opcodes);
+    vm.load(bytecode.opcodes, bytecode.debug_symbols);
     *vm.mem(LCL) = 300;
     *vm.mem(ARG) = 400;
     *vm.mem(THIS) = 3000;

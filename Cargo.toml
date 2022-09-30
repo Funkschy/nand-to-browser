@@ -11,6 +11,8 @@ license-file = "LICENSE"
 crate-type = ["cdylib", "rlib"]
 
 [features]
+trace_vm = []    # this will just print information on any executed instruction while running the vm
+trace_calls = [] # if this is enabled, calls will be traced even if trace_vm is disabled
 default = ["console_error_panic_hook"]
 
 [dependencies]

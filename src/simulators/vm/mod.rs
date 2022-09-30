@@ -1,13 +1,21 @@
 pub mod command;
 
 use crate::definitions::SCREEN_START;
-use crate::definitions::{Address, Word, ARG, LCL, MEM_SIZE, SP, THAT, THIS};
+use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, LCL, MEM_SIZE, SP, THAT, THIS};
 use command::{Instruction, Opcode, Segment};
+use std::collections::HashMap;
 
 pub struct VM {
     // the program counter / instruction pointer
     pc: usize,
     program: Vec<Opcode>,
+
+    // debug information which is used in the UI and for internal debugging
+    debug_symbols: HashMap<u16, String>,
+    // a stack of source code positions, which can be mapped to strings on demand by mapping them
+    // over the debug_symbols map
+    call_stack: Vec<u16>,
+
     // 0-15        virtual registers
     // 16-255      static variables
     // 256-2047    stack
@@ -18,8 +26,13 @@ pub struct VM {
 
 macro_rules! tos_binary {
     ($vm:expr, $op:tt) => {{
+        if cfg!(feature = "trace_vm") {
+            println!("{}", stringify!($op));
+        }
+
         let sp = $vm.memory[SP] as Address;
-        $vm.memory[sp - 2] = ($vm.memory[sp - 2] $op $vm.memory[sp - 1]) as Word;
+        // cast up to i32 so that no overflow checks get triggered in debug mode
+        $vm.memory[sp - 2] = ($vm.memory[sp - 2] as i32 $op $vm.memory[sp - 1] as i32) as Word;
         $vm.memory[SP] -= 1;
         $vm.pc += 1;
     }};
@@ -27,6 +40,10 @@ macro_rules! tos_binary {
 
 macro_rules! tos_binary_bool {
     ($vm:expr, $op:tt) => {{
+        if cfg!(feature = "trace_vm") {
+            println!("{}", stringify!($op));
+        }
+
         let sp = $vm.memory[SP] as Address;
         // in the hack architecture, true is actually -1 not 1 so we have to invert the tos
         // if it was already 0 (false) it will stay zero, if it was 1 it will be -1
@@ -38,6 +55,10 @@ macro_rules! tos_binary_bool {
 
 macro_rules! tos_unary {
     ($vm:expr, $op:tt) => {{
+        if cfg!(feature = "trace_vm") {
+            println!("{}", stringify!($op));
+        }
+
         let sp = $vm.memory[SP] as Address;
         $vm.memory[sp - 1] = $op($vm.memory[sp - 1] as Word);
         $vm.pc += 1;
@@ -90,11 +111,11 @@ impl VM {
         offset as Address + index as Address
     }
 
-    fn get_value(&self, segment: Segment, index: i16) -> i16 {
+    fn get_value(&self, segment: Segment, index: i16) -> Word {
         if segment == Segment::Constant {
-            index as i16
+            index
         } else {
-            let addr = self.get_seg_address(segment, index) as Address;
+            let addr = self.get_seg_address(segment, index);
             self.memory[addr]
         }
     }
@@ -103,10 +124,16 @@ impl VM {
         &self.memory[SCREEN_START..(SCREEN_START + 8192)]
     }
 
-    pub fn load(&mut self, program: Vec<Opcode>) {
+    pub fn load(&mut self, program: Vec<Opcode>, debug_symbols: HashMap<u16, String>) {
         self.program = program;
+        self.debug_symbols = debug_symbols;
         self.pc = 0;
-        // TODO: zero out memory
+        for i in 0..self.memory.len() {
+            self.memory[i] = 0;
+        }
+        // page 162 of the book:
+        // the VM implementation can start by generating assembly code that sets SP=256
+        *self.mem(SP) = INIT_SP;
     }
 
     fn consume_segment(&mut self) -> Segment {
@@ -131,6 +158,14 @@ impl VM {
         i16::from_le_bytes([left_byte, right_byte])
     }
 
+    fn push_call(&mut self, function: Symbol) {
+        self.call_stack.push(function);
+    }
+
+    fn pop_call(&mut self) -> Option<u16> {
+        self.call_stack.pop()
+    }
+
     pub fn step(&mut self) {
         use Instruction::{
             Add, And, Call, Eq, Function, Goto, Gt, IfGoto, Lt, Neg, Not, Or, Pop, Push, Return,
@@ -139,12 +174,6 @@ impl VM {
 
         let opcode = self.program[self.pc];
         let instr = opcode.try_into().unwrap();
-        if cfg!(test) {
-            dbg!(self.pc);
-            dbg!(instr);
-            dbg!(self.memory[SP]);
-            dbg!(self.tos());
-        }
 
         match instr {
             Add => tos_binary!(self, +),
@@ -160,7 +189,11 @@ impl VM {
                 let segment = self.consume_segment();
                 let index = self.consume_short();
                 let value = self.get_value(segment, index);
-                println!("pushing {}", value);
+
+                if cfg!(feature = "trace_vm") {
+                    println!("push {:?} {} {}", segment, index, value);
+                }
+
                 self.push(value);
                 self.pc += 1;
             }
@@ -169,8 +202,12 @@ impl VM {
                 let index = self.consume_short();
                 let address = self.get_seg_address(segment, index);
                 let value = self.pop();
+
+                if cfg!(feature = "trace_vm") {
+                    println!("pop {:?} {} {} {}", segment, index, address, value);
+                }
+
                 *self.mem(address) = value;
-                println!("memory[{}] = {}", address, value);
                 self.pc += 1;
             }
             Goto => {
@@ -183,11 +220,21 @@ impl VM {
                 if condition == 0 {
                     self.pc += 1;
                 } else {
-                    println!("jumping to {}", instr);
                     self.pc = instr as usize;
                 }
             }
             Function => {
+                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                    println!("function {}", self.debug_symbols[&(self.pc as u16)]);
+                    println!("SP   {}", *self.mem(SP));
+                    println!("LCL  {}", *self.mem(LCL));
+                    println!("ARG  {}", *self.mem(ARG));
+                    println!("THIS {}", *self.mem(THIS));
+                    println!("THAT {}", *self.mem(THAT));
+                }
+
+                self.push_call(self.pc as Symbol);
+
                 let n_locals = self.consume_short();
                 for _ in 0..n_locals {
                     self.push(0);
@@ -195,6 +242,10 @@ impl VM {
                 self.pc += 1;
             }
             Return => {
+                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                    println!("return");
+                }
+
                 let frame = *self.mem(LCL) as Address;
                 // the return address
                 let ret = *self.mem(frame - 5) as Address;
@@ -208,9 +259,27 @@ impl VM {
                 *self.mem(LCL) = *self.mem(frame - 4);
 
                 self.pc = ret;
+                let popped = self.pop_call();
+                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                    if let Some(ret_from) = popped {
+                        print!("returning from {}", self.debug_symbols[&(ret_from as u16)]);
+                        if let Some(&ret_to) = self.call_stack.last() {
+                            println!(" to {}", self.debug_symbols[&(ret_to as u16)]);
+                        } else {
+                            println!(" to nowhere");
+                        }
+                        println!("at address {}", ret);
+                    } else {
+                        println!("returning from top level");
+                    }
+                }
             }
             Call => {
                 let function = self.consume_short();
+                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                    println!("call {}", self.debug_symbols[&(function as u16)]);
+                }
+
                 let n_args = self.consume_short();
 
                 dbg!(function);
@@ -236,8 +305,13 @@ impl VM {
             }
         };
 
-        if cfg!(test) {
+        if cfg!(feature = "trace_vm") {
+            dbg!(self.pc);
             dbg!(self.memory[SP]);
+            dbg!(self.memory[LCL]);
+            dbg!(self.memory[ARG]);
+            dbg!(self.memory[THIS]);
+            dbg!(self.memory[THAT]);
             dbg!(self.tos());
         }
     }
@@ -248,12 +322,14 @@ impl Default for VM {
         let mut vm = Self {
             pc: 0,
             program: vec![],
+            debug_symbols: HashMap::new(),
+            call_stack: Vec::with_capacity(32),
             memory: Box::new([0; MEM_SIZE]),
         };
 
         // page 162 of the book:
         // the VM implementation can start by generating assembly code that sets SP=256
-        vm.memory[0] = 256;
+        vm.memory[0] = INIT_SP;
 
         vm
     }
@@ -358,7 +434,7 @@ mod tests {
             Opcode::instruction(Instruction::Add),
         ];
 
-        vm.load(bytecode);
+        vm.load(bytecode, HashMap::new());
 
         *vm.mem(SP) = 256;
         *vm.mem(LCL) = 300;
@@ -383,11 +459,6 @@ mod tests {
     #[test]
     fn basic_test_vme() {
         let mut vm = VM::default();
-        *vm.mem(SP) = 256;
-        *vm.mem(LCL) = 300;
-        *vm.mem(ARG) = 400;
-        *vm.mem(THIS) = 3000;
-        *vm.mem(THAT) = 3010;
 
         let bytecode = r#"
             push constant 10
@@ -420,7 +491,13 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(SP) = 256;
+        *vm.mem(LCL) = 300;
+        *vm.mem(ARG) = 400;
+        *vm.mem(THIS) = 3000;
+        *vm.mem(THAT) = 3010;
 
         for _ in 0..25 {
             vm.step();
@@ -439,7 +516,6 @@ mod tests {
     #[test]
     fn pointer_test_vme() {
         let mut vm = VM::default();
-        *vm.mem(0) = 256;
 
         let bytecode = r#"
             push constant 3030
@@ -462,7 +538,9 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(0) = 256;
 
         for _ in 0..15 {
             vm.step();
@@ -478,7 +556,6 @@ mod tests {
     #[test]
     fn static_test_vme() {
         let mut vm = VM::default();
-        *vm.mem(0) = 256;
 
         let bytecode = r#"
             push constant 111
@@ -497,7 +574,9 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(0) = 256;
 
         for _ in 0..11 {
             vm.step();
@@ -509,7 +588,6 @@ mod tests {
     #[test]
     fn simple_add() {
         let mut vm = VM::default();
-        *vm.mem(0) = 256;
 
         let bytecode = r#"
             push constant 7
@@ -520,7 +598,9 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(0) = 256;
 
         for _ in 0..3 {
             vm.step();
@@ -533,7 +613,6 @@ mod tests {
     #[test]
     fn stack_test() {
         let mut vm = VM::default();
-        *vm.mem(0) = 256;
 
         let bytecode = r#"
             push constant 17
@@ -579,7 +658,9 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(0) = 256;
 
         for _ in 0..38 {
             vm.step();
@@ -601,10 +682,6 @@ mod tests {
     #[test]
     fn basic_loop() {
         let mut vm = VM::default();
-        *vm.mem(SP) = 256;
-        *vm.mem(LCL) = 300;
-        *vm.mem(ARG) = 400;
-        *vm.mem_indirect(ARG, 0) = 3;
 
         let bytecode = r#"
             // Computes the sum 1 + 2 + ... + argument[0] and pushes the
@@ -629,7 +706,12 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(SP) = 256;
+        *vm.mem(LCL) = 300;
+        *vm.mem(ARG) = 400;
+        *vm.mem_indirect(ARG, 0) = 3;
 
         for _ in 0..33 {
             vm.step();
@@ -642,11 +724,6 @@ mod tests {
     #[test]
     fn fibonacci_series() {
         let mut vm = VM::default();
-        *vm.mem(SP) = 256;
-        *vm.mem(LCL) = 300;
-        *vm.mem(ARG) = 400;
-        *vm.mem_indirect(ARG, 0) = 6;
-        *vm.mem_indirect(ARG, 1) = 3000;
 
         let bytecode = r#"
             // Puts the first argument[0] elements of the Fibonacci series
@@ -698,7 +775,13 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(SP) = 256;
+        *vm.mem(LCL) = 300;
+        *vm.mem(ARG) = 400;
+        *vm.mem_indirect(ARG, 0) = 6;
+        *vm.mem_indirect(ARG, 1) = 3000;
 
         for _ in 0..73 {
             vm.step();
@@ -715,7 +798,6 @@ mod tests {
     #[test]
     fn fibonacci_element() {
         let mut vm = VM::default();
-        *vm.mem(SP) = 261;
 
         let main = r#"
             // Computes the n'th element of the Fibonacci series, recursively.
@@ -763,7 +845,9 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(SP) = 261;
 
         for _ in 0..110 {
             vm.step();
@@ -776,28 +860,6 @@ mod tests {
     #[test]
     fn nested_call() {
         let mut vm = VM::default();
-        *vm.mem(0) = 261;
-        *vm.mem(1) = 261;
-        *vm.mem(2) = 256;
-        *vm.mem(3) = -3;
-        *vm.mem(4) = -4;
-        *vm.mem(5) = -1; // test results
-        *vm.mem(6) = -1;
-        *vm.mem(256) = 1234; // fake stack frame from call Sys.init
-        *vm.mem(257) = -1;
-        *vm.mem(258) = -2;
-        *vm.mem(259) = -3;
-        *vm.mem(260) = -4;
-
-        for i in 261..=299 {
-            *vm.mem(i) = -1;
-        }
-
-        *vm.mem(SP) = 261;
-        *vm.mem(LCL) = 261;
-        *vm.mem(ARG) = 256;
-        *vm.mem(THIS) = 3000;
-        *vm.mem(THAT) = 4000;
 
         let sys = r#"
             // Sys.vm for NestedCall test.
@@ -868,7 +930,30 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(0) = 261;
+        *vm.mem(1) = 261;
+        *vm.mem(2) = 256;
+        *vm.mem(3) = -3;
+        *vm.mem(4) = -4;
+        *vm.mem(5) = -1; // test results
+        *vm.mem(6) = -1;
+        *vm.mem(256) = 1234; // fake stack frame from call Sys.init
+        *vm.mem(257) = -1;
+        *vm.mem(258) = -2;
+        *vm.mem(259) = -3;
+        *vm.mem(260) = -4;
+
+        for i in 261..=299 {
+            *vm.mem(i) = -1;
+        }
+
+        *vm.mem(SP) = 261;
+        *vm.mem(LCL) = 261;
+        *vm.mem(ARG) = 256;
+        *vm.mem(THIS) = 3000;
+        *vm.mem(THAT) = 4000;
 
         for _ in 0..50 {
             vm.step();
@@ -886,18 +971,6 @@ mod tests {
     #[test]
     fn simple_function() {
         let mut vm = VM::default();
-        *vm.mem(SP) = 317;
-        *vm.mem(LCL) = 317;
-        *vm.mem(ARG) = 310;
-        *vm.mem(THIS) = 3000;
-        *vm.mem(THAT) = 4000;
-        *vm.mem_indirect(ARG, 0) = 1234;
-        *vm.mem_indirect(ARG, 1) = 37;
-        *vm.mem_indirect(ARG, 2) = 9;
-        *vm.mem_indirect(ARG, 3) = 305;
-        *vm.mem_indirect(ARG, 4) = 300;
-        *vm.mem_indirect(ARG, 5) = 3010;
-        *vm.mem_indirect(ARG, 6) = 4010;
 
         let sys = r#"
             function SimpleFunction.test 2
@@ -915,7 +988,20 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(SP) = 317;
+        *vm.mem(LCL) = 317;
+        *vm.mem(ARG) = 310;
+        *vm.mem(THIS) = 3000;
+        *vm.mem(THAT) = 4000;
+        *vm.mem_indirect(ARG, 0) = 1234;
+        *vm.mem_indirect(ARG, 1) = 37;
+        *vm.mem_indirect(ARG, 2) = 9;
+        *vm.mem_indirect(ARG, 3) = 305;
+        *vm.mem_indirect(ARG, 4) = 300;
+        *vm.mem_indirect(ARG, 5) = 3010;
+        *vm.mem_indirect(ARG, 6) = 4010;
 
         for _ in 0..10 {
             vm.step();
@@ -932,7 +1018,6 @@ mod tests {
     #[test]
     fn statics_test() {
         let mut vm = VM::default();
-        *vm.mem(SP) = 261;
 
         let sys = r#"
             // Tests that different functions, stored in two different
@@ -996,7 +1081,9 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
+
+        *vm.mem(SP) = 261;
 
         for _ in 0..36 {
             vm.step();
@@ -1052,7 +1139,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes);
+        vm.load(program.opcodes, program.debug_symbols);
 
         for _ in 0..500000 {
             vm.step();

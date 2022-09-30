@@ -1,0 +1,7 @@
+\subsection{Problems}
+VM crashed bei mehreren Beispielen
+
+Das Problem war eine falsche Kompilierung von Labels. Die erste Implementierung hatte nur eine Symboltabelle für lokale und globale Symbole, welche nie zurückgesetzt wurde. Dies führt jedoch zu einer Reihe von Problemen.
+Jump Instruktionen können zu Labels springen, welche weiter unten im Quellcode stehen und somit der Symboltabelle noch nicht bekannt waren. Dies wurde möglich indem anstatt einer Instruktion, ein Platzhalterwert benutzt wurde, welcher später durch die tatsächliche Instruktion ersetzt wurde.
+Allerdings hatte dieses Verfahren ohne weitere Anpassungen ein Problem, wenn der Jack Compiler das selbe Label in verschiedenen Prozeduren verwendet. Da die Symboltabelle nie zurückgesetzt wurde, hat der Parser das Label nicht als noch unbekannt identifiziert, sonder hat stattdessen einen Jump in eine vorherige Funktion produziert.
+Um dieses Problem zu beheben, erhält nun jede Funktion ihre eigene Symboltabelle
