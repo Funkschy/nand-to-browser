@@ -1,4 +1,5 @@
 import {App} from "nand-to-tetris-web";
+import {get_key_code} from "./keyboard.js";
 
 let steps_per_tick = 9000;
 
@@ -69,6 +70,21 @@ step_button.onclick = () => {
   console.log('step');
   app.step();
 };
+
+const handle_input = (key) => {
+  // only set the key if the vm is currently running
+  if (interval !== null) {
+    app.set_input_key(key);
+  }
+};
+
+document.addEventListener('keydown', (e) => {
+  handle_input(get_key_code(e));
+});
+
+document.addEventListener('keyup', (e) => {
+  handle_input(0);
+});
 
 const render_loop = () => {
   const data = app.display_buffer();

@@ -1,7 +1,7 @@
 pub mod command;
 
 use crate::definitions::SCREEN_START;
-use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, LCL, MEM_SIZE, SP, THAT, THIS};
+use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SP, THAT, THIS};
 use command::{Instruction, Opcode, Segment};
 use std::collections::HashMap;
 
@@ -122,6 +122,10 @@ impl VM {
 
     pub fn display(&self) -> &[Word] {
         &self.memory[SCREEN_START..(SCREEN_START + 8192)]
+    }
+
+    pub fn set_input_key(&mut self, key: i16) {
+        *self.mem(KBD) = key;
     }
 
     pub fn load(&mut self, program: Vec<Opcode>, debug_symbols: HashMap<u16, String>) {

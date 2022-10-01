@@ -71,4 +71,8 @@ impl App {
         // TODO: maybe do this without copying, or even better do the entire rendering inside of wasm
         self.vm.display().to_vec()
     }
+
+    pub fn set_input_key(&mut self, key: i16) {
+        self.vm.set_input_key(key);
+    }
 }

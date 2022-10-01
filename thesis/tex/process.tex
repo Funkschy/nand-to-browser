@@ -34,3 +34,8 @@ Mit diesem System verbrauchen Instruktionen nur genau soviel Speicher wie notwen
 
 \subsection{Parsing}
 Da die Anwendung eine Reihe an Parsern enthält, macht es Sinn gemeinsame Komponenten auszulagern.
+
+\subsection{Keyboard}
+Das Keyboard handling ist eine Übersetzung des entsprechenden Java Codes in der offiziellen Implementierung.
+Zunächst wurde dies in Javascript implementiert, jedoch war zu diesem Zeitpunkt schon eine Portierung in den Rust Code geplant.
+Die Verarbeitung von Sonderzeichen, wie Backspace oder Enter ist in Javascript anders als in Java, da diese als String im Event stehen.
