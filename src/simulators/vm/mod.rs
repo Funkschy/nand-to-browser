@@ -24,11 +24,27 @@ pub struct VM {
     memory: Box<[Word; MEM_SIZE]>,
 }
 
+macro_rules! trace_vm {
+    ($block:expr) => {
+        if cfg!(feature = "trace_vm") {
+            $block
+        }
+    };
+}
+
+macro_rules! trace_calls {
+    ($block:expr) => {
+        if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+            $block
+        }
+    };
+}
+
 macro_rules! tos_binary {
     ($vm:expr, $op:tt) => {{
-        if cfg!(feature = "trace_vm") {
+        trace_vm!({
             println!("{}", stringify!($op));
-        }
+        });
 
         let sp = $vm.memory[SP] as Address;
         // cast up to i32 so that no overflow checks get triggered in debug mode
@@ -40,9 +56,9 @@ macro_rules! tos_binary {
 
 macro_rules! tos_binary_bool {
     ($vm:expr, $op:tt) => {{
-        if cfg!(feature = "trace_vm") {
+        trace_vm!({
             println!("{}", stringify!($op));
-        }
+        });
 
         let sp = $vm.memory[SP] as Address;
         // in the hack architecture, true is actually -1 not 1 so we have to invert the tos
@@ -55,9 +71,9 @@ macro_rules! tos_binary_bool {
 
 macro_rules! tos_unary {
     ($vm:expr, $op:tt) => {{
-        if cfg!(feature = "trace_vm") {
+        trace_vm!({
             println!("{}", stringify!($op));
-        }
+        });
 
         let sp = $vm.memory[SP] as Address;
         $vm.memory[sp - 1] = $op($vm.memory[sp - 1] as Word);
@@ -67,25 +83,40 @@ macro_rules! tos_unary {
 
 impl VM {
     #[inline]
-    pub fn mem(&mut self, address: Address) -> &mut Word {
-        &mut self.memory[address]
+    pub fn mem(&self, address: Address) -> Word {
+        self.memory[address]
     }
 
     #[inline]
-    fn mem_indirect(&mut self, address_of_address: Address, offset: usize) -> &mut Word {
-        &mut self.memory[self.memory[address_of_address] as Address + offset]
+    fn set_mem(&mut self, address: Address, value: Word) {
+        self.memory[address] = value;
+    }
+
+    #[inline]
+    fn mem_indirect(&self, address_of_address: Address, offset: usize) -> Word {
+        self.memory[self.memory[address_of_address] as Address + offset]
+    }
+
+    #[inline]
+    fn set_mem_indirect(&mut self, address_of_address: Address, offset: usize, value: Word) {
+        self.set_mem(self.memory[address_of_address] as Address + offset, value);
+    }
+
+    #[inline]
+    fn add_to_mem(&mut self, address: Address, relative_value: Word) {
+        self.set_mem(address, self.mem(address) + relative_value);
     }
 
     #[inline]
     fn pop(&mut self) -> Word {
-        *self.mem(SP) -= 1;
-        *self.mem_indirect(SP, 0)
+        self.add_to_mem(SP, -1);
+        self.mem_indirect(SP, 0)
     }
 
     #[inline]
     fn push(&mut self, value: Word) {
-        *self.mem_indirect(SP, 0) = value;
-        *self.mem(SP) += 1;
+        self.set_mem_indirect(SP, 0, value);
+        self.add_to_mem(SP, 1);
     }
 
     #[inline]
@@ -125,7 +156,7 @@ impl VM {
     }
 
     pub fn set_input_key(&mut self, key: i16) {
-        *self.mem(KBD) = key;
+        self.set_mem(KBD, key);
     }
 
     pub fn load(&mut self, program: Vec<Opcode>, debug_symbols: HashMap<u16, String>) {
@@ -137,7 +168,7 @@ impl VM {
         }
         // page 162 of the book:
         // the VM implementation can start by generating assembly code that sets SP=256
-        *self.mem(SP) = INIT_SP;
+        self.set_mem(SP, INIT_SP);
     }
 
     fn consume_segment(&mut self) -> Segment {
@@ -170,6 +201,13 @@ impl VM {
         self.call_stack.pop()
     }
 
+    pub fn run(&mut self) {
+        self.pc = 0;
+        while self.pc < self.program.len() {
+            self.step();
+        }
+    }
+
     pub fn step(&mut self) {
         use Instruction::{
             Add, And, Call, Eq, Function, Goto, Gt, IfGoto, Lt, Neg, Not, Or, Pop, Push, Return,
@@ -194,9 +232,9 @@ impl VM {
                 let index = self.consume_short();
                 let value = self.get_value(segment, index);
 
-                if cfg!(feature = "trace_vm") {
+                trace_vm!({
                     println!("push {:?} {} {}", segment, index, value);
-                }
+                });
 
                 self.push(value);
                 self.pc += 1;
@@ -207,11 +245,11 @@ impl VM {
                 let address = self.get_seg_address(segment, index);
                 let value = self.pop();
 
-                if cfg!(feature = "trace_vm") {
+                trace_vm!({
                     println!("pop {:?} {} {} {}", segment, index, address, value);
-                }
+                });
 
-                *self.mem(address) = value;
+                self.set_mem(address, value);
                 self.pc += 1;
             }
             Goto => {
@@ -228,14 +266,14 @@ impl VM {
                 }
             }
             Function => {
-                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                trace_calls!({
                     println!("function {}", self.debug_symbols[&(self.pc as u16)]);
-                    println!("SP   {}", *self.mem(SP));
-                    println!("LCL  {}", *self.mem(LCL));
-                    println!("ARG  {}", *self.mem(ARG));
-                    println!("THIS {}", *self.mem(THIS));
-                    println!("THAT {}", *self.mem(THAT));
-                }
+                    println!("SP   {}", self.mem(SP));
+                    println!("LCL  {}", self.mem(LCL));
+                    println!("ARG  {}", self.mem(ARG));
+                    println!("THIS {}", self.mem(THIS));
+                    println!("THAT {}", self.mem(THAT));
+                });
 
                 self.push_call(self.pc as Symbol);
 
@@ -246,25 +284,26 @@ impl VM {
                 self.pc += 1;
             }
             Return => {
-                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                trace_calls!({
                     println!("return");
-                }
+                });
 
-                let frame = *self.mem(LCL) as Address;
+                let frame = self.mem(LCL) as Address;
                 // the return address
-                let ret = *self.mem(frame - 5) as Address;
+                let ret = self.mem(frame - 5) as Address;
                 // reposition the return value for the caller
-                *self.mem_indirect(ARG, 0) = self.pop();
+                let return_value = self.pop();
+                self.set_mem_indirect(ARG, 0, return_value);
                 // restore the stack for the caller
-                *self.mem(SP) = *self.mem(ARG) + 1;
-                *self.mem(THAT) = *self.mem(frame - 1);
-                *self.mem(THIS) = *self.mem(frame - 2);
-                *self.mem(ARG) = *self.mem(frame - 3);
-                *self.mem(LCL) = *self.mem(frame - 4);
+                self.set_mem(SP, self.mem(ARG) + 1);
+                self.set_mem(THAT, self.mem(frame - 1));
+                self.set_mem(THIS, self.mem(frame - 2));
+                self.set_mem(ARG, self.mem(frame - 3));
+                self.set_mem(LCL, self.mem(frame - 4));
 
                 self.pc = ret;
                 let popped = self.pop_call();
-                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                trace_calls!({
                     if let Some(ret_from) = popped {
                         print!("returning from {}", self.debug_symbols[&(ret_from as u16)]);
                         if let Some(&ret_to) = self.call_stack.last() {
@@ -276,40 +315,37 @@ impl VM {
                     } else {
                         println!("returning from top level");
                     }
-                }
+                });
             }
             Call => {
                 let function = self.consume_short();
-                if cfg!(any(feature = "trace_vm", feature = "trace_calls")) {
+                trace_calls!({
                     println!("call {}", self.debug_symbols[&(function as u16)]);
-                }
+                });
 
                 let n_args = self.consume_short();
-
-                dbg!(function);
-                dbg!(n_args);
 
                 let ret_addr = self.pc + 1;
                 self.push(ret_addr as i16);
 
-                let lcl = *self.mem(LCL);
+                let lcl = self.mem(LCL);
                 self.push(lcl);
-                let arg = *self.mem(ARG);
+                let arg = self.mem(ARG);
                 self.push(arg);
-                let this = *self.mem(THIS);
+                let this = self.mem(THIS);
                 self.push(this);
-                let that = *self.mem(THAT);
+                let that = self.mem(THAT);
                 self.push(that);
 
-                let sp = *self.mem(SP);
-                *self.mem(ARG) = sp - n_args - 5;
-                *self.mem(LCL) = sp;
+                let sp = self.mem(SP);
+                self.set_mem(ARG, sp - n_args - 5);
+                self.set_mem(LCL, sp);
 
                 self.pc = function as usize;
             }
         };
 
-        if cfg!(feature = "trace_vm") {
+        trace_vm!({
             dbg!(self.pc);
             dbg!(self.memory[SP]);
             dbg!(self.memory[LCL]);
@@ -317,7 +353,7 @@ impl VM {
             dbg!(self.memory[THIS]);
             dbg!(self.memory[THAT]);
             dbg!(self.tos());
-        }
+        });
     }
 }
 
@@ -440,24 +476,24 @@ mod tests {
 
         vm.load(bytecode, HashMap::new());
 
-        *vm.mem(SP) = 256;
-        *vm.mem(LCL) = 300;
-        *vm.mem(ARG) = 400;
-        *vm.mem(THIS) = 3000;
-        *vm.mem(THAT) = 3010;
+        vm.set_mem(SP, 256);
+        vm.set_mem(LCL, 300);
+        vm.set_mem(ARG, 400);
+        vm.set_mem(THIS, 3000);
+        vm.set_mem(THAT, 3010);
 
         for _ in 0..25 {
             vm.step();
         }
 
-        assert_eq!(472, *vm.mem(256));
-        assert_eq!(10, *vm.mem(300));
-        assert_eq!(21, *vm.mem(401));
-        assert_eq!(22, *vm.mem(402));
-        assert_eq!(36, *vm.mem(3006));
-        assert_eq!(42, *vm.mem(3012));
-        assert_eq!(45, *vm.mem(3015));
-        assert_eq!(510, *vm.mem(11));
+        assert_eq!(472, vm.mem(256));
+        assert_eq!(10, vm.mem(300));
+        assert_eq!(21, vm.mem(401));
+        assert_eq!(22, vm.mem(402));
+        assert_eq!(36, vm.mem(3006));
+        assert_eq!(42, vm.mem(3012));
+        assert_eq!(45, vm.mem(3015));
+        assert_eq!(510, vm.mem(11));
     }
 
     #[test]
@@ -497,24 +533,24 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(SP) = 256;
-        *vm.mem(LCL) = 300;
-        *vm.mem(ARG) = 400;
-        *vm.mem(THIS) = 3000;
-        *vm.mem(THAT) = 3010;
+        vm.set_mem(SP, 256);
+        vm.set_mem(LCL, 300);
+        vm.set_mem(ARG, 400);
+        vm.set_mem(THIS, 3000);
+        vm.set_mem(THAT, 3010);
 
         for _ in 0..25 {
             vm.step();
         }
 
-        assert_eq!(472, *vm.mem(256));
-        assert_eq!(10, *vm.mem(300));
-        assert_eq!(21, *vm.mem(401));
-        assert_eq!(22, *vm.mem(402));
-        assert_eq!(36, *vm.mem(3006));
-        assert_eq!(42, *vm.mem(3012));
-        assert_eq!(45, *vm.mem(3015));
-        assert_eq!(510, *vm.mem(11));
+        assert_eq!(472, vm.mem(256));
+        assert_eq!(10, vm.mem(300));
+        assert_eq!(21, vm.mem(401));
+        assert_eq!(22, vm.mem(402));
+        assert_eq!(36, vm.mem(3006));
+        assert_eq!(42, vm.mem(3012));
+        assert_eq!(45, vm.mem(3015));
+        assert_eq!(510, vm.mem(11));
     }
 
     #[test]
@@ -544,17 +580,17 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(0) = 256;
+        vm.set_mem(0, 256);
 
         for _ in 0..15 {
             vm.step();
         }
 
-        assert_eq!(6084, *vm.mem(256));
-        assert_eq!(3030, *vm.mem(3));
-        assert_eq!(3040, *vm.mem(4));
-        assert_eq!(32, *vm.mem(3032));
-        assert_eq!(46, *vm.mem(3046));
+        assert_eq!(6084, vm.mem(256));
+        assert_eq!(3030, vm.mem(3));
+        assert_eq!(3040, vm.mem(4));
+        assert_eq!(32, vm.mem(3032));
+        assert_eq!(46, vm.mem(3046));
     }
 
     #[test]
@@ -580,13 +616,13 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(0) = 256;
+        vm.set_mem(0, 256);
 
         for _ in 0..11 {
             vm.step();
         }
 
-        assert_eq!(1110, *vm.mem(256));
+        assert_eq!(1110, vm.mem(256));
     }
 
     #[test]
@@ -604,14 +640,14 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(0) = 256;
+        vm.set_mem(0, 256);
 
         for _ in 0..3 {
             vm.step();
         }
 
-        assert_eq!(257, *vm.mem(0));
-        assert_eq!(15, *vm.mem(256));
+        assert_eq!(257, vm.mem(0));
+        assert_eq!(15, vm.mem(256));
     }
 
     #[test]
@@ -664,23 +700,23 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(0) = 256;
+        vm.set_mem(0, 256);
 
         for _ in 0..38 {
             vm.step();
         }
 
-        assert_eq!(266, *vm.mem(0));
-        assert_eq!(-1, *vm.mem(256));
-        assert_eq!(0, *vm.mem(257));
-        assert_eq!(0, *vm.mem(258));
-        assert_eq!(0, *vm.mem(259));
-        assert_eq!(-1, *vm.mem(260));
-        assert_eq!(0, *vm.mem(261));
-        assert_eq!(-1, *vm.mem(262));
-        assert_eq!(0, *vm.mem(263));
-        assert_eq!(0, *vm.mem(264));
-        assert_eq!(-91, *vm.mem(265));
+        assert_eq!(266, vm.mem(0));
+        assert_eq!(-1, vm.mem(256));
+        assert_eq!(0, vm.mem(257));
+        assert_eq!(0, vm.mem(258));
+        assert_eq!(0, vm.mem(259));
+        assert_eq!(-1, vm.mem(260));
+        assert_eq!(0, vm.mem(261));
+        assert_eq!(-1, vm.mem(262));
+        assert_eq!(0, vm.mem(263));
+        assert_eq!(0, vm.mem(264));
+        assert_eq!(-91, vm.mem(265));
     }
 
     #[test]
@@ -712,17 +748,17 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(SP) = 256;
-        *vm.mem(LCL) = 300;
-        *vm.mem(ARG) = 400;
-        *vm.mem_indirect(ARG, 0) = 3;
+        vm.set_mem(SP, 256);
+        vm.set_mem(LCL, 300);
+        vm.set_mem(ARG, 400);
+        vm.set_mem_indirect(ARG, 0, 3);
 
         for _ in 0..33 {
             vm.step();
         }
 
-        assert_eq!(257, *vm.mem(0));
-        assert_eq!(6, *vm.mem(256));
+        assert_eq!(257, vm.mem(0));
+        assert_eq!(6, vm.mem(256));
     }
 
     #[test]
@@ -781,22 +817,22 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(SP) = 256;
-        *vm.mem(LCL) = 300;
-        *vm.mem(ARG) = 400;
-        *vm.mem_indirect(ARG, 0) = 6;
-        *vm.mem_indirect(ARG, 1) = 3000;
+        vm.set_mem(SP, 256);
+        vm.set_mem(LCL, 300);
+        vm.set_mem(ARG, 400);
+        vm.set_mem_indirect(ARG, 0, 6);
 
+        vm.set_mem_indirect(ARG, 1, 3000);
         for _ in 0..73 {
             vm.step();
         }
 
-        assert_eq!(0, *vm.mem(3000));
-        assert_eq!(1, *vm.mem(3001));
-        assert_eq!(1, *vm.mem(3002));
-        assert_eq!(2, *vm.mem(3003));
-        assert_eq!(3, *vm.mem(3004));
-        assert_eq!(5, *vm.mem(3005));
+        assert_eq!(0, vm.mem(3000));
+        assert_eq!(1, vm.mem(3001));
+        assert_eq!(1, vm.mem(3002));
+        assert_eq!(2, vm.mem(3003));
+        assert_eq!(3, vm.mem(3004));
+        assert_eq!(5, vm.mem(3005));
     }
 
     #[test]
@@ -851,19 +887,29 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(SP) = 261;
+        vm.set_mem(SP, 261);
 
         for _ in 0..110 {
             vm.step();
         }
 
-        assert_eq!(262, *vm.mem(0));
-        assert_eq!(3, *vm.mem(261));
+        assert_eq!(262, vm.mem(0));
+        assert_eq!(3, vm.mem(261));
     }
 
     #[test]
     fn nested_call() {
         let mut vm = VM::default();
+
+        for i in 261..=299 {
+            vm.set_mem(i, -1);
+        }
+
+        vm.set_mem(SP, 261);
+        vm.set_mem(LCL, 261);
+        vm.set_mem(ARG, 256);
+        vm.set_mem(THIS, 3000);
+        vm.set_mem(THAT, 4000);
 
         let sys = r#"
             // Sys.vm for NestedCall test.
@@ -936,40 +982,30 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(0) = 261;
-        *vm.mem(1) = 261;
-        *vm.mem(2) = 256;
-        *vm.mem(3) = -3;
-        *vm.mem(4) = -4;
-        *vm.mem(5) = -1; // test results
-        *vm.mem(6) = -1;
-        *vm.mem(256) = 1234; // fake stack frame from call Sys.init
-        *vm.mem(257) = -1;
-        *vm.mem(258) = -2;
-        *vm.mem(259) = -3;
-        *vm.mem(260) = -4;
-
-        for i in 261..=299 {
-            *vm.mem(i) = -1;
-        }
-
-        *vm.mem(SP) = 261;
-        *vm.mem(LCL) = 261;
-        *vm.mem(ARG) = 256;
-        *vm.mem(THIS) = 3000;
-        *vm.mem(THAT) = 4000;
+        vm.set_mem(0, 261);
+        vm.set_mem(1, 261);
+        vm.set_mem(2, 256);
+        vm.set_mem(3, -3);
+        vm.set_mem(4, -4);
+        vm.set_mem(5, -1); // test results
+        vm.set_mem(6, -1);
+        vm.set_mem(256, 1234); // fake stack frame from call Sys.init
+        vm.set_mem(257, -1);
+        vm.set_mem(258, -2);
+        vm.set_mem(259, -3);
+        vm.set_mem(260, -4);
 
         for _ in 0..50 {
             vm.step();
         }
 
-        assert_eq!(261, *vm.mem(0));
-        assert_eq!(261, *vm.mem(1));
-        assert_eq!(256, *vm.mem(2));
-        assert_eq!(4000, *vm.mem(3));
-        assert_eq!(5000, *vm.mem(4));
-        assert_eq!(135, *vm.mem(5));
-        assert_eq!(246, *vm.mem(6));
+        assert_eq!(261, vm.mem(0));
+        assert_eq!(261, vm.mem(1));
+        assert_eq!(256, vm.mem(2));
+        assert_eq!(4000, vm.mem(3));
+        assert_eq!(5000, vm.mem(4));
+        assert_eq!(135, vm.mem(5));
+        assert_eq!(246, vm.mem(6));
     }
 
     #[test]
@@ -994,29 +1030,29 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(SP) = 317;
-        *vm.mem(LCL) = 317;
-        *vm.mem(ARG) = 310;
-        *vm.mem(THIS) = 3000;
-        *vm.mem(THAT) = 4000;
-        *vm.mem_indirect(ARG, 0) = 1234;
-        *vm.mem_indirect(ARG, 1) = 37;
-        *vm.mem_indirect(ARG, 2) = 9;
-        *vm.mem_indirect(ARG, 3) = 305;
-        *vm.mem_indirect(ARG, 4) = 300;
-        *vm.mem_indirect(ARG, 5) = 3010;
-        *vm.mem_indirect(ARG, 6) = 4010;
+        vm.set_mem(SP, 317);
+        vm.set_mem(LCL, 317);
+        vm.set_mem(ARG, 310);
+        vm.set_mem(THIS, 3000);
+        vm.set_mem(THAT, 4000);
+        vm.set_mem_indirect(ARG, 0, 1234);
+        vm.set_mem_indirect(ARG, 1, 37);
+        vm.set_mem_indirect(ARG, 2, 9);
+        vm.set_mem_indirect(ARG, 3, 305);
+        vm.set_mem_indirect(ARG, 4, 300);
+        vm.set_mem_indirect(ARG, 5, 3010);
+        vm.set_mem_indirect(ARG, 6, 4010);
 
         for _ in 0..10 {
             vm.step();
         }
 
-        assert_eq!(311, *vm.mem(0));
-        assert_eq!(305, *vm.mem(1));
-        assert_eq!(300, *vm.mem(2));
-        assert_eq!(3010, *vm.mem(3));
-        assert_eq!(4010, *vm.mem(4));
-        assert_eq!(1196, *vm.mem(310));
+        assert_eq!(311, vm.mem(0));
+        assert_eq!(305, vm.mem(1));
+        assert_eq!(300, vm.mem(2));
+        assert_eq!(3010, vm.mem(3));
+        assert_eq!(4010, vm.mem(4));
+        assert_eq!(1196, vm.mem(310));
     }
 
     #[test]
@@ -1087,15 +1123,15 @@ mod tests {
 
         vm.load(program.opcodes, program.debug_symbols);
 
-        *vm.mem(SP) = 261;
+        vm.set_mem(SP, 261);
 
         for _ in 0..36 {
             vm.step();
         }
 
-        assert_eq!(263, *vm.mem(0));
-        assert_eq!(-2, *vm.mem(261));
-        assert_eq!(8, *vm.mem(262));
+        assert_eq!(263, vm.mem(0));
+        assert_eq!(-2, vm.mem(261));
+        assert_eq!(8, vm.mem(262));
     }
 
     #[test]
@@ -1149,8 +1185,8 @@ mod tests {
             vm.step();
         }
 
-        for &word in vm.display() {
-            assert_eq!(255, word);
+        for i in SCREEN_START..KBD {
+            assert_eq!(255, vm.mem(i));
         }
     }
 }
