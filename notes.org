@@ -21,10 +21,10 @@
 - [ ] Test Script runner
 - [ ] Erfolgreiche Ausführung verschiedener Projekt 9 Abgaben
 - [ ] Ordentliches error handling
-** TODO VM Frontend [5/22]
+** TODO VM Frontend [6/22]
 - [X] vm step aus frontend aufrufen
 - [X] display speicher in canvas rendern
-- [ ] keyboard interaktion in vm speicher schreiben
+- [X] keyboard interaktion in vm speicher schreiben
 - [ ] Geschwindigkeitsregulation
 - [X] Step Button
 - [X] Run Button
