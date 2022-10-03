@@ -63,6 +63,12 @@ impl App {
         Self { vm }
     }
 
+    pub fn step_times(&mut self, times: u32) {
+        for _ in 0..times {
+            self.vm.step();
+        }
+    }
+
     pub fn step(&mut self) {
         self.vm.step();
     }

@@ -1,7 +1,7 @@
 import {App} from "nand-to-tetris-web";
 import {get_key_code} from "./keyboard.js";
 
-let steps_per_tick = 9000;
+let steps_per_tick = 12000;
 
 const vm_screen = document.getElementById('screen');
 const ctx = vm_screen.getContext('2d');
@@ -41,9 +41,7 @@ const render = (display_memory) => {
 
 
 const run = () => {
-  for (let i = 0; i < steps_per_tick; i++) {
-    app.step();
-  }
+  app.step_times(steps_per_tick);
 };
 
 const start_button = document.getElementById('start-button');
