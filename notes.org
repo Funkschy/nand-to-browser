@@ -4,8 +4,8 @@
 - [X] alle commands implementieren
 - [X] command parsing
 - [X] funktionen erkennen die aufgerufen aber nicht deklariert werden
-- [ ] native stdlib implementieren
-  - [ ] Math
+- [-] native stdlib implementieren [1/8]
+  - [X] Math
   - [ ] String
   - [ ] Array
   - [ ] Output
@@ -21,6 +21,9 @@
 - [ ] Test Script runner
 - [ ] Erfolgreiche Ausführung verschiedener Projekt 9 Abgaben
 - [ ] Ordentliches error handling
+  - [ ] kein unwrap/expect
+  - [ ] panics bei invaliden typen durch TryInto ersetzten
+  - [ ] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
 ** TODO VM Frontend [6/22]
 - [X] vm step aus frontend aufrufen
 - [X] display speicher in canvas rendern
@@ -44,5 +47,5 @@
 - [ ] Anzeige des globalen Stacks
 - [ ] Anzeige des globalen RAMS
 - [ ] Numberformat switcher
-** TODO sonstiges [0/1]
+** TODO sonstiges [0/2]
 - [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger
