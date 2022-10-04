@@ -523,7 +523,6 @@ impl<'src> Parser<'src> {
                         let (first, second) = split_u16(addr);
                         opcodes.push(Opcode::constant(first));
                         opcodes.push(Opcode::constant(second));
-                        function_addresses.insert(label.to_string(), addr);
                     } else {
                         unresolved.insert(label);
                     }
