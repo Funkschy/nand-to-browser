@@ -1,5 +1,9 @@
 use super::{Spanned, StringLexer};
 use crate::simulators::vm::command::{ByteCodeParseError, Instruction, Opcode, Segment};
+use crate::simulators::vm::stdlib::Stdlib;
+use crate::simulators::vm::ProgramInfo;
+use crate::util::{split_i16, split_u16};
+use crate::VM;
 use std::num::ParseIntError;
 
 use std::collections::{HashMap, HashSet};
@@ -112,8 +116,8 @@ impl SymbolTable {
     ///
     /// if the value does not exist we create a new symbol for it
     /// and assume that this is the definition or that it will be defined later
-    fn lookup(&mut self, ident: impl Into<String>) -> Option<Symbol> {
-        self.symbols.get(&ident.into()).copied()
+    fn lookup<'s>(&mut self, ident: impl Into<&'s str>) -> Option<Symbol> {
+        self.symbols.get(ident.into()).copied()
     }
 
     fn lookup_or_insert(&mut self, ident: impl Into<String>) -> Symbol {
@@ -171,16 +175,22 @@ pub struct Parser<'src> {
     global_symbols: SymbolTable,
     // every entry represents the symbols in the current function (labels)
     function_symbols: Vec<SymbolTable>,
+    stdlib: Stdlib<'static, VM>,
 }
 
 impl<'src> Parser<'src> {
     pub fn new(sources: Vec<SourceFile<'src>>) -> Self {
+        Self::with_stdlib(sources, Stdlib::default())
+    }
+
+    pub fn with_stdlib(sources: Vec<SourceFile<'src>>, stdlib: Stdlib<'static, VM>) -> Self {
         Self {
             module_index: 0,
             instruction_counter: 0,
             sources,
             global_symbols: SymbolTable::default(),
             function_symbols: vec![SymbolTable::default()],
+            stdlib,
         }
     }
 
@@ -264,15 +274,18 @@ impl<'src> Parser<'src> {
 
     fn consume_symbol(&mut self) -> ParseResult<'src, Result<Symbol, &'src str>> {
         let ident = self.consume_ident()?;
+
         if let Some(symbol) = self.function_symbols()?.lookup(ident) {
             // the label for this symbol was already parsed in the current function
-            Ok(Ok(symbol))
-        } else if let Some(symbol) = self.global_symbols.lookup(ident) {
-            // the label for this symbol was already parsed in some module
-            Ok(Ok(symbol))
-        } else {
-            Ok(Err(ident))
+            return Ok(Ok(symbol));
         }
+
+        if let Some(symbol) = self.global_symbols.lookup(ident) {
+            // the label for this symbol was already parsed in some module
+            return Ok(Ok(symbol));
+        }
+
+        Ok(Err(ident))
     }
 
     fn consume_label(&mut self, function_internal: bool) -> ParseResult<'src, &'src str> {
@@ -297,16 +310,6 @@ impl<'src> Parser<'src> {
 
         let mut code: Vec<CodeEntry<'src>> = Vec::with_capacity(128);
         let mut debug_symbols = HashMap::new();
-
-        fn split_i16(value: i16) -> (u8, u8) {
-            let values = value.to_le_bytes();
-            (values[0], values[1])
-        }
-
-        fn split_u16(value: u16) -> (u8, u8) {
-            let values = value.to_le_bytes();
-            (values[0], values[1])
-        }
 
         fn push_instr(inst_count: &mut u16, code: &mut Vec<CodeEntry>, value: Instruction) {
             code.push(CodeEntry::Opcode(Opcode::instruction(value)));
@@ -382,6 +385,7 @@ impl<'src> Parser<'src> {
         }
 
         self.instruction_counter = 0;
+        let mut function_addresses = HashMap::new();
 
         loop {
             let token = self.next_token();
@@ -423,6 +427,7 @@ impl<'src> Parser<'src> {
                 Token::Identifier("function") => {
                     let label = self.consume_label(false)?;
                     debug_symbols.insert(self.instruction_counter, label.to_owned());
+                    function_addresses.insert(label.to_owned(), self.instruction_counter);
 
                     let n_locals = self.consume_int()?;
                     self.function_symbols.push(SymbolTable::default());
@@ -473,6 +478,7 @@ impl<'src> Parser<'src> {
             };
         }
 
+        // TODO: check program length cannot be larger than u16::MAX - NUMBER_OF_STDLIB_FUNCTIONS
         let mut opcodes = Vec::with_capacity(code.capacity());
         let mut unresolved = HashSet::new();
         let mut function_index = 0;
@@ -511,6 +517,13 @@ impl<'src> Parser<'src> {
                         let (first, second) = split_u16(addr);
                         opcodes.push(Opcode::constant(first));
                         opcodes.push(Opcode::constant(second));
+                    } else if let Some(builtin_function) = self.stdlib.lookup(label) {
+                        // we are calling a builtin function
+                        let addr = builtin_function.virtual_address();
+                        let (first, second) = split_u16(addr);
+                        opcodes.push(Opcode::constant(first));
+                        opcodes.push(Opcode::constant(second));
+                        function_addresses.insert(label.to_string(), addr);
                     } else {
                         unresolved.insert(label);
                     }
@@ -518,8 +531,22 @@ impl<'src> Parser<'src> {
             }
         }
 
+        // insert the missing stdlib functions
+        // we need more than the function called by the program, because the stdlib functions
+        // can call each other
+        for (&name, &addr) in self.stdlib.by_name() {
+            if self.global_symbols.lookup(name).is_none() {
+                function_addresses.insert(name.to_owned(), addr);
+                debug_symbols.insert(addr, name.to_owned());
+            }
+        }
+
         if unresolved.is_empty() {
-            Ok(ParsedProgram::new(opcodes, debug_symbols))
+            Ok(ParsedProgram::new(
+                opcodes,
+                debug_symbols,
+                function_addresses,
+            ))
         } else {
             Err(ParseError::UnresolvedSymbols(unresolved))
         }
@@ -532,20 +559,47 @@ pub struct ParsedProgram {
     // a map from positions in the bytecode to their corresponding names in the bytecode
     // this is need to display infos in the UI (like the callstack) and for debugging the VM
     pub debug_symbols: HashMap<Symbol, String>,
+    // the vm should be able to call functions by their names. This is needed for the stdlib
+    pub function_by_name: HashMap<String, Symbol>,
 }
 
 impl ParsedProgram {
-    pub fn new(opcodes: Vec<Opcode>, debug_symbols: HashMap<Symbol, String>) -> Self {
+    pub fn new(
+        opcodes: Vec<Opcode>,
+        debug_symbols: HashMap<Symbol, String>,
+        function_by_name: HashMap<String, Symbol>,
+    ) -> Self {
         Self {
             opcodes,
             debug_symbols,
+            function_by_name,
         }
+    }
+}
+
+impl ProgramInfo for ParsedProgram {
+    fn opcodes(&self) -> &Vec<Opcode> {
+        &self.opcodes
+    }
+
+    fn debug_symbols(&self) -> &HashMap<u16, String> {
+        &self.debug_symbols
+    }
+
+    fn function_by_name(&self) -> &HashMap<String, Symbol> {
+        &self.function_by_name
+    }
+
+    fn sys_init_address(&self) -> Option<u16> {
+        self.function_by_name.get("Sys.init").copied()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::simulators::vm::stdlib::{StdlibFunction, StdlibOk};
+
     #[test]
     fn parser_should_report_unresolved_labels() {
         let main = r#"
@@ -1163,5 +1217,310 @@ mod tests {
                 Opcode::instruction(Instruction::Return),
             ]
         )
+    }
+
+    #[test]
+    fn test_stdlib_functions_resolve_to_correct_virtual_address() {
+        let source = "
+            function Main.main 1
+            push constant 2
+            pop local 0
+            push local 0
+            push constant 3
+            add
+            pop local 0
+            push constant 3
+            call String.new 1
+            push constant 107
+            call String.appendChar 2
+            push constant 101
+            call String.appendChar 2
+            push constant 107
+            call String.appendChar 2
+            pop static 0
+            push constant 0
+            return
+            ";
+
+        let stdlib = Stdlib::new();
+        let stdlib_address_space = stdlib.len() as u16..=u16::MAX;
+        let new_address = stdlib.lookup("String.new").unwrap().virtual_address();
+        let append_address = stdlib
+            .lookup("String.appendChar")
+            .unwrap()
+            .virtual_address();
+
+        assert_eq!(true, stdlib_address_space.contains(&new_address));
+        assert_eq!(true, stdlib_address_space.contains(&append_address));
+
+        let (new_1, new_2) = split_u16(new_address);
+        let (append_1, append_2) = split_u16(append_address);
+
+        let programs = vec![SourceFile::new("Simple.vm", source)];
+        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let code = parser.parse().unwrap();
+
+        assert_eq!(
+            code.opcodes,
+            vec![
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(1),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(2),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Local),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Local),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(3),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Add),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Local),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(3),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(new_1),
+                Opcode::constant(new_2),
+                Opcode::constant(1),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(107),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(append_1),
+                Opcode::constant(append_2),
+                Opcode::constant(2),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(101),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(append_1),
+                Opcode::constant(append_2),
+                Opcode::constant(2),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(107),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(append_1),
+                Opcode::constant(append_2),
+                Opcode::constant(2),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Pop),
+                Opcode::segment(Segment::Static),
+                Opcode::constant(16),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Push),
+                Opcode::segment(Segment::Constant),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Return)
+            ]
+        )
+    }
+
+    #[test]
+    fn test_stdlib_functions_edge_cases() {
+        // the first and last stdlib functions
+        let source = "
+            call Math.init 0
+            call Sys.wait 1
+            ";
+
+        let stdlib = Stdlib::new();
+        let init_address = stdlib.lookup("Math.init").unwrap().virtual_address();
+        let wait_address = stdlib.lookup("Sys.wait").unwrap().virtual_address();
+
+        assert_eq!(49, stdlib.len());
+        assert_eq!(u16::MAX - (stdlib.len() as u16 - 1), init_address);
+        assert_eq!(u16::MAX, wait_address);
+
+        let (init_1, init_2) = split_u16(init_address);
+        let (wait_1, wait_2) = split_u16(wait_address);
+
+        let programs = vec![SourceFile::new("Simple.vm", source)];
+        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let code = parser.parse().unwrap();
+
+        assert_eq!(
+            code.opcodes,
+            vec![
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(init_1),
+                Opcode::constant(init_2),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(wait_1),
+                Opcode::constant(wait_2),
+                Opcode::constant(1),
+                Opcode::constant(0),
+            ]
+        )
+    }
+
+    #[test]
+    fn test_sys_init_is_resolve_to_stdlib_if_not_in_bytecode() {
+        // the first and last stdlib functions
+        let source = "
+            function Main.main 0
+            call Sys.init 0
+            ";
+
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        by_name.insert("Sys.init", u16::MAX);
+        by_address.insert(
+            u16::MAX,
+            StdlibFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+                Ok(StdlibOk::Finished(0))
+            }),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+        let init_address = stdlib.lookup("Sys.init").unwrap().virtual_address();
+
+        assert_eq!(1, stdlib.len());
+        assert_eq!(u16::MAX, init_address);
+
+        let (init_1, init_2) = split_u16(init_address);
+
+        let programs = vec![SourceFile::new("Simple.vm", source)];
+        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let code = parser.parse().unwrap();
+
+        assert_eq!(
+            code.opcodes,
+            vec![
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(init_1),
+                Opcode::constant(init_2),
+                Opcode::constant(0),
+                Opcode::constant(0),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_sys_init_can_be_overwritten_by_bytecode_before() {
+        // the first and last stdlib functions
+        let source = "
+            function Sys.init 0
+            return
+
+            function Main.main 0
+            call Sys.init 0
+            ";
+
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        by_name.insert("Sys.init", u16::MAX);
+        by_address.insert(
+            u16::MAX,
+            StdlibFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+                Ok(StdlibOk::Finished(0))
+            }),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+        let init_address = stdlib.lookup("Sys.init").unwrap().virtual_address();
+
+        assert_eq!(1, stdlib.len());
+        assert_eq!(u16::MAX, init_address);
+
+        let programs = vec![SourceFile::new("Simple.vm", source)];
+        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let code = parser.parse().unwrap();
+
+        assert_eq!(
+            code.opcodes,
+            vec![
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Return),
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::constant(0),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_sys_init_can_be_overwritten_by_bytecode_after() {
+        // the first and last stdlib functions
+        let source = "
+            function Main.main 0
+            call Sys.init 0
+
+            function Sys.init 0
+            return
+            ";
+
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        by_name.insert("Sys.init", u16::MAX);
+        by_address.insert(
+            u16::MAX,
+            StdlibFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+                Ok(StdlibOk::Finished(0))
+            }),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+        let init_address = stdlib.lookup("Sys.init").unwrap().virtual_address();
+
+        assert_eq!(1, stdlib.len());
+        assert_eq!(u16::MAX, init_address);
+
+        let programs = vec![SourceFile::new("Simple.vm", source)];
+        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let code = parser.parse().unwrap();
+
+        assert_eq!(
+            code.opcodes,
+            vec![
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Call),
+                Opcode::constant(8),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Function),
+                Opcode::constant(0),
+                Opcode::constant(0),
+                Opcode::instruction(Instruction::Return),
+            ]
+        );
     }
 }

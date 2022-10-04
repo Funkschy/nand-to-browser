@@ -39,3 +39,16 @@ Da die Anwendung eine Reihe an Parsern enthält, macht es Sinn gemeinsame Kompon
 Das Keyboard handling ist eine Übersetzung des entsprechenden Java Codes in der offiziellen Implementierung.
 Zunächst wurde dies in Javascript implementiert, jedoch war zu diesem Zeitpunkt schon eine Portierung in den Rust Code geplant.
 Die Verarbeitung von Sonderzeichen, wie Backspace oder Enter ist in Javascript anders als in Java, da diese als String im Event stehen.
+
+\subsection{Debugging}
+Tracing via macros (conditional compilation), kann über feature flags angeschaltet werden
+
+\subsection{Stdlib}
+Die Standardlibrary ist aus zwei Gründen kompliziert. Erstens ist es nicht akzeptabel den aktuellen Thread zu blockieren, da die WebAssembly Anwendung in nur einem Thread läuft. Deswegen können Funktionen wie Sys.wait nicht einfach wie in der Java version mit einem Thread.sleep implementiert werden.
+Zweitens sollten Stdlib Funktionen in der Lage sein, VM Funktionen aufzurufen, damit die Standardlibrary in den Projekten 10 & 11 Stück für Stück entwickelt werden kann. Dies ist kompliziert, da die VM Schrittweise ausgeführt wird. Die Stdlib kann nicht einfach die gesamte VM Funktion ausführen, da diese möglicherweise Endlosschleifen enthält. Dies ist z.B. der Fall wenn Sys.init (Stdlib) die Main.main (VM) Funktion aufruft, welche normalerweise eine Endlosschleife enthält.
+Es muss also möglich sein, Stdlibfunktionen, welche in Rust implementiert sind, zu pausieren und dann im nächsten VM Tick fortzusetzen.
+Hierfür verwaltet die VM einen internen Callstack. Jedes Element in diesem enthält eine Rücksprungaddresse und die aktuelle Funktion (optional da auch Programme ohne Funktionen zulässig sind).
+Zusätzlich gibt es ein State Feld, welches nur für Stdlib Funktionen relevant ist. Dieses enthält die ursprüngliche Parameterliste und den Zustand der Funktion
+Jede Stdlib Funktion erhält beim Aufruf die originalen Parameter und ihren Zustand.
+nachdem die Funktion den Code für ihren aktuellen Zustand ausgeführt hat, gibt diese den nächsten Zustand zurück.
+Der Zustand kann genutzt werden, um die Schritte zu zählen, welche bereits in der Funktion verbracht wurden, womit sich Sys.wait implementieren lässt, oder aber um die Stelle in der Funktion zu finden, wo die Ausführung zuletzt unterbrochen wurde. So ruft Sys.init z.B. bei einem Zustand von 0 Memory.init auf und gibt dann einen nächsten Zustand von 1 zurück. Wird Sys.init dann beim nächsten Mal mit einem Zustand von 1 aufgerufen, führt diese die nächste Init Funktion aus.

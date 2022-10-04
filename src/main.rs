@@ -4,13 +4,13 @@ use simulators::vm::VM;
 mod definitions;
 mod parse;
 mod simulators;
+mod util;
 
 #[cfg(feature = "desktop")]
 fn run_desktop(vm: &mut VM) {
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::pixels::{Color, PixelFormatEnum};
-    use std::time::Duration;
 
     let logical_width = 512;
     let logical_height = 256;
@@ -37,7 +37,7 @@ fn run_desktop(vm: &mut VM) {
         .unwrap();
 
     // only scale by integers instead of fractions to keep everything crisp
-    canvas.set_integer_scale(true);
+    canvas.set_integer_scale(true).unwrap();
 
     canvas.set_draw_color(Color::RGB(255, 255, 255));
     canvas.clear();
@@ -85,7 +85,7 @@ fn run_desktop(vm: &mut VM) {
         let words_per_row = 32;
 
         bg_texture
-            .with_lock(None, |buffer: &mut [u8], pitch: usize| {
+            .with_lock(None, |buffer: &mut [u8], _pitch: usize| {
                 let display = vm.display();
 
                 let mut i = 0;
@@ -154,7 +154,7 @@ fn main() {
     let mut bytecode_parser = Parser::new(programs);
     let program = bytecode_parser.parse().unwrap();
 
-    vm.load(program.opcodes, program.debug_symbols);
+    vm.load(program);
 
     run_desktop(&mut vm);
 }

@@ -1,6 +1,6 @@
 #+title: Notes
 * TODOs
-** TODO VM Emulator [3/12]
+** TODO VM Emulator [5/12]
 - [X] alle commands implementieren
 - [X] command parsing
 - [X] funktionen erkennen die aufgerufen aber nicht deklariert werden
@@ -13,8 +13,8 @@
   - [ ] Keyboard
   - [ ] Memory
   - [ ] Sys
-- [ ] unbekannte funktionen in stdlib suchen und adden falls nötig
-- [ ] Start der Ausführung bei Sys.init falls vorhanden
+- [X] unbekannte funktionen in stdlib suchen und adden falls nötig
+- [X] Start der Ausführung bei Sys.init falls vorhanden
 - [ ] checken ob Funktionsname zu Klassennamen passt
 - [ ] Debug Infos für Funktionen
 - [ ] Debug Infos für lokale Label

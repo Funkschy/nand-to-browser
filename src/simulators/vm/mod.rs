@@ -1,9 +1,72 @@
 pub mod command;
 
+#[allow(dead_code)]
+pub mod stdlib;
+
 use crate::definitions::SCREEN_START;
 use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SP, THAT, THIS};
 use command::{Instruction, Opcode, Segment};
 use std::collections::HashMap;
+use stdlib::*;
+
+pub trait ProgramInfo {
+    fn opcodes(&self) -> &Vec<Opcode>;
+    fn debug_symbols(&self) -> &HashMap<Symbol, String>;
+    fn function_by_name(&self) -> &HashMap<String, Symbol>;
+    fn sys_init_address(&self) -> Option<Symbol>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReturnAddress {
+    EndOfProgram, // the return for the first function in the program (usually Sys.init)
+    VM(Symbol),
+    Builtin(State),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CallState {
+    // the state the function is in and the original args
+    Builtin(State, Vec<Word>),
+    VM,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CallStackEntry {
+    ret_addr: ReturnAddress,
+    function: Option<Symbol>,
+    state: CallState,
+}
+
+impl CallStackEntry {
+    pub fn top_level() -> Self {
+        Self {
+            ret_addr: ReturnAddress::EndOfProgram,
+            function: None,
+            state: CallState::VM,
+        }
+    }
+
+    pub fn builtin(
+        ret_addr: ReturnAddress,
+        function: Symbol,
+        state: State,
+        args: Vec<Word>,
+    ) -> Self {
+        Self {
+            ret_addr,
+            function: Some(function),
+            state: CallState::Builtin(state, args),
+        }
+    }
+
+    pub fn vm(ret_addr: ReturnAddress, function: Symbol) -> Self {
+        Self {
+            ret_addr,
+            function: Some(function),
+            state: CallState::VM,
+        }
+    }
+}
 
 pub struct VM {
     // the program counter / instruction pointer
@@ -11,10 +74,14 @@ pub struct VM {
     program: Vec<Opcode>,
 
     // debug information which is used in the UI and for internal debugging
-    debug_symbols: HashMap<u16, String>,
-    // a stack of source code positions, which can be mapped to strings on demand by mapping them
-    // over the debug_symbols map
-    call_stack: Vec<u16>,
+    debug_symbols: HashMap<Symbol, String>,
+    function_by_name: HashMap<String, Symbol>,
+
+    call_stack: Vec<CallStackEntry>,
+
+    stdlib: Stdlib<'static, Self>,
+    // if this is set to Some(address) the vm will jump to Sys.init on the next step
+    sys_init: Option<Symbol>,
 
     // 0-15        virtual registers
     // 16-255      static variables
@@ -81,15 +148,44 @@ macro_rules! tos_unary {
     }};
 }
 
-impl VM {
+impl VirtualMachine for VM {
     #[inline]
-    pub fn mem(&self, address: Address) -> Word {
+    fn mem(&self, address: Address) -> Word {
         self.memory[address]
     }
 
     #[inline]
     fn set_mem(&mut self, address: Address, value: Word) {
         self.memory[address] = value;
+    }
+
+    fn call(&mut self, name: &str, params: Vec<i16>) -> Result<VMCallOk, StdlibError> {
+        trace_calls!({
+            println!("Calling {} by name", name);
+        });
+
+        let address = self
+            .function_by_name
+            .get(name)
+            .copied()
+            .ok_or(StdlibError::CallingNonExistendFunction)?;
+
+        self.call_function(address, params.len() as Word)
+    }
+}
+
+impl VM {
+    pub fn new(stdlib: Stdlib<'static, Self>) -> Self {
+        Self {
+            pc: 0,
+            program: vec![],
+            debug_symbols: HashMap::new(),
+            call_stack: Vec::with_capacity(32),
+            memory: Box::new([0; MEM_SIZE]),
+            stdlib,
+            function_by_name: HashMap::new(),
+            sys_init: None,
+        }
     }
 
     #[inline]
@@ -159,16 +255,28 @@ impl VM {
         self.set_mem(KBD, key);
     }
 
-    pub fn load(&mut self, program: Vec<Opcode>, debug_symbols: HashMap<u16, String>) {
-        self.program = program;
-        self.debug_symbols = debug_symbols;
+    pub fn load(&mut self, info: impl ProgramInfo) {
+        self.program = info.opcodes().clone();
+        self.debug_symbols = info.debug_symbols().clone();
+        self.function_by_name = info.function_by_name().clone();
         self.pc = 0;
         for i in 0..self.memory.len() {
             self.memory[i] = 0;
         }
         // page 162 of the book:
-        // the VM implementation can start by generating assembly code that sets SP=256
+        // the VM implementation c
+        // an start by generating assembly code that sets SP=256
         self.set_mem(SP, INIT_SP);
+
+        self.call_stack.clear();
+        self.push_call(CallStackEntry::top_level());
+
+        if let Some(sys_init_address) = info.sys_init_address() {
+            if sys_init_address != 0 {
+                println!("Sys.init at {}", sys_init_address);
+                self.sys_init = Some(sys_init_address);
+            }
+        }
     }
 
     fn consume_segment(&mut self) -> Segment {
@@ -193,12 +301,187 @@ impl VM {
         i16::from_le_bytes([left_byte, right_byte])
     }
 
-    fn push_call(&mut self, function: Symbol) {
-        self.call_stack.push(function);
+    fn push_call(&mut self, entry: CallStackEntry) -> usize {
+        let idx = self.call_stack.len();
+        self.call_stack.push(entry);
+        idx
     }
 
-    fn pop_call(&mut self) -> Option<u16> {
+    fn peek_call(&mut self) -> Option<&mut CallStackEntry> {
+        self.call_stack.last_mut()
+    }
+
+    fn update_call_stack_tos_next_state(&mut self, next_state: State) {
+        self.update_call_stack_index_next_state(self.call_stack.len() - 1, next_state)
+    }
+
+    fn update_call_stack_index_next_state(&mut self, index: usize, next_state: State) {
+        let call = self.call_stack.get_mut(index).unwrap();
+
+        if let CallState::Builtin(ref mut old_state, _) = call.state {
+            trace_calls!({
+                println!(
+                    "updating state of {:?} from {} to {}",
+                    call.function, *old_state, next_state
+                );
+            });
+            *old_state = next_state;
+        } else {
+            panic!("trying to continue a vm function");
+        }
+    }
+
+    fn return_address(&mut self) -> Option<ReturnAddress> {
+        let current_call = self.peek_call()?;
+        match current_call.state {
+            CallState::Builtin(state, _) => Some(ReturnAddress::Builtin(state + 1)),
+            CallState::VM => Some(ReturnAddress::VM(self.pc as Symbol + 1)),
+        }
+    }
+
+    fn pop_call(&mut self) -> Option<CallStackEntry> {
         self.call_stack.pop()
+    }
+
+    pub fn call_stack_names(&self) -> Vec<&str> {
+        self.call_stack
+            .iter()
+            .filter_map(|c| {
+                c.function
+                    .and_then(|f| self.debug_symbols.get(&f).map(String::as_str))
+            })
+            .collect()
+    }
+
+    fn handle_builtin_finished(&mut self, ret_val: Word) {
+        let this_call = self.pop_call().unwrap();
+        if let ReturnAddress::Builtin(state) = this_call.ret_addr {
+            self.update_call_stack_tos_next_state(state);
+        }
+        self.push(ret_val);
+        self.pc += 1;
+    }
+
+    fn continue_builtin_function(&mut self, entry: CallStackEntry) {
+        use StdlibOk::*;
+
+        trace_calls!({
+            println!("continuing {:?}", entry);
+        });
+
+        let function = *self.stdlib.by_address(entry.function.unwrap()).unwrap();
+        let (state, args) = if let CallState::Builtin(state, args) = entry.state {
+            (state, args)
+        } else {
+            panic!("trying to continue vm function");
+        };
+        let ret_val = function.continue_call(self, state, &args).unwrap();
+
+        match ret_val {
+            Finished(ret_val) => {
+                trace_calls!({
+                    println!(
+                        "returning from stdlib function {} with return value {}",
+                        function.name(),
+                        ret_val
+                    );
+                });
+                self.handle_builtin_finished(ret_val);
+            }
+            ContinueInNextStep(next_state) => {
+                self.update_call_stack_tos_next_state(next_state);
+            }
+        }
+    }
+
+    fn call_builtin_function(&mut self, function: StdlibFunction<'static, Self>, args: Vec<i16>) {
+        use StdlibOk::*;
+
+        trace_calls!({
+            println!(
+                "calling stdlib function {} with {:?}",
+                function.name(),
+                &args
+            );
+            println!("{:?}", self.call_stack_names());
+        });
+
+        let ret_addr = self.return_address().unwrap();
+        let init_state = 0;
+        let index = self.push_call(CallStackEntry::builtin(
+            ret_addr,
+            function.virtual_address(),
+            init_state,
+            args.clone(),
+        ));
+        // TODO: handle error return value
+        let ret_val = function.call(self, &args).unwrap();
+
+        match ret_val {
+            Finished(ret_val) => {
+                trace_calls!({
+                    println!(
+                        "returning from stdlib function {} with return value {}",
+                        function.name(),
+                        ret_val
+                    );
+                });
+                self.handle_builtin_finished(ret_val);
+            }
+            ContinueInNextStep(next_state) => {
+                self.update_call_stack_index_next_state(index, next_state);
+            }
+        }
+    }
+
+    fn call_vm_function(&mut self, function: Symbol, n_args: i16) {
+        // TODO: handle error if calling a non existing function
+
+        trace_calls!({
+            println!("call {} at {}", self.debug_symbols[&function], function);
+            println!("{:?}", self.call_stack_names());
+        });
+
+        let ret_addr = self.pc + 1;
+        self.push(ret_addr as Word);
+
+        let lcl = self.mem(LCL);
+        self.push(lcl);
+        let arg = self.mem(ARG);
+        self.push(arg);
+        let this = self.mem(THIS);
+        self.push(this);
+        let that = self.mem(THAT);
+        self.push(that);
+
+        let sp = self.mem(SP);
+        let arg = sp - n_args - 5;
+        self.set_mem(ARG, arg);
+        self.set_mem(LCL, sp);
+
+        let ret_addr = self.return_address().unwrap();
+        self.push_call(CallStackEntry::vm(ret_addr, function));
+        self.pc = function as usize;
+    }
+
+    fn call_function(&mut self, function: Symbol, n_args: i16) -> Result<VMCallOk, StdlibError> {
+        if let Some(&stdlib_function) = self.stdlib.by_address(function) {
+            trace_calls!({
+                println!("{} is a builtin function", stdlib_function.name());
+            });
+
+            // TODO: assert that if this was called by bytecode, the n_args matches
+            let n_args = stdlib_function.num_args();
+            let sp = self.mem(SP) as usize;
+            let args = Vec::from(&self.memory[sp - n_args..sp]);
+            self.set_mem(SP, (sp - n_args) as i16);
+
+            self.call_builtin_function(stdlib_function, args);
+            Ok(VMCallOk::WasBuiltinFunction)
+        } else {
+            self.call_vm_function(function, n_args);
+            Ok(VMCallOk::WasVMFunction)
+        }
     }
 
     pub fn run(&mut self) {
@@ -213,6 +496,28 @@ impl VM {
             Add, And, Call, Eq, Function, Goto, Gt, IfGoto, Lt, Neg, Not, Or, Pop, Push, Return,
             Sub,
         };
+
+        if let Some(sys_init_address) = self.sys_init {
+            println!("jumping to Sys.init at {}", sys_init_address);
+            self.call_function(sys_init_address, 0).unwrap();
+            self.sys_init = None;
+            return;
+        }
+
+        let currently_in_builtin_f = match self.peek_call() {
+            Some(CallStackEntry {
+                state: CallState::Builtin(_, _),
+                ret_addr,
+                ..
+            }) => *ret_addr != ReturnAddress::EndOfProgram,
+            _ => false,
+        };
+
+        if currently_in_builtin_f {
+            let peeked = self.peek_call().unwrap().clone();
+            self.continue_builtin_function(peeked);
+            return;
+        }
 
         let opcode = self.program[self.pc];
         let instr = opcode.try_into().unwrap();
@@ -254,11 +559,19 @@ impl VM {
             }
             Goto => {
                 let instr = self.consume_short();
+                // TODO: implement debug symbols for labels
+                trace_vm!({
+                    println!("goto {}", instr);
+                });
                 self.pc = instr as usize;
             }
             IfGoto => {
                 let instr = self.consume_short();
                 let condition = self.pop();
+                trace_vm!({
+                    println!("if-goto {} {}", condition, instr);
+                });
+
                 if condition == 0 {
                     self.pc += 1;
                 } else {
@@ -273,9 +586,8 @@ impl VM {
                     println!("ARG  {}", self.mem(ARG));
                     println!("THIS {}", self.mem(THIS));
                     println!("THAT {}", self.mem(THAT));
+                    println!("PC   {}", self.pc);
                 });
-
-                self.push_call(self.pc as Symbol);
 
                 let n_locals = self.consume_short();
                 for _ in 0..n_locals {
@@ -289,11 +601,16 @@ impl VM {
                 });
 
                 let frame = self.mem(LCL) as Address;
+                if frame < 5 {
+                    panic!("{} {} {:?}", frame, self.pc, self.call_stack_names());
+                }
                 // the return address
                 let ret = self.mem(frame - 5) as Address;
+
                 // reposition the return value for the caller
                 let return_value = self.pop();
                 self.set_mem_indirect(ARG, 0, return_value);
+
                 // restore the stack for the caller
                 self.set_mem(SP, self.mem(ARG) + 1);
                 self.set_mem(THAT, self.mem(frame - 1));
@@ -301,47 +618,38 @@ impl VM {
                 self.set_mem(ARG, self.mem(frame - 3));
                 self.set_mem(LCL, self.mem(frame - 4));
 
-                self.pc = ret;
-                let popped = self.pop_call();
+                let popped = self.pop_call().unwrap();
+
+                if popped.ret_addr != ReturnAddress::EndOfProgram {
+                    self.pc = ret;
+                }
+
+                if let CallStackEntry {
+                    ret_addr: ReturnAddress::Builtin(next_state),
+                    ..
+                } = popped
+                {
+                    self.update_call_stack_tos_next_state(next_state);
+                }
+
+                // TODO: use debug symbols here
                 trace_calls!({
-                    if let Some(ret_from) = popped {
-                        print!("returning from {}", self.debug_symbols[&(ret_from as u16)]);
-                        if let Some(&ret_to) = self.call_stack.last() {
-                            println!(" to {}", self.debug_symbols[&(ret_to as u16)]);
-                        } else {
-                            println!(" to nowhere");
-                        }
-                        println!("at address {}", ret);
+                    print!("returning from {:?}", popped.function); //self.debug_symbols[&(ret_from as u16)]);
+
+                    if let Some(ret_to) = self.call_stack.last() {
+                        println!(" to {:?}", ret_to); //self.debug_symbols[&(ret_to as u16)]);
+                        println!("LCL changed from {} to {}", frame, self.memory[LCL]);
                     } else {
-                        println!("returning from top level");
+                        println!(" to nowhere");
                     }
+                    println!("at address {}", ret);
                 });
             }
             Call => {
-                let function = self.consume_short();
-                trace_calls!({
-                    println!("call {}", self.debug_symbols[&(function as u16)]);
-                });
-
+                let function = self.consume_short() as u16;
                 let n_args = self.consume_short();
 
-                let ret_addr = self.pc + 1;
-                self.push(ret_addr as i16);
-
-                let lcl = self.mem(LCL);
-                self.push(lcl);
-                let arg = self.mem(ARG);
-                self.push(arg);
-                let this = self.mem(THIS);
-                self.push(this);
-                let that = self.mem(THAT);
-                self.push(that);
-
-                let sp = self.mem(SP);
-                self.set_mem(ARG, sp - n_args - 5);
-                self.set_mem(LCL, sp);
-
-                self.pc = function as usize;
+                self.call_function(function, n_args).unwrap();
             }
         };
 
@@ -359,19 +667,7 @@ impl VM {
 
 impl Default for VM {
     fn default() -> Self {
-        let mut vm = Self {
-            pc: 0,
-            program: vec![],
-            debug_symbols: HashMap::new(),
-            call_stack: Vec::with_capacity(32),
-            memory: Box::new([0; MEM_SIZE]),
-        };
-
-        // page 162 of the book:
-        // the VM implementation can start by generating assembly code that sets SP=256
-        vm.memory[0] = INIT_SP;
-
-        vm
+        Self::new(Stdlib::default())
     }
 }
 
@@ -381,6 +677,7 @@ mod tests {
     use crate::definitions::KBD;
     use crate::definitions::SCREEN_START;
     use crate::parse::bytecode::*;
+    use crate::simulators::vm::stdlib::StdlibFunction;
 
     #[test]
     fn basic_test_vme_no_parse() {
@@ -473,8 +770,8 @@ mod tests {
             Opcode::constant(0),
             Opcode::instruction(Instruction::Add),
         ];
-
-        vm.load(bytecode, HashMap::new());
+        let program = ParsedProgram::new(bytecode, HashMap::new(), HashMap::new());
+        vm.load(program);
 
         vm.set_mem(SP, 256);
         vm.set_mem(LCL, 300);
@@ -531,7 +828,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(SP, 256);
         vm.set_mem(LCL, 300);
@@ -578,7 +875,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(0, 256);
 
@@ -614,7 +911,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(0, 256);
 
@@ -638,7 +935,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(0, 256);
 
@@ -698,7 +995,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(0, 256);
 
@@ -746,7 +1043,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(SP, 256);
         vm.set_mem(LCL, 300);
@@ -815,7 +1112,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(SP, 256);
         vm.set_mem(LCL, 300);
@@ -885,7 +1182,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(SP, 261);
 
@@ -980,7 +1277,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(0, 261);
         vm.set_mem(1, 261);
@@ -1028,7 +1325,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(SP, 317);
         vm.set_mem(LCL, 317);
@@ -1121,7 +1418,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         vm.set_mem(SP, 261);
 
@@ -1179,7 +1476,7 @@ mod tests {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         for _ in 0..500000 {
             vm.step();
@@ -1188,5 +1485,216 @@ mod tests {
         for i in SCREEN_START..KBD {
             assert_eq!(255, vm.mem(i));
         }
+    }
+    #[test]
+    fn test_should_execute_stdlib_implementation() {
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        by_name.insert("Math.abs", u16::MAX);
+        by_address.insert(
+            u16::MAX,
+            StdlibFunction::new(u16::MAX, "Math.abs", 1, &|_, _, params| {
+                Ok(StdlibOk::Finished(params[0].abs()))
+            }),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+
+        let mut vm = VM::new(stdlib.clone());
+
+        let src = r#"
+            function Lines.init 0
+            push constant 0
+            push constant 42
+            sub
+            call Math.abs 1
+            label LOOP
+            goto LOOP
+            "#;
+
+        let programs = vec![SourceFile::new("MathsTest.vm", src)];
+        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..100 {
+            vm.step();
+        }
+
+        assert_eq!(vm.pop(), 42);
+    }
+
+    #[test]
+    fn test_should_execute_stdlib_implementation_multiple_args() {
+        let stdlib = Stdlib::new();
+
+        let mut vm = VM::new(stdlib.clone());
+
+        let src = r#"
+            function Main.main 0
+            push constant 42
+            push constant 3
+            push constant 4
+            call Math.multiply 2
+            push constant 2
+            call Math.multiply 2
+            neg
+            call Math.abs 1
+            label LOOP
+            goto LOOP
+            "#;
+
+        let programs = vec![SourceFile::new("MathsTest.vm", src)];
+        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..20 {
+            vm.step();
+        }
+
+        assert_eq!(vm.pop(), 24);
+        assert_eq!(vm.pop(), 42);
+    }
+    #[test]
+    fn test_calling_vm_from_builtin_function() {
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+            match state {
+                0 => {
+                    if VMCallOk::WasBuiltinFunction == vm.call("Memory.init", vec![])? {
+                        // continue immediately
+                        sys_init(vm, state + 1, params)
+                    } else {
+                        Ok(StdlibOk::ContinueInNextStep(state + 1))
+                    }
+                }
+                1 => {
+                    if VMCallOk::WasBuiltinFunction == vm.call("Main.main", vec![])? {
+                        // continue immediately
+                        sys_init(vm, state + 1, params)
+                    } else {
+                        Ok(StdlibOk::ContinueInNextStep(state + 1))
+                    }
+                }
+                _ => Ok(StdlibOk::Finished(0)),
+            }
+        }
+
+        by_name.insert("Sys.init", u16::MAX - 1);
+        by_address.insert(
+            u16::MAX - 1,
+            StdlibFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
+        );
+
+        fn mem_init<VM: VirtualMachine>(_: &mut VM, _: State, _: &[Word]) -> StdResult {
+            Ok(StdlibOk::Finished(20))
+        }
+
+        by_name.insert("Memory.init", u16::MAX);
+        by_address.insert(
+            u16::MAX,
+            StdlibFunction::new(u16::MAX, "Memory.init", 0, &mem_init),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+
+        let mut vm = VM::new(stdlib.clone());
+
+        let src = r#"
+            function Main.main 0
+            call Memory.init 0
+            push constant 22
+            add // the 20 should have been pushed by the Memory.init call
+            return // return to Sys.init
+            "#;
+
+        let programs = vec![SourceFile::new("Main.vm", src)];
+        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..10 {
+            vm.step();
+        }
+
+        assert_eq!(vm.pop(), 42);
+    }
+
+    #[test]
+    fn test_continuing_parked_stdlib_function() {
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        fn sys_wait<VM: VirtualMachine>(_: &mut VM, state: State, params: &[Word]) -> StdResult {
+            if state == 0 {
+                if params[0] < 2 {
+                    return Ok(StdlibOk::Finished(params[0]));
+                }
+                // 2 because one tick is already used
+                return Ok(StdlibOk::ContinueInNextStep(2));
+            }
+
+            if params[0] as usize > state {
+                return Ok(StdlibOk::ContinueInNextStep(state + 1));
+            }
+
+            Ok(StdlibOk::Finished(params[0]))
+        }
+
+        fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, _: &[Word]) -> StdResult {
+            if state == 0 {
+                vm.call("Main.main", vec![])?;
+            }
+            Ok(StdlibOk::Finished(0))
+        }
+
+        by_name.insert("Sys.init", u16::MAX - 1);
+        by_address.insert(
+            u16::MAX - 1,
+            StdlibFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
+        );
+
+        by_name.insert("Sys.wait", u16::MAX);
+        by_address.insert(
+            u16::MAX,
+            StdlibFunction::new(u16::MAX, "Sys.wait", 1, &sys_wait),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+
+        let mut vm = VM::new(stdlib.clone());
+
+        let src = r#"
+            function Main.getReturnValue 0
+            push constant 42
+            return
+
+            function Main.main 0
+            push constant 10 // wait 10 ticks
+            call Sys.wait 1
+            push constant 2
+            call Sys.wait 1 // wait 2 more ticks
+            call Main.getReturnValue 0
+            return // return to Sys.init
+            "#;
+
+        let programs = vec![SourceFile::new("Main.vm", src)];
+        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..22 {
+            vm.step();
+        }
+
+        assert_eq!(vm.pop(), 42);
     }
 }

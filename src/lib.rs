@@ -3,6 +3,7 @@ use wasm_bindgen::prelude::*;
 mod definitions;
 mod parse;
 mod simulators;
+mod util;
 
 use parse::bytecode::Parser;
 use parse::bytecode::SourceFile;
@@ -58,7 +59,7 @@ impl App {
         let mut bytecode_parser = Parser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
-        vm.load(program.opcodes, program.debug_symbols);
+        vm.load(program);
 
         Self { vm }
     }
