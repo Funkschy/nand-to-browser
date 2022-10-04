@@ -1,3 +1,4 @@
+use crate::simulators::vm::stdlib::Stdlib;
 use wasm_bindgen::prelude::*;
 
 mod definitions;
@@ -26,7 +27,7 @@ impl App {
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
 
-        let mut vm = VM::default();
+        let mut vm = VM::new(Stdlib::new());
 
         let sys = include_str!("../res/stdlib/Sys.vm");
         let array = include_str!("../res/stdlib/Array.vm");
@@ -56,7 +57,7 @@ impl App {
             SourceFile::new("Tetromino.vm", tetromino),
         ];
 
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);

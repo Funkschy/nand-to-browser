@@ -44,3 +44,5 @@
 - [ ] Anzeige des globalen Stacks
 - [ ] Anzeige des globalen RAMS
 - [ ] Numberformat switcher
+** TODO sonstiges [0/1]
+- [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger

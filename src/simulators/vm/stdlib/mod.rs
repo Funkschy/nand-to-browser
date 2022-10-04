@@ -41,6 +41,9 @@ pub enum StdlibError {
     IncorrectNumberOfArgs,
     CallingNonExistendFunction,
     NoReturnValueFromStdlibFunction,
+
+    MathDivideByZero,
+    MathNegativeSqrt,
 }
 
 pub type StdResult = Result<StdlibOk, StdlibError>;

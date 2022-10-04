@@ -16,17 +16,25 @@ pub fn multiply<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> 
 }
 
 pub fn divide<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
-    unimplemented!()
+    if params[1] != 0 {
+        Ok(StdlibOk::Finished(params[0] / params[1]))
+    } else {
+        Err(StdlibError::MathDivideByZero)
+    }
 }
 
 pub fn min<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
-    unimplemented!()
+    Ok(StdlibOk::Finished(params[0].min(params[1])))
 }
 
 pub fn max<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
-    unimplemented!()
+    Ok(StdlibOk::Finished(params[0].max(params[1])))
 }
 
 pub fn sqrt<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
-    unimplemented!()
+    if params[0] >= 0 {
+        Ok(StdlibOk::Finished((params[0] as f64).sqrt() as Word))
+    } else {
+        Err(StdlibError::MathNegativeSqrt)
+    }
 }
