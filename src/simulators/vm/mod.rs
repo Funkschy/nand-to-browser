@@ -7,7 +7,7 @@ use crate::definitions::SCREEN_START;
 use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SP, THAT, THIS};
 use command::{Instruction, Segment};
 use std::collections::HashMap;
-use stdlib::*;
+use stdlib::{BuiltinFunction, State, Stdlib, StdlibError, StdlibOk, VMCallOk, VirtualMachine};
 
 pub trait ProgramInfo {
     fn instructions(&self) -> &Vec<Instruction>;
@@ -293,7 +293,7 @@ impl VM {
     }
 
     fn update_call_stack_tos_next_state(&mut self, next_state: State) {
-        self.update_call_stack_index_next_state(self.call_stack.len() - 1, next_state)
+        self.update_call_stack_index_next_state(self.call_stack.len() - 1, next_state);
     }
 
     fn update_call_stack_index_next_state(&mut self, index: usize, next_state: State) {
@@ -375,8 +375,8 @@ impl VM {
         }
     }
 
-    fn call_builtin_function(&mut self, function: StdlibFunction<'static, Self>, args: Vec<i16>) {
-        use StdlibOk::*;
+    fn call_builtin_function(&mut self, function: BuiltinFunction<'static, Self>, args: &[Word]) {
+        use StdlibOk::{ContinueInNextStep, Finished};
 
         trace_calls!({
             println!(
@@ -393,7 +393,7 @@ impl VM {
             ret_addr,
             function.virtual_address(),
             init_state,
-            args.clone(),
+            args.to_owned(),
         ));
         // TODO: handle error return value
         let ret_val = function.call(self, &args).unwrap();
@@ -457,7 +457,7 @@ impl VM {
             let args = Vec::from(&self.memory[sp - n_args..sp]);
             self.set_mem(SP, (sp - n_args) as i16);
 
-            self.call_builtin_function(stdlib_function, args);
+            self.call_builtin_function(stdlib_function, &args);
             Ok(VMCallOk::WasBuiltinFunction)
         } else {
             self.call_vm_function(function, n_args);
@@ -646,8 +646,8 @@ mod tests {
     use super::*;
     use crate::definitions::KBD;
     use crate::definitions::SCREEN_START;
-    use crate::parse::bytecode::*;
-    use crate::simulators::vm::stdlib::StdlibFunction;
+    use crate::parse::bytecode::{ParsedProgram, Parser, SourceFile};
+    use crate::simulators::vm::stdlib::{BuiltinFunction, StdResult};
 
     #[test]
     fn basic_test_vme_no_parse() {
@@ -1465,7 +1465,7 @@ mod tests {
         by_name.insert("Math.abs", u16::MAX);
         by_address.insert(
             u16::MAX,
-            StdlibFunction::new(u16::MAX, "Math.abs", 1, &|_, _, params| {
+            BuiltinFunction::new(u16::MAX, "Math.abs", 1, &|_, _, params| {
                 Ok(StdlibOk::Finished(params[0].abs()))
             }),
         );
@@ -1561,7 +1561,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX - 1);
         by_address.insert(
             u16::MAX - 1,
-            StdlibFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
+            BuiltinFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
         );
 
         fn mem_init<VM: VirtualMachine>(_: &mut VM, _: State, _: &[Word]) -> StdResult {
@@ -1571,7 +1571,7 @@ mod tests {
         by_name.insert("Memory.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            StdlibFunction::new(u16::MAX, "Memory.init", 0, &mem_init),
+            BuiltinFunction::new(u16::MAX, "Memory.init", 0, &mem_init),
         );
 
         let stdlib = Stdlib::of(by_name, by_address);
@@ -1630,13 +1630,13 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX - 1);
         by_address.insert(
             u16::MAX - 1,
-            StdlibFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
+            BuiltinFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
         );
 
         by_name.insert("Sys.wait", u16::MAX);
         by_address.insert(
             u16::MAX,
-            StdlibFunction::new(u16::MAX, "Sys.wait", 1, &sys_wait),
+            BuiltinFunction::new(u16::MAX, "Sys.wait", 1, &sys_wait),
         );
 
         let stdlib = Stdlib::of(by_name, by_address);

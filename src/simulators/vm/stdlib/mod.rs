@@ -48,7 +48,7 @@ pub enum StdlibError {
 
 pub type StdResult = Result<StdlibOk, StdlibError>;
 
-pub struct StdlibFunction<'f, VM: VirtualMachine> {
+pub struct BuiltinFunction<'f, VM: VirtualMachine> {
     // the fake address which is used to jump to this builtin function
     // Calls in the vm do not work via the function name and instead use the functions address in
     // the bytecode for better performance. This is of course a bit of an issue with functions that
@@ -59,14 +59,14 @@ pub struct StdlibFunction<'f, VM: VirtualMachine> {
     function: &'f dyn Fn(&mut VM, State, &[Word]) -> StdResult,
 }
 
-impl<'f, VM: VirtualMachine> fmt::Debug for StdlibFunction<'f, VM> {
+impl<'f, VM: VirtualMachine> fmt::Debug for BuiltinFunction<'f, VM> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
 // for some weird reason, the derive implementations weren't recognized by the compiler
-impl<'f, VM: VirtualMachine> Clone for StdlibFunction<'f, VM> {
+impl<'f, VM: VirtualMachine> Clone for BuiltinFunction<'f, VM> {
     fn clone(&self) -> Self {
         Self {
             virtual_address: self.virtual_address,
@@ -77,9 +77,9 @@ impl<'f, VM: VirtualMachine> Clone for StdlibFunction<'f, VM> {
     }
 }
 
-impl<'f, VM: VirtualMachine> std::marker::Copy for StdlibFunction<'f, VM> {}
+impl<'f, VM: VirtualMachine> std::marker::Copy for BuiltinFunction<'f, VM> {}
 
-impl<'f, VM: VirtualMachine> StdlibFunction<'f, VM> {
+impl<'f, VM: VirtualMachine> BuiltinFunction<'f, VM> {
     pub fn new(
         virtual_address: Symbol,
         name: &'static str,
@@ -123,7 +123,7 @@ impl<'f, VM: VirtualMachine> StdlibFunction<'f, VM> {
 #[derive(Default)]
 pub struct Stdlib<'f, VM: VirtualMachine> {
     by_name: HashMap<&'static str, Symbol>,
-    by_address: HashMap<Symbol, StdlibFunction<'f, VM>>,
+    by_address: HashMap<Symbol, BuiltinFunction<'f, VM>>,
 }
 
 // for some weird reason, the derive implementations weren't recognized by the compiler
@@ -148,7 +148,7 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
 
     pub fn of(
         by_name: HashMap<&'static str, Symbol>,
-        by_address: HashMap<Symbol, StdlibFunction<'f, VM>>,
+        by_address: HashMap<Symbol, BuiltinFunction<'f, VM>>,
     ) -> Self {
         Self {
             by_name,
@@ -156,11 +156,11 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
         }
     }
 
-    pub fn by_address(&self, function: Symbol) -> Option<&StdlibFunction<'f, VM>> {
+    pub fn by_address(&self, function: Symbol) -> Option<&BuiltinFunction<'f, VM>> {
         self.by_address.get(&function)
     }
 
-    pub fn lookup<'s>(&self, ident: impl Into<&'s str>) -> Option<&StdlibFunction<'f, VM>> {
+    pub fn lookup<'s>(&self, ident: impl Into<&'s str>) -> Option<&BuiltinFunction<'f, VM>> {
         self.by_name
             .get(ident.into())
             .and_then(|&address| self.by_address(address))
@@ -177,7 +177,7 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
 
 fn stdlib<'f, VM: VirtualMachine>() -> (
     HashMap<&'static str, Symbol>,
-    HashMap<Symbol, StdlibFunction<'f, VM>>,
+    HashMap<Symbol, BuiltinFunction<'f, VM>>,
 ) {
     const NUMBER_OF_STDLIB_FUNCTIONS: usize = 49;
 
@@ -188,14 +188,14 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
 
     let mut def = |name, n_args, f| {
         let address = virtual_function_offset + by_address.len() as u16;
-        let function = StdlibFunction::new(address, name, n_args, f);
+        let function = BuiltinFunction::new(address, name, n_args, f);
         by_address.insert(address, function);
         by_name.insert(name, address);
     };
 
     // Math
     {
-        use os_math::*;
+        use os_math::{abs, divide, init, max, min, multiply, sqrt};
         def("Math.init", 0, &init);
         def("Math.abs", 1, &abs);
         def("Math.multiply", 2, &multiply);
@@ -207,7 +207,10 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
 
     // String
     {
-        use os_string::*;
+        use os_string::{
+            append_char, backspace, char_at, dispose, double_quote, erase_last_char, int_value,
+            length, new, newline, set_char_at, set_int,
+        };
         def("String.new", 1, &new);
         def("String.dispose", 1, &dispose);
         def("String.length", 1, &length);
@@ -224,14 +227,16 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
 
     // Array
     {
-        use os_array::*;
+        use os_array::{dispose, new};
         def("Array.new", 1, &new);
         def("Array.dispose", 1, &dispose);
     }
 
     // Output
     {
-        use os_output::*;
+        use os_output::{
+            backspace, init, move_cursor, print_char, print_int, print_string, println,
+        };
         def("Output.init", 0, &init);
         def("Output.moveCursor", 2, &move_cursor);
         def("Output.printChar", 1, &print_char);
@@ -243,7 +248,9 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
 
     // Screen
     {
-        use os_screen::*;
+        use os_screen::{
+            clear_screen, draw_circle, draw_line, draw_pixel, draw_rectangle, init, set_color,
+        };
         def("Screen.init", 0, &init);
         def("Screen.clearScreen", 0, &clear_screen);
         def("Screen.setColor", 1, &set_color);
@@ -255,7 +262,7 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
 
     // Keyboard
     {
-        use os_keyboard::*;
+        use os_keyboard::{init, key_pressed, read_char, read_int, read_line};
         def("Keyboard.init", 0, &init);
         def("Keyboard.keyPressed", 0, &key_pressed);
         def("Keyboard.readChar", 0, &read_char);
@@ -265,7 +272,7 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
 
     // Memory
     {
-        use os_memory::*;
+        use os_memory::{alloc, de_alloc, init, peek, poke};
         def("Memory.init", 0, &init);
         def("Memory.peek", 1, &peek);
         def("Memory.poke", 2, &poke);
@@ -275,7 +282,7 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
 
     // Sys
     {
-        use os_sys::*;
+        use os_sys::{error, halt, init, wait};
         def("Sys.init", 0, &init);
         def("Sys.halt", 0, &halt);
         def("Sys.error", 1, &error);

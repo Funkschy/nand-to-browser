@@ -512,7 +512,7 @@ impl ProgramInfo for ParsedProgram {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::simulators::vm::stdlib::{StdlibFunction, StdlibOk};
+    use crate::simulators::vm::stdlib::{BuiltinFunction, StdlibOk};
 
     #[test]
     fn parser_should_report_unresolved_labels() {
@@ -1244,7 +1244,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            StdlibFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
                 Ok(StdlibOk::Finished(0))
             }),
         );
@@ -1288,7 +1288,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            StdlibFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
                 Ok(StdlibOk::Finished(0))
             }),
         );
@@ -1334,7 +1334,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            StdlibFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
                 Ok(StdlibOk::Finished(0))
             }),
         );
