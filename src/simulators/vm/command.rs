@@ -7,17 +7,16 @@ pub enum ByteCodeParseError {
     IllegalSegmentString,
 }
 
-#[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Segment {
-    Argument = 0,
-    Local = 1,
-    Static = 2,
-    Constant = 3,
-    This = 4,
-    That = 5,
-    Pointer = 6,
-    Temp = 7,
+    Argument,
+    Local,
+    Static,
+    Constant,
+    This,
+    That,
+    Pointer,
+    Temp,
 }
 
 impl FromStr for Segment {
