@@ -1,0 +1,1325 @@
+function WallGame.new 0
+push constant 5
+call Memory.alloc 1
+pop pointer 0
+push constant 60
+pop static 0
+push constant 30
+pop static 1
+push constant 240
+pop static 2
+push constant 8000
+pop static 4
+push constant 32767
+pop static 3
+push constant 32
+pop static 5
+call Trig.new 0
+pop static 6
+push pointer 0
+call WallGame.initStepTable 1
+pop temp 0
+push static 0
+call Array.new 1
+pop this 4
+call Level.level1 0
+pop this 0
+push constant 72
+pop this 1
+push constant 72
+pop this 2
+push constant 110
+pop this 3
+push pointer 0
+return
+function WallGame.dispose 0
+push argument 0
+pop pointer 0
+push this 0
+call Map.dispose 1
+pop temp 0
+push pointer 0
+call Memory.deAlloc 1
+pop temp 0
+push constant 0
+return
+function WallGame.drawPlayer 2
+push argument 0
+pop pointer 0
+push this 1
+push constant 256
+add
+pop local 0
+push constant 0
+not
+call Screen.setColor 1
+pop temp 0
+push local 0
+push this 2
+push constant 2
+call Screen.drawCircle 3
+pop temp 0
+push this 3
+push static 1
+sub
+pop local 1
+push local 1
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 1
+push constant 360
+add
+pop local 1
+label IF_FALSE0
+push local 0
+push this 2
+push local 0
+push static 6
+push local 1
+call Trig.cos 2
+push constant 5
+call Math.divide 2
+add
+push this 2
+push static 6
+push local 1
+call Trig.sin 2
+push constant 5
+call Math.divide 2
+add
+call Screen.drawLine 4
+pop temp 0
+push this 3
+push static 1
+add
+pop local 1
+push local 1
+push constant 360
+lt
+not
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 1
+push constant 360
+sub
+pop local 1
+label IF_FALSE1
+push local 0
+push this 2
+push local 0
+push static 6
+push local 1
+call Trig.cos 2
+push constant 5
+call Math.divide 2
+add
+push this 2
+push static 6
+push local 1
+call Trig.sin 2
+push constant 5
+call Math.divide 2
+add
+call Screen.drawLine 4
+pop temp 0
+push constant 0
+return
+function WallGame.moveForwards 2
+push argument 0
+pop pointer 0
+push this 1
+push static 6
+push this 3
+call Trig.cos 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+add
+pop local 0
+push this 2
+push static 6
+push this 3
+call Trig.sin 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+add
+pop local 1
+push this 0
+push local 0
+push static 5
+call Math.divide 2
+push local 1
+push static 5
+call Math.divide 2
+call Map.isWall 3
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+pop this 1
+push local 1
+pop this 2
+push constant 0
+not
+return
+label IF_FALSE0
+push constant 0
+return
+function WallGame.moveLeft 2
+push argument 0
+pop pointer 0
+push this 1
+push static 6
+push this 3
+call Trig.sin 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+add
+pop local 0
+push this 2
+push static 6
+push this 3
+call Trig.cos 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+sub
+pop local 1
+push this 0
+push local 0
+push static 5
+call Math.divide 2
+push local 1
+push static 5
+call Math.divide 2
+call Map.isWall 3
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+pop this 1
+push local 1
+pop this 2
+push constant 0
+not
+return
+label IF_FALSE0
+push constant 0
+return
+function WallGame.moveBackwards 2
+push argument 0
+pop pointer 0
+push this 1
+push static 6
+push this 3
+call Trig.cos 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+sub
+pop local 0
+push this 2
+push static 6
+push this 3
+call Trig.sin 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+sub
+pop local 1
+push this 0
+push local 0
+push static 5
+call Math.divide 2
+push local 1
+push static 5
+call Math.divide 2
+call Map.isWall 3
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+pop this 1
+push local 1
+pop this 2
+push constant 0
+not
+return
+label IF_FALSE0
+push constant 0
+return
+function WallGame.moveRight 2
+push argument 0
+pop pointer 0
+push this 1
+push static 6
+push this 3
+call Trig.sin 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+sub
+pop local 0
+push this 2
+push static 6
+push this 3
+call Trig.cos 2
+push argument 1
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+add
+pop local 1
+push this 0
+push local 0
+push static 5
+call Math.divide 2
+push local 1
+push static 5
+call Math.divide 2
+call Map.isWall 3
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+pop this 1
+push local 1
+pop this 2
+push constant 0
+not
+return
+label IF_FALSE0
+push constant 0
+return
+function WallGame.rotateLeft 0
+push argument 0
+pop pointer 0
+push this 3
+push argument 1
+sub
+pop this 3
+push this 3
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 3
+push constant 360
+add
+pop this 3
+label IF_FALSE0
+push constant 0
+return
+function WallGame.rotateRight 0
+push argument 0
+pop pointer 0
+push this 3
+push argument 1
+add
+pop this 3
+push this 3
+push constant 360
+lt
+not
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 3
+push constant 360
+sub
+pop this 3
+label IF_FALSE0
+push constant 0
+return
+function WallGame.drawGrid 1
+push argument 0
+pop pointer 0
+push static 5
+pop local 0
+label WHILE_EXP0
+push local 0
+push constant 256
+lt
+not
+if-goto WHILE_END0
+push constant 256
+push local 0
+push constant 511
+push local 0
+call Screen.drawLine 4
+pop temp 0
+push local 0
+push static 5
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 256
+pop local 0
+label WHILE_EXP1
+push local 0
+push constant 511
+lt
+not
+if-goto WHILE_END1
+push local 0
+push constant 0
+push local 0
+push constant 255
+call Screen.drawLine 4
+pop temp 0
+push local 0
+push static 5
+add
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push constant 0
+return
+function WallGame.drawRay 0
+push argument 0
+pop pointer 0
+push argument 1
+push constant 1
+neg
+gt
+push argument 1
+push constant 256
+lt
+and
+push argument 2
+push constant 1
+neg
+gt
+and
+push argument 2
+push constant 256
+lt
+and
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+not
+call Screen.setColor 1
+pop temp 0
+push constant 255
+push this 1
+add
+push this 2
+push constant 255
+push argument 1
+add
+push argument 2
+call Screen.drawLine 4
+pop temp 0
+label IF_FALSE0
+push constant 0
+return
+function WallGame.castToVerticalWall 7
+push argument 0
+pop pointer 0
+push argument 1
+push constant 90
+lt
+push argument 1
+push constant 270
+gt
+or
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 1
+push static 5
+call Math.divide 2
+push static 5
+call Math.multiply 2
+push static 5
+add
+pop local 0
+push static 5
+pop local 1
+goto IF_END0
+label IF_FALSE0
+push this 1
+push static 5
+call Math.divide 2
+push static 5
+call Math.multiply 2
+push constant 1
+sub
+pop local 0
+push static 5
+neg
+pop local 1
+label IF_END0
+push static 6
+push argument 1
+call Trig.tan 2
+push local 0
+push this 1
+sub
+call Math.multiply 2
+push static 6
+call Trig.FIX_POINT 1
+call Math.divide 2
+push this 2
+add
+pop local 2
+push argument 1
+push constant 90
+eq
+push argument 1
+push constant 270
+eq
+or
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push static 3
+pop local 3
+goto IF_END1
+label IF_FALSE1
+push constant 0
+pop local 6
+label WHILE_EXP0
+push local 6
+not
+not
+if-goto WHILE_END0
+push local 0
+push static 5
+call Math.divide 2
+pop local 4
+push local 2
+push static 5
+call Math.divide 2
+pop local 5
+push local 4
+push this 0
+call Map.width 1
+lt
+not
+push local 5
+push this 0
+call Map.height 1
+lt
+not
+or
+push local 0
+push constant 0
+lt
+or
+push local 2
+push constant 0
+lt
+or
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 0
+not
+pop local 6
+push static 3
+pop local 3
+goto IF_END2
+label IF_FALSE2
+push this 0
+push local 4
+push local 5
+call Map.isWall 3
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 0
+not
+pop local 6
+push local 0
+push this 1
+sub
+push static 6
+call Trig.FIX_POINT 1
+call Math.multiply 2
+push static 6
+push argument 1
+call Trig.cos 2
+call Math.divide 2
+pop local 3
+goto IF_END3
+label IF_FALSE3
+push local 2
+push argument 1
+push static 8
+add
+pop pointer 1
+push that 0
+add
+pop local 2
+push local 0
+push local 1
+add
+pop local 0
+label IF_END3
+label IF_END2
+goto WHILE_EXP0
+label WHILE_END0
+label IF_END1
+push local 3
+return
+function WallGame.castToHorizontalWall 7
+push argument 0
+pop pointer 0
+push argument 1
+push constant 0
+gt
+push argument 1
+push constant 180
+lt
+and
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push this 2
+push static 5
+call Math.divide 2
+push static 5
+call Math.multiply 2
+push static 5
+add
+pop local 0
+push static 5
+pop local 1
+goto IF_END0
+label IF_FALSE0
+push this 2
+push static 5
+call Math.divide 2
+push static 5
+call Math.multiply 2
+push constant 1
+sub
+pop local 0
+push static 5
+neg
+pop local 1
+label IF_END0
+push static 6
+push argument 1
+call Trig.itan 2
+push local 0
+push this 2
+sub
+call Math.multiply 2
+push static 6
+call Trig.FIX_POINT 1
+call Math.divide 2
+push this 1
+add
+pop local 2
+push argument 1
+push constant 0
+eq
+push argument 1
+push constant 180
+eq
+or
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push static 3
+pop local 3
+goto IF_END1
+label IF_FALSE1
+push constant 0
+pop local 6
+label WHILE_EXP0
+push local 6
+not
+not
+if-goto WHILE_END0
+push local 2
+push static 5
+call Math.divide 2
+pop local 4
+push local 0
+push static 5
+call Math.divide 2
+pop local 5
+push local 4
+push this 0
+call Map.width 1
+lt
+not
+push local 5
+push this 0
+call Map.height 1
+lt
+not
+or
+push local 2
+push constant 0
+lt
+or
+push local 0
+push constant 0
+lt
+or
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push constant 0
+not
+pop local 6
+push static 3
+pop local 3
+goto IF_END2
+label IF_FALSE2
+push this 0
+push local 4
+push local 5
+call Map.isWall 3
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push constant 0
+not
+pop local 6
+push local 0
+push this 2
+sub
+push static 6
+call Trig.FIX_POINT 1
+call Math.multiply 2
+push static 6
+push argument 1
+call Trig.sin 2
+call Math.divide 2
+pop local 3
+goto IF_END3
+label IF_FALSE3
+push local 2
+push argument 1
+push static 7
+add
+pop pointer 1
+push that 0
+add
+pop local 2
+push local 0
+push local 1
+add
+pop local 0
+label IF_END3
+label IF_END2
+goto WHILE_EXP0
+label WHILE_END0
+label IF_END1
+push local 3
+return
+function WallGame.drawWallSlice 2
+push argument 0
+pop pointer 0
+push argument 2
+push constant 0
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push static 2
+pop local 0
+goto IF_END0
+label IF_FALSE0
+push static 4
+push argument 2
+call Math.divide 2
+push static 2
+call Math.min 2
+pop local 0
+label IF_END0
+push static 2
+push local 0
+sub
+push constant 2
+call Math.divide 2
+pop local 1
+push argument 1
+push constant 4
+call Math.multiply 2
+pop argument 1
+push local 0
+push constant 0
+gt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push argument 1
+push local 1
+push argument 1
+push local 1
+push local 0
+add
+call Screen.drawLine 4
+pop temp 0
+label IF_FALSE1
+push constant 0
+return
+function WallGame.render 6
+push argument 0
+pop pointer 0
+push this 3
+push constant 30
+sub
+pop local 1
+push local 1
+push constant 0
+lt
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 360
+push local 1
+add
+pop local 1
+label IF_FALSE0
+label WHILE_EXP0
+push local 0
+push static 0
+lt
+not
+if-goto WHILE_END0
+push pointer 0
+push local 1
+call WallGame.castToHorizontalWall 2
+pop local 2
+push pointer 0
+push local 1
+call WallGame.castToVerticalWall 2
+pop local 3
+push local 0
+push constant 30
+lt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push static 6
+push local 0
+push constant 30
+sub
+push constant 360
+add
+call Trig.cos 2
+push local 2
+push local 3
+call Math.min 2
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+pop local 4
+goto IF_END1
+label IF_FALSE1
+push static 6
+push local 0
+push constant 30
+sub
+call Trig.cos 2
+push local 2
+push local 3
+call Math.min 2
+call Math.multiply 2
+push constant 100
+call Math.divide 2
+pop local 4
+label IF_END1
+push local 0
+push this 4
+add
+push local 4
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push constant 0
+not
+call Screen.setColor 1
+pop temp 0
+push pointer 0
+push local 0
+push local 4
+call WallGame.drawWallSlice 3
+pop temp 0
+push local 0
+push constant 1
+add
+pop local 0
+push local 1
+push constant 1
+add
+pop local 1
+push local 1
+push constant 360
+lt
+not
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 1
+push constant 360
+sub
+pop local 1
+label IF_FALSE2
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function WallGame.blankWalls 0
+push argument 0
+pop pointer 0
+push constant 0
+call Screen.setColor 1
+pop temp 0
+push constant 0
+push constant 0
+push static 0
+push constant 4
+call Math.multiply 2
+push static 2
+call Screen.drawRectangle 4
+pop temp 0
+push constant 0
+return
+function WallGame.draw 0
+push argument 0
+pop pointer 0
+push this 0
+push constant 0
+push constant 256
+push constant 0
+push static 5
+call Map.draw 5
+pop temp 0
+push pointer 0
+call WallGame.drawPlayer 1
+pop temp 0
+push pointer 0
+call WallGame.blankWalls 1
+pop temp 0
+push pointer 0
+call WallGame.render 1
+pop temp 0
+push constant 0
+return
+function WallGame.run 2
+push argument 0
+pop pointer 0
+push this 0
+push constant 0
+not
+push constant 256
+push constant 0
+push static 5
+call Map.draw 5
+pop temp 0
+push pointer 0
+call WallGame.draw 1
+pop temp 0
+push constant 22
+push constant 0
+call Output.moveCursor 2
+pop temp 0
+push constant 30
+call String.new 1
+push constant 77
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 118
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 58
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 65
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 114
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 119
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 107
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 121
+call String.appendChar 2
+push constant 115
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 82
+call String.appendChar 2
+push constant 111
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 97
+call String.appendChar 2
+push constant 116
+call String.appendChar 2
+push constant 101
+call String.appendChar 2
+push constant 58
+call String.appendChar 2
+push constant 32
+call String.appendChar 2
+push constant 118
+call String.appendChar 2
+push constant 44
+call String.appendChar 2
+push constant 98
+call String.appendChar 2
+call Output.printString 1
+pop temp 0
+push constant 0
+pop local 1
+label WHILE_EXP0
+push local 1
+not
+not
+if-goto WHILE_END0
+label WHILE_EXP1
+push local 0
+push constant 0
+eq
+not
+if-goto WHILE_END1
+call Keyboard.keyPressed 0
+pop local 0
+goto WHILE_EXP1
+label WHILE_END1
+push local 0
+push constant 81
+eq
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push constant 0
+not
+pop local 1
+label IF_FALSE0
+push local 0
+push constant 130
+eq
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push pointer 0
+push constant 5
+call WallGame.moveLeft 2
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push pointer 0
+call WallGame.draw 1
+pop temp 0
+label IF_FALSE2
+label IF_FALSE1
+push local 0
+push constant 131
+eq
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push pointer 0
+push constant 5
+call WallGame.moveForwards 2
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push pointer 0
+call WallGame.draw 1
+pop temp 0
+label IF_FALSE4
+label IF_FALSE3
+push local 0
+push constant 132
+eq
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push pointer 0
+push constant 5
+call WallGame.moveRight 2
+if-goto IF_TRUE6
+goto IF_FALSE6
+label IF_TRUE6
+push pointer 0
+call WallGame.draw 1
+pop temp 0
+label IF_FALSE6
+label IF_FALSE5
+push local 0
+push constant 133
+eq
+if-goto IF_TRUE7
+goto IF_FALSE7
+label IF_TRUE7
+push pointer 0
+push constant 5
+call WallGame.moveBackwards 2
+if-goto IF_TRUE8
+goto IF_FALSE8
+label IF_TRUE8
+push pointer 0
+call WallGame.draw 1
+pop temp 0
+label IF_FALSE8
+label IF_FALSE7
+push local 0
+push constant 86
+eq
+if-goto IF_TRUE9
+goto IF_FALSE9
+label IF_TRUE9
+push pointer 0
+push constant 5
+call WallGame.rotateLeft 2
+pop temp 0
+push pointer 0
+call WallGame.draw 1
+pop temp 0
+label IF_FALSE9
+push local 0
+push constant 66
+eq
+if-goto IF_TRUE10
+goto IF_FALSE10
+label IF_TRUE10
+push pointer 0
+push constant 5
+call WallGame.rotateRight 2
+pop temp 0
+push pointer 0
+call WallGame.draw 1
+pop temp 0
+label IF_FALSE10
+label WHILE_EXP2
+push local 0
+push constant 0
+eq
+not
+not
+if-goto WHILE_END2
+call Keyboard.keyPressed 0
+pop local 0
+goto WHILE_EXP2
+label WHILE_END2
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return
+function WallGame.initStepTable 1
+push argument 0
+pop pointer 0
+push constant 360
+call Array.new 1
+pop static 7
+push constant 360
+call Array.new 1
+pop static 8
+label WHILE_EXP0
+push local 0
+push constant 360
+lt
+not
+if-goto WHILE_END0
+push local 0
+push static 7
+add
+push static 5
+push static 6
+push local 0
+call Trig.itan 2
+call Math.multiply 2
+push static 6
+call Trig.FIX_POINT 1
+call Math.divide 2
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 90
+lt
+not
+push local 0
+push constant 270
+lt
+and
+if-goto IF_TRUE0
+goto IF_FALSE0
+label IF_TRUE0
+push local 0
+push static 7
+add
+pop pointer 1
+push that 0
+push constant 0
+gt
+if-goto IF_TRUE1
+goto IF_FALSE1
+label IF_TRUE1
+push local 0
+push static 7
+add
+push local 0
+push static 7
+add
+pop pointer 1
+push that 0
+neg
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+label IF_FALSE1
+goto IF_END0
+label IF_FALSE0
+push local 0
+push static 7
+add
+pop pointer 1
+push that 0
+push constant 0
+lt
+if-goto IF_TRUE2
+goto IF_FALSE2
+label IF_TRUE2
+push local 0
+push static 7
+add
+push local 0
+push static 7
+add
+pop pointer 1
+push that 0
+neg
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+label IF_FALSE2
+label IF_END0
+push local 0
+push static 8
+add
+push static 5
+push static 6
+push local 0
+call Trig.tan 2
+call Math.multiply 2
+push static 6
+call Trig.FIX_POINT 1
+call Math.divide 2
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+push local 0
+push constant 0
+lt
+not
+push local 0
+push constant 180
+lt
+and
+if-goto IF_TRUE3
+goto IF_FALSE3
+label IF_TRUE3
+push local 0
+push static 8
+add
+pop pointer 1
+push that 0
+push constant 0
+lt
+if-goto IF_TRUE4
+goto IF_FALSE4
+label IF_TRUE4
+push local 0
+push static 8
+add
+push local 0
+push static 8
+add
+pop pointer 1
+push that 0
+neg
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+label IF_FALSE4
+goto IF_END3
+label IF_FALSE3
+push local 0
+push static 8
+add
+pop pointer 1
+push that 0
+push constant 0
+gt
+if-goto IF_TRUE5
+goto IF_FALSE5
+label IF_TRUE5
+push local 0
+push static 8
+add
+push local 0
+push static 8
+add
+pop pointer 1
+push that 0
+neg
+pop temp 0
+pop pointer 1
+push temp 0
+pop that 0
+label IF_FALSE5
+label IF_END3
+push local 0
+push constant 1
+add
+pop local 0
+goto WHILE_EXP0
+label WHILE_END0
+push constant 0
+return

@@ -1,0 +1,11 @@
+function Main.main 1
+call WallGame.new 0
+pop local 0
+push local 0
+call WallGame.run 1
+pop temp 0
+push local 0
+call WallGame.dispose 1
+pop temp 0
+push constant 0
+return

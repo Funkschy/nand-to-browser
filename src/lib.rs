@@ -42,6 +42,13 @@ impl App {
         let render = include_str!("../res/tetris/Render.vm");
         let tetromino = include_str!("../res/tetris/Tetromino.vm");
 
+        // let main = include_str!("../res/raycasting/Main.vm");
+        // let level = include_str!("../res/raycasting/Level.vm");
+        // let map = include_str!("../res/raycasting/Map.vm");
+        // let player = include_str!("../res/raycasting/Player.vm");
+        // let trig = include_str!("../res/raycasting/Trig.vm");
+        // let wall_game = include_str!("../res/raycasting/WallGame.vm");
+
         let programs = vec![
             SourceFile::new("Sys.vm", sys),
             SourceFile::new("Keyboard.vm", keyboard),
@@ -56,6 +63,13 @@ impl App {
             SourceFile::new("Random.vm", random),
             SourceFile::new("Render.vm", render),
             SourceFile::new("Tetromino.vm", tetromino),
+            // raycasting
+            // SourceFile::new("Main.vm", main),
+            // SourceFile::new("Level.vm", level),
+            // SourceFile::new("Map.vm", map),
+            // SourceFile::new("Player.vm", player),
+            // SourceFile::new("Trig.vm", trig),
+            // SourceFile::new("WallGame.vm", wall_game),
         ];
 
         let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
