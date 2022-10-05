@@ -49,3 +49,4 @@
 - [ ] Numberformat switcher
 ** TODO sonstiges [0/2]
 - [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger
+- [ ] Benchmark: 3fcc146df140f95a7be8290d897cc46b4dbccc59 vs Nachfolger
