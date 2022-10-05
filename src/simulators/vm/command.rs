@@ -1,12 +1,10 @@
-use std::convert::TryInto;
-use std::fmt;
 use std::str::FromStr;
+
+use crate::definitions::{Symbol, Word};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ByteCodeParseError {
-    IllegalInstruction,
-    IllegalSegment,
-    SegmentParse,
+    IllegalSegmentString,
 }
 
 #[repr(u8)]
@@ -34,113 +32,28 @@ impl FromStr for Segment {
             "that" => Ok(Segment::That),
             "pointer" => Ok(Segment::Pointer),
             "temp" => Ok(Segment::Temp),
-            _ => Err(ByteCodeParseError::SegmentParse),
+            _ => Err(ByteCodeParseError::IllegalSegmentString),
         }
     }
 }
 
-#[repr(u8)]
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Instruction {
     // arithmetic commands (no arguments)
-    Add = 0,
-    Sub = 1,
-    Eq = 2,
-    Gt = 3,
-    Lt = 4,
-    And = 5,
-    Or = 6,
-    Not = 7,
-    Neg = 8,
-    // memory access commands (8 bit segment + 16 bit index arguments)
-    Push = 9,
-    Pop = 10,
-    // programflow commands (16 bit instruction address as argument)
-    Goto = 11,
-    IfGoto = 12,
-    // function commands
-    // 16 bit nlocals as arguments
-    Function = 13,
-    // 16 bit instruction address + 16 bit nargs as arguments
-    Call = 14,
-    // return (no arguments)
-    Return = 15,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union Opcode {
-    instruction: Instruction,
-    segment: Segment,
-    constant: u8,
-}
-
-impl Opcode {
-    pub fn instruction(instruction: Instruction) -> Self {
-        Opcode { instruction }
-    }
-    pub fn segment(segment: Segment) -> Self {
-        Opcode { segment }
-    }
-    pub fn constant(constant: u8) -> Self {
-        Opcode { constant }
-    }
-}
-
-impl PartialEq for Opcode {
-    fn eq(&self, other: &Self) -> bool {
-        unsafe { self.constant == other.constant }
-    }
-}
-
-impl fmt::Debug for Opcode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unsafe { write!(f, "{:#x}", self.constant) }
-    }
-}
-
-impl TryInto<Instruction> for Opcode {
-    type Error = ByteCodeParseError;
-
-    /// Return the opcode as an instance of the Instruction enum
-    fn try_into(self) -> Result<Instruction, Self::Error> {
-        // SAFETY: this will only return Ok if the value of the enum was actually in the
-        // valid range of instructions
-        unsafe {
-            if self.constant >= Instruction::Add as u8 && self.constant <= Instruction::Return as u8
-            {
-                Ok(self.instruction)
-            } else {
-                Err(ByteCodeParseError::IllegalInstruction)
-            }
-        }
-    }
-}
-
-impl TryInto<u8> for Opcode {
-    type Error = ByteCodeParseError;
-
-    /// Return the opcode as a byte
-    fn try_into(self) -> Result<u8, Self::Error> {
-        // SAFETY: all enum fields have the same size, so just reading the
-        // 8 bits of memory will always be safe
-        unsafe { Ok(self.constant) }
-    }
-}
-
-impl TryInto<Segment> for Opcode {
-    type Error = ByteCodeParseError;
-
-    /// Return the opcode as a segment
-    fn try_into(self) -> Result<Segment, Self::Error> {
-        // SAFETY: this will only return Ok if the value of the enum was actually in the
-        // valid range of segments
-        unsafe {
-            if self.constant >= Segment::Argument as u8 && self.constant <= Segment::Temp as u8 {
-                Ok(self.segment)
-            } else {
-                Err(ByteCodeParseError::IllegalSegment)
-            }
-        }
-    }
+    Add,
+    Sub,
+    Eq,
+    Gt,
+    Lt,
+    And,
+    Or,
+    Not,
+    Neg,
+    Push { segment: Segment, index: Word },
+    Pop { segment: Segment, index: Word },
+    Goto { instruction: Symbol },
+    IfGoto { instruction: Symbol },
+    Function { n_locals: Word },
+    Call { function: Symbol, n_args: Word },
+    Return,
 }

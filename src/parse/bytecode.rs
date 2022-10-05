@@ -1,8 +1,7 @@
 use super::{Spanned, StringLexer};
-use crate::simulators::vm::command::{ByteCodeParseError, Instruction, Opcode, Segment};
+use crate::simulators::vm::command::{ByteCodeParseError, Instruction, Segment};
 use crate::simulators::vm::stdlib::Stdlib;
 use crate::simulators::vm::ProgramInfo;
-use crate::util::{split_i16, split_u16};
 use crate::VM;
 use std::num::ParseIntError;
 
@@ -169,7 +168,6 @@ pub struct Parser<'src> {
     // the index of the current instruction
     // this is used for Label Commands, which hold a symbol with their own position in
     // the sourcecode as their value
-    instruction_counter: u16,
     sources: Vec<SourceFile<'src>>,
     // symbols that are available in every module (functions and statics)
     global_symbols: SymbolTable,
@@ -186,7 +184,6 @@ impl<'src> Parser<'src> {
     pub fn with_stdlib(sources: Vec<SourceFile<'src>>, stdlib: Stdlib<'static, VM>) -> Self {
         Self {
             module_index: 0,
-            instruction_counter: 0,
             sources,
             global_symbols: SymbolTable::default(),
             function_symbols: vec![SymbolTable::default()],
@@ -288,9 +285,12 @@ impl<'src> Parser<'src> {
         Ok(Err(ident))
     }
 
-    fn consume_label(&mut self, function_internal: bool) -> ParseResult<'src, &'src str> {
+    fn consume_label(
+        &mut self,
+        symbol: Symbol,
+        function_internal: bool,
+    ) -> ParseResult<'src, &'src str> {
         let ident = self.consume_ident()?;
-        let symbol = self.instruction_counter;
         // labels for ifs and such
         if function_internal {
             self.function_symbols()?.set(ident, symbol);
@@ -302,89 +302,39 @@ impl<'src> Parser<'src> {
 
     pub fn parse(&mut self) -> ParseResult<'src, ParsedProgram> {
         enum CodeEntry<'src> {
-            FunctionStart { n_locals: i16 },
-            Opcode(Opcode),
-            WaitingForGlobalLabel(&'src str),
-            WaitingForLocalLabel(&'src str),
+            Instruction(Instruction),
+            WaitingForLabel(&'src str, Instruction),
         }
 
         let mut code: Vec<CodeEntry<'src>> = Vec::with_capacity(128);
         let mut debug_symbols = HashMap::new();
 
-        fn push_instr(inst_count: &mut u16, code: &mut Vec<CodeEntry>, value: Instruction) {
-            code.push(CodeEntry::Opcode(Opcode::instruction(value)));
-            *inst_count += 1;
+        fn push_instr(code: &mut Vec<CodeEntry>, value: Instruction) {
+            code.push(CodeEntry::Instruction(value));
         }
-
-        fn push_segment(inst_count: &mut u16, code: &mut Vec<CodeEntry>, value: Segment) {
-            code.push(CodeEntry::Opcode(Opcode::segment(value)));
-            *inst_count += 1;
-        }
-
-        fn push_i16(inst_count: &mut u16, code: &mut Vec<CodeEntry>, value: i16) {
-            let (first, second) = split_i16(value);
-            code.push(CodeEntry::Opcode(Opcode::constant(first)));
-            code.push(CodeEntry::Opcode(Opcode::constant(second)));
-            *inst_count += 2;
-        }
-
-        fn push_u16(inst_count: &mut u16, code: &mut Vec<CodeEntry>, value: u16) {
-            let (first, second) = split_u16(value);
-            code.push(CodeEntry::Opcode(Opcode::constant(first)));
-            code.push(CodeEntry::Opcode(Opcode::constant(second)));
-            *inst_count += 2;
-        }
-
-        fn push_function(inst_count: &mut u16, code: &mut Vec<CodeEntry>, n_locals: i16) {
-            code.push(CodeEntry::FunctionStart { n_locals });
-            *inst_count += 3;
-        }
-
-        fn wait_for_global<'src>(
-            inst_count: &mut u16,
-            code: &mut Vec<CodeEntry<'src>>,
-            label: &'src str,
-        ) {
-            code.push(CodeEntry::WaitingForGlobalLabel(label));
-            *inst_count += 2;
-        }
-
-        fn wait_for_local<'src>(
-            inst_count: &mut u16,
-            code: &mut Vec<CodeEntry<'src>>,
-            label: &'src str,
-        ) {
-            code.push(CodeEntry::WaitingForLocalLabel(label));
-            *inst_count += 2;
-        }
-
-        #[derive(PartialEq, Eq)]
-        enum WaitKind {
-            Local,
-            Global,
-        }
-
-        use WaitKind::*;
 
         fn push_target<'src>(
-            inst_count: &mut u16,
             code: &mut Vec<CodeEntry<'src>>,
             target: Result<Symbol, &'src str>,
-            kind: WaitKind,
+            instr: Instruction,
         ) {
             match target {
-                Ok(addr) => push_u16(inst_count, code, addr),
-                Err(waiting_for) => {
-                    if kind == Local {
-                        wait_for_local(inst_count, code, waiting_for)
-                    } else {
-                        wait_for_global(inst_count, code, waiting_for)
-                    }
+                Ok(addr) => {
+                    let full_instruction = match instr {
+                        Instruction::Goto { .. } => Instruction::Goto { instruction: addr },
+                        Instruction::IfGoto { .. } => Instruction::IfGoto { instruction: addr },
+                        Instruction::Call { n_args, .. } => Instruction::Call {
+                            function: addr,
+                            n_args,
+                        },
+                        _ => unreachable!(),
+                    };
+                    push_instr(code, full_instruction);
                 }
+                Err(waiting_for) => code.push(CodeEntry::WaitingForLabel(waiting_for, instr)),
             };
         }
 
-        self.instruction_counter = 0;
         let mut function_addresses = HashMap::new();
 
         loop {
@@ -396,112 +346,92 @@ impl<'src> Parser<'src> {
             match token? {
                 Token::Identifier("push") => {
                     let (segment, index) = self.consume_segment_with_index()?;
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Push);
-                    push_segment(&mut self.instruction_counter, &mut code, segment);
-                    push_i16(&mut self.instruction_counter, &mut code, index);
+                    push_instr(&mut code, Instruction::Push { segment, index });
                 }
                 Token::Identifier("pop") => {
                     let (segment, index) = self.consume_segment_with_index()?;
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Pop);
-                    push_segment(&mut self.instruction_counter, &mut code, segment);
-                    push_i16(&mut self.instruction_counter, &mut code, index);
+                    push_instr(&mut code, Instruction::Pop { segment, index });
                 }
                 Token::Identifier("if-goto") => {
                     let target = self.consume_symbol()?;
-                    push_instr(
-                        &mut self.instruction_counter,
-                        &mut code,
-                        Instruction::IfGoto,
-                    );
-                    push_target(&mut self.instruction_counter, &mut code, target, Local);
+                    push_target(&mut code, target, Instruction::IfGoto { instruction: 0 });
                 }
                 Token::Identifier("goto") => {
                     let target = self.consume_symbol()?;
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Goto);
-                    push_target(&mut self.instruction_counter, &mut code, target, Local);
+                    push_target(&mut code, target, Instruction::Goto { instruction: 0 });
                 }
                 Token::Identifier("label") => {
-                    let _label = self.consume_label(true)?;
+                    let symbol = code.len() as Symbol;
+                    let _label = self.consume_label(symbol, true)?;
                     // TODO: debug symbols for local labels
                 }
                 Token::Identifier("function") => {
-                    let label = self.consume_label(false)?;
-                    debug_symbols.insert(self.instruction_counter, label.to_owned());
-                    function_addresses.insert(label.to_owned(), self.instruction_counter);
+                    let symbol = code.len() as Symbol;
+                    let label = self.consume_label(symbol, false)?;
+                    debug_symbols.insert(symbol, label.to_owned());
+                    function_addresses.insert(label.to_owned(), symbol);
 
                     let n_locals = self.consume_int()?;
                     self.function_symbols.push(SymbolTable::default());
 
-                    push_function(&mut self.instruction_counter, &mut code, n_locals);
+                    push_instr(&mut code, Instruction::Function { n_locals });
                 }
-                Token::Identifier("return") => push_instr(
-                    &mut self.instruction_counter,
-                    &mut code,
-                    Instruction::Return,
-                ),
+                Token::Identifier("return") => {
+                    push_instr(&mut code, Instruction::Return);
+                }
                 Token::Identifier("call") => {
                     let target = self.consume_symbol()?;
                     let n_args = self.consume_int()?;
 
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Call);
-                    push_target(&mut self.instruction_counter, &mut code, target, Global);
-                    push_i16(&mut self.instruction_counter, &mut code, n_args);
+                    // placeholder
+                    let function = 0;
+                    push_target(&mut code, target, Instruction::Call { function, n_args });
                 }
-                Token::Identifier("add") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Add)
-                }
-                Token::Identifier("sub") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Sub)
-                }
-                Token::Identifier("eq") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Eq)
-                }
-                Token::Identifier("gt") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Gt)
-                }
-                Token::Identifier("lt") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Lt)
-                }
-                Token::Identifier("and") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::And)
-                }
-                Token::Identifier("or") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Or)
-                }
-                Token::Identifier("not") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Not)
-                }
-                Token::Identifier("neg") => {
-                    push_instr(&mut self.instruction_counter, &mut code, Instruction::Neg)
-                }
+                Token::Identifier("add") => push_instr(&mut code, Instruction::Add),
+                Token::Identifier("sub") => push_instr(&mut code, Instruction::Sub),
+                Token::Identifier("eq") => push_instr(&mut code, Instruction::Eq),
+                Token::Identifier("gt") => push_instr(&mut code, Instruction::Gt),
+                Token::Identifier("lt") => push_instr(&mut code, Instruction::Lt),
+                Token::Identifier("and") => push_instr(&mut code, Instruction::And),
+                Token::Identifier("or") => push_instr(&mut code, Instruction::Or),
+                Token::Identifier("not") => push_instr(&mut code, Instruction::Not),
+                Token::Identifier("neg") => push_instr(&mut code, Instruction::Neg),
                 _ => return Err(ParseError::InvalidToken),
             };
         }
 
         // TODO: check program length cannot be larger than u16::MAX - NUMBER_OF_STDLIB_FUNCTIONS
-        let mut opcodes = Vec::with_capacity(code.capacity());
+        let mut instructions = Vec::with_capacity(code.capacity());
         let mut unresolved = HashSet::new();
         let mut function_index = 0;
         let mut function_offset = 0;
 
         for c in code {
             match c {
-                CodeEntry::FunctionStart { n_locals } => {
+                CodeEntry::Instruction(Instruction::Function { n_locals }) => {
                     function_index += 1;
-                    function_offset = opcodes.len();
-
-                    opcodes.push(Opcode::instruction(Instruction::Function));
-
-                    let (first, second) = split_i16(n_locals);
-                    opcodes.push(Opcode::constant(first));
-                    opcodes.push(Opcode::constant(second));
+                    function_offset = instructions.len();
+                    instructions.push(Instruction::Function { n_locals })
                 }
-                CodeEntry::Opcode(opcode) => opcodes.push(opcode),
-                CodeEntry::WaitingForLocalLabel(label) => {
-                    if let Some(addr) = self.function_symbols[function_index].lookup(label) {
-                        let (first, second) = split_u16(addr);
-                        opcodes.push(Opcode::constant(first));
-                        opcodes.push(Opcode::constant(second));
+                CodeEntry::Instruction(instr) => instructions.push(instr),
+                CodeEntry::WaitingForLabel(label, Instruction::Call { n_args, .. }) => {
+                    if let Some(function) = self.global_symbols.lookup(label) {
+                        instructions.push(Instruction::Call { function, n_args })
+                    } else if let Some(builtin_function) = self.stdlib.lookup(label) {
+                        // we are calling a builtin function
+                        let function = builtin_function.virtual_address();
+                        instructions.push(Instruction::Call { function, n_args })
+                    } else {
+                        unresolved.insert(label);
+                    }
+                }
+                CodeEntry::WaitingForLabel(label, instr) => {
+                    if let Some(instruction) = self.function_symbols[function_index].lookup(label) {
+                        if let Instruction::Goto { .. } = instr {
+                            instructions.push(Instruction::Goto { instruction })
+                        } else {
+                            instructions.push(Instruction::IfGoto { instruction })
+                        }
                     } else {
                         return Err(ParseError::UnresolvedLocalLabel {
                             label: label.to_string(),
@@ -510,21 +440,6 @@ impl<'src> Parser<'src> {
                                 .unwrap_or(&"unknown".to_string())
                                 .clone(),
                         });
-                    }
-                }
-                CodeEntry::WaitingForGlobalLabel(label) => {
-                    if let Some(addr) = self.global_symbols.lookup(label) {
-                        let (first, second) = split_u16(addr);
-                        opcodes.push(Opcode::constant(first));
-                        opcodes.push(Opcode::constant(second));
-                    } else if let Some(builtin_function) = self.stdlib.lookup(label) {
-                        // we are calling a builtin function
-                        let addr = builtin_function.virtual_address();
-                        let (first, second) = split_u16(addr);
-                        opcodes.push(Opcode::constant(first));
-                        opcodes.push(Opcode::constant(second));
-                    } else {
-                        unresolved.insert(label);
                     }
                 }
             }
@@ -542,7 +457,7 @@ impl<'src> Parser<'src> {
 
         if unresolved.is_empty() {
             Ok(ParsedProgram::new(
-                opcodes,
+                instructions,
                 debug_symbols,
                 function_addresses,
             ))
@@ -554,7 +469,7 @@ impl<'src> Parser<'src> {
 
 #[derive(Debug)]
 pub struct ParsedProgram {
-    pub opcodes: Vec<Opcode>,
+    pub instructions: Vec<Instruction>,
     // a map from positions in the bytecode to their corresponding names in the bytecode
     // this is need to display infos in the UI (like the callstack) and for debugging the VM
     pub debug_symbols: HashMap<Symbol, String>,
@@ -564,12 +479,12 @@ pub struct ParsedProgram {
 
 impl ParsedProgram {
     pub fn new(
-        opcodes: Vec<Opcode>,
+        instructions: Vec<Instruction>,
         debug_symbols: HashMap<Symbol, String>,
         function_by_name: HashMap<String, Symbol>,
     ) -> Self {
         Self {
-            opcodes,
+            instructions,
             debug_symbols,
             function_by_name,
         }
@@ -577,8 +492,8 @@ impl ParsedProgram {
 }
 
 impl ProgramInfo for ParsedProgram {
-    fn opcodes(&self) -> &Vec<Opcode> {
-        &self.opcodes
+    fn instructions(&self) -> &Vec<Instruction> {
+        &self.instructions
     }
 
     fn debug_symbols(&self) -> &HashMap<u16, String> {
@@ -697,85 +612,75 @@ mod tests {
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return),
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return),
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(3),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Add),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(3),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(107),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(4),
-                Opcode::constant(0),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(101),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(4),
-                Opcode::constant(0),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(107),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(4),
-                Opcode::constant(0),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(16),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return)
+                Instruction::Function { n_locals: 1 },
+                Instruction::Return,
+                Instruction::Function { n_locals: 2 },
+                Instruction::Return,
+                Instruction::Function { n_locals: 1 },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 2
+                },
+                Instruction::Pop {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 3
+                },
+                Instruction::Add,
+                Instruction::Pop {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 3
+                },
+                Instruction::Call {
+                    function: 0,
+                    n_args: 1
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 107
+                },
+                Instruction::Call {
+                    function: 2,
+                    n_args: 2
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 101
+                },
+                Instruction::Call {
+                    function: 2,
+                    n_args: 2
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 107
+                },
+                Instruction::Call {
+                    function: 2,
+                    n_args: 2
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 16
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 0
+                },
+                Instruction::Return
             ]
         )
     }
@@ -803,61 +708,55 @@ mod tests {
         let parsed_bytecode = parser.parse().unwrap();
 
         let expected_bytecode = vec![
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(0),
-            Opcode::constant(0),
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 0,
+            },
             //
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::Local),
-            Opcode::constant(0),
-            Opcode::constant(0),
+            Instruction::Pop {
+                segment: Segment::Local,
+                index: 0,
+            },
             //
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Local),
-            Opcode::constant(0),
-            Opcode::constant(0),
+            Instruction::Push {
+                segment: Segment::Local,
+                index: 0,
+            },
             //
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(10),
-            Opcode::constant(0),
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 10,
+            },
             //
-            Opcode::instruction(Instruction::Lt),
+            Instruction::Lt,
             //
-            Opcode::instruction(Instruction::Not),
+            Instruction::Not,
             //
-            Opcode::instruction(Instruction::IfGoto),
-            Opcode::constant(37),
-            Opcode::constant(0),
+            Instruction::IfGoto { instruction: 12 },
             //
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Local),
-            Opcode::constant(0),
-            Opcode::constant(0),
+            Instruction::Push {
+                segment: Segment::Local,
+                index: 0,
+            },
             //
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(1),
-            Opcode::constant(0),
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 1,
+            },
             //
-            Opcode::instruction(Instruction::Add),
+            Instruction::Add,
             //
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::Local),
-            Opcode::constant(0),
-            Opcode::constant(0),
+            Instruction::Pop {
+                segment: Segment::Local,
+                index: 0,
+            },
             //
-            Opcode::instruction(Instruction::Goto),
-            Opcode::constant(8),
-            Opcode::constant(0),
+            Instruction::Goto { instruction: 2 },
             //
-            Opcode::instruction(Instruction::Goto),
-            Opcode::constant(37),
-            Opcode::constant(0),
+            Instruction::Goto { instruction: 12 },
         ];
 
-        assert_eq!(parsed_bytecode.opcodes, expected_bytecode);
+        assert_eq!(parsed_bytecode.instructions, expected_bytecode);
     }
 
     #[test]
@@ -886,53 +785,51 @@ mod tests {
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Add),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Sub),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::IfGoto),
-                Opcode::constant(8),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 0
+                },
+                Instruction::Pop {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Add,
+                Instruction::Pop {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 1
+                },
+                Instruction::Sub,
+                Instruction::Pop {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::IfGoto { instruction: 2 },
+                Instruction::Push {
+                    segment: Segment::Local,
+                    index: 0
+                },
             ]
         )
     }
@@ -986,79 +883,67 @@ mod tests {
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(4),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(15),
-                Opcode::constant(0),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Goto),
-                Opcode::constant(12),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Lt),
-                Opcode::instruction(Instruction::IfGoto),
-                Opcode::constant(33),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Goto),
-                Opcode::constant(38),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Sub),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(15),
-                Opcode::constant(0),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Argument),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Sub),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(15),
-                Opcode::constant(0),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Add),
-                Opcode::instruction(Instruction::Return),
+                Instruction::Function { n_locals: 0 },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 4
+                },
+                Instruction::Call {
+                    function: 4,
+                    n_args: 1
+                },
+                Instruction::Goto { instruction: 3 },
+                Instruction::Function { n_locals: 0 },
+                Instruction::Push {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 2
+                },
+                Instruction::Lt,
+                Instruction::IfGoto { instruction: 10 },
+                Instruction::Goto { instruction: 12 },
+                Instruction::Push {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::Return,
+                Instruction::Push {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 2
+                },
+                Instruction::Sub,
+                Instruction::Call {
+                    function: 4,
+                    n_args: 1
+                },
+                Instruction::Push {
+                    segment: Segment::Argument,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 1
+                },
+                Instruction::Sub,
+                Instruction::Call {
+                    function: 4,
+                    n_args: 1
+                },
+                Instruction::Add,
+                Instruction::Return,
             ]
         )
     }
+
     #[test]
     fn test_statics_are_resolved_correctly_per_file() {
         let class1 = r#"
@@ -1094,68 +979,68 @@ mod tests {
         let result = parser.parse().unwrap();
 
         assert_eq!(
-            result.opcodes,
+            result.instructions,
             vec![
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(16),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(16),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(17),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(16),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(17),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(18),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(18),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(19),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(18),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(19),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(20),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(20),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(21),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(20),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(21),
-                Opcode::constant(0),
+                Instruction::Push {
+                    segment: Segment::Static,
+                    index: 16
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 16
+                },
+                Instruction::Push {
+                    segment: Segment::Static,
+                    index: 17
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 16
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 17
+                },
+                Instruction::Push {
+                    segment: Segment::Static,
+                    index: 18
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 18
+                },
+                Instruction::Push {
+                    segment: Segment::Static,
+                    index: 19
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 18
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 19
+                },
+                Instruction::Push {
+                    segment: Segment::Static,
+                    index: 20
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 20
+                },
+                Instruction::Push {
+                    segment: Segment::Static,
+                    index: 21
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 20
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 21
+                },
             ]
         )
     }
@@ -1186,34 +1071,18 @@ mod tests {
         let result = parser.parse().unwrap();
 
         assert_eq!(
-            result.opcodes,
+            result.instructions,
             vec![
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::IfGoto),
-                Opcode::constant(9),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Goto),
-                Opcode::constant(12),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Goto),
-                Opcode::constant(12),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return),
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::IfGoto),
-                Opcode::constant(22),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Goto),
-                Opcode::constant(25),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Goto),
-                Opcode::constant(25),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return),
+                Instruction::Function { n_locals: 0 },
+                Instruction::IfGoto { instruction: 3 },
+                Instruction::Goto { instruction: 4 },
+                Instruction::Goto { instruction: 4 },
+                Instruction::Return,
+                Instruction::Function { n_locals: 0 },
+                Instruction::IfGoto { instruction: 8 },
+                Instruction::Goto { instruction: 9 },
+                Instruction::Goto { instruction: 9 },
+                Instruction::Return,
             ]
         )
     }
@@ -1252,85 +1121,76 @@ mod tests {
         assert_eq!(true, stdlib_address_space.contains(&new_address));
         assert_eq!(true, stdlib_address_space.contains(&append_address));
 
-        let (new_1, new_2) = split_u16(new_address);
-        let (append_1, append_2) = split_u16(append_address);
-
         let programs = vec![SourceFile::new("Simple.vm", source)];
         let mut parser = Parser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(3),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Add),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Local),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(3),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(new_1),
-                Opcode::constant(new_2),
-                Opcode::constant(1),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(107),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(append_1),
-                Opcode::constant(append_2),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(101),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(append_1),
-                Opcode::constant(append_2),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(107),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(append_1),
-                Opcode::constant(append_2),
-                Opcode::constant(2),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Pop),
-                Opcode::segment(Segment::Static),
-                Opcode::constant(16),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Push),
-                Opcode::segment(Segment::Constant),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return)
+                Instruction::Function { n_locals: 1 },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 2
+                },
+                Instruction::Pop {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 3
+                },
+                Instruction::Add,
+                Instruction::Pop {
+                    segment: Segment::Local,
+                    index: 0
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 3
+                },
+                Instruction::Call {
+                    function: new_address,
+                    n_args: 1
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 107
+                },
+                Instruction::Call {
+                    function: append_address,
+                    n_args: 2
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 101
+                },
+                Instruction::Call {
+                    function: append_address,
+                    n_args: 2
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 107
+                },
+                Instruction::Call {
+                    function: append_address,
+                    n_args: 2
+                },
+                Instruction::Pop {
+                    segment: Segment::Static,
+                    index: 16
+                },
+                Instruction::Push {
+                    segment: Segment::Constant,
+                    index: 0
+                },
+                Instruction::Return
             ]
         )
     }
@@ -1351,26 +1211,21 @@ mod tests {
         assert_eq!(u16::MAX - (stdlib.len() as u16 - 1), init_address);
         assert_eq!(u16::MAX, wait_address);
 
-        let (init_1, init_2) = split_u16(init_address);
-        let (wait_1, wait_2) = split_u16(wait_address);
-
         let programs = vec![SourceFile::new("Simple.vm", source)];
         let mut parser = Parser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(init_1),
-                Opcode::constant(init_2),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(wait_1),
-                Opcode::constant(wait_2),
-                Opcode::constant(1),
-                Opcode::constant(0),
+                Instruction::Call {
+                    function: init_address,
+                    n_args: 0
+                },
+                Instruction::Call {
+                    function: wait_address,
+                    n_args: 1
+                },
             ]
         )
     }
@@ -1400,23 +1255,18 @@ mod tests {
         assert_eq!(1, stdlib.len());
         assert_eq!(u16::MAX, init_address);
 
-        let (init_1, init_2) = split_u16(init_address);
-
         let programs = vec![SourceFile::new("Simple.vm", source)];
         let mut parser = Parser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(init_1),
-                Opcode::constant(init_2),
-                Opcode::constant(0),
-                Opcode::constant(0),
+                Instruction::Function { n_locals: 0 },
+                Instruction::Call {
+                    function: init_address,
+                    n_args: 0
+                },
             ]
         );
     }
@@ -1454,20 +1304,15 @@ mod tests {
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return),
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::constant(0),
+                Instruction::Function { n_locals: 0 },
+                Instruction::Return,
+                Instruction::Function { n_locals: 0 },
+                Instruction::Call {
+                    function: 0,
+                    n_args: 0
+                }
             ]
         );
     }
@@ -1505,20 +1350,15 @@ mod tests {
         let code = parser.parse().unwrap();
 
         assert_eq!(
-            code.opcodes,
+            code.instructions,
             vec![
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Call),
-                Opcode::constant(8),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Function),
-                Opcode::constant(0),
-                Opcode::constant(0),
-                Opcode::instruction(Instruction::Return),
+                Instruction::Function { n_locals: 0 },
+                Instruction::Call {
+                    function: 2,
+                    n_args: 0
+                },
+                Instruction::Function { n_locals: 0 },
+                Instruction::Return,
             ]
         );
     }

@@ -4,7 +4,6 @@ use simulators::vm::VM;
 mod definitions;
 mod parse;
 mod simulators;
-mod util;
 
 #[cfg(feature = "desktop")]
 fn run_desktop(vm: &mut VM) {

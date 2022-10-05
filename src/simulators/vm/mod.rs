@@ -5,12 +5,12 @@ pub mod stdlib;
 
 use crate::definitions::SCREEN_START;
 use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SP, THAT, THIS};
-use command::{Instruction, Opcode, Segment};
+use command::{Instruction, Segment};
 use std::collections::HashMap;
 use stdlib::*;
 
 pub trait ProgramInfo {
-    fn opcodes(&self) -> &Vec<Opcode>;
+    fn instructions(&self) -> &Vec<Instruction>;
     fn debug_symbols(&self) -> &HashMap<Symbol, String>;
     fn function_by_name(&self) -> &HashMap<String, Symbol>;
     fn sys_init_address(&self) -> Option<Symbol>;
@@ -71,7 +71,7 @@ impl CallStackEntry {
 pub struct VM {
     // the program counter / instruction pointer
     pc: usize,
-    program: Vec<Opcode>,
+    program: Vec<Instruction>,
 
     // debug information which is used in the UI and for internal debugging
     debug_symbols: HashMap<Symbol, String>,
@@ -170,6 +170,9 @@ impl VirtualMachine for VM {
             .copied()
             .ok_or(StdlibError::CallingNonExistendFunction)?;
 
+        dbg!(name);
+        dbg!(address);
+
         self.call_function(address, params.len() as Word)
     }
 }
@@ -256,7 +259,7 @@ impl VM {
     }
 
     pub fn load(&mut self, info: impl ProgramInfo) {
-        self.program = info.opcodes().clone();
+        self.program = info.instructions().clone();
         self.debug_symbols = info.debug_symbols().clone();
         self.function_by_name = info.function_by_name().clone();
         self.pc = 0;
@@ -277,28 +280,6 @@ impl VM {
                 self.sys_init = Some(sys_init_address);
             }
         }
-    }
-
-    fn consume_segment(&mut self) -> Segment {
-        let value = self.program[self.pc + 1];
-        self.pc += 1;
-        value
-            .try_into()
-            .expect("argument does not fit into a segment")
-    }
-
-    fn consume_short(&mut self) -> i16 {
-        // this assumes that the target uses little endian byte ordering, but so does the wasm
-        // standard, therefore this should be absolutely fine
-        //
-        // "WebAssembly portability assumes that execution environments offer the
-        // following characteristics: [...] Little-endian byte ordering"
-        // See:
-        // https://webassembly.org/docs/portability/
-        let left_byte: u8 = self.program[self.pc + 1].try_into().unwrap();
-        let right_byte: u8 = self.program[self.pc + 2].try_into().unwrap();
-        self.pc += 2;
-        i16::from_le_bytes([left_byte, right_byte])
     }
 
     fn push_call(&mut self, entry: CallStackEntry) -> usize {
@@ -519,8 +500,7 @@ impl VM {
             return;
         }
 
-        let opcode = self.program[self.pc];
-        let instr = opcode.try_into().unwrap();
+        let instr = self.program[self.pc];
 
         match instr {
             Add => tos_binary!(self, +),
@@ -532,9 +512,7 @@ impl VM {
             Eq => tos_binary_bool!(self, ==),
             Gt => tos_binary_bool!(self, >),
             Lt => tos_binary_bool!(self, <),
-            Push => {
-                let segment = self.consume_segment();
-                let index = self.consume_short();
+            Push { segment, index } => {
                 let value = self.get_value(segment, index);
 
                 trace_vm!({
@@ -544,9 +522,7 @@ impl VM {
                 self.push(value);
                 self.pc += 1;
             }
-            Pop => {
-                let segment = self.consume_segment();
-                let index = self.consume_short();
+            Pop { segment, index } => {
                 let address = self.get_seg_address(segment, index);
                 let value = self.pop();
 
@@ -557,28 +533,26 @@ impl VM {
                 self.set_mem(address, value);
                 self.pc += 1;
             }
-            Goto => {
-                let instr = self.consume_short();
+            Goto { instruction } => {
                 // TODO: implement debug symbols for labels
                 trace_vm!({
-                    println!("goto {}", instr);
+                    println!("goto {}", instruction);
                 });
-                self.pc = instr as usize;
+                self.pc = instruction as usize;
             }
-            IfGoto => {
-                let instr = self.consume_short();
+            IfGoto { instruction } => {
                 let condition = self.pop();
                 trace_vm!({
-                    println!("if-goto {} {}", condition, instr);
+                    println!("if-goto {} {}", condition, instruction);
                 });
 
                 if condition == 0 {
                     self.pc += 1;
                 } else {
-                    self.pc = instr as usize;
+                    self.pc = instruction as usize;
                 }
             }
-            Function => {
+            Function { n_locals } => {
                 trace_calls!({
                     println!("function {}", self.debug_symbols[&(self.pc as u16)]);
                     println!("SP   {}", self.mem(SP));
@@ -589,7 +563,6 @@ impl VM {
                     println!("PC   {}", self.pc);
                 });
 
-                let n_locals = self.consume_short();
                 for _ in 0..n_locals {
                     self.push(0);
                 }
@@ -645,10 +618,7 @@ impl VM {
                     println!("at address {}", ret);
                 });
             }
-            Call => {
-                let function = self.consume_short() as u16;
-                let n_args = self.consume_short();
-
+            Call { function, n_args } => {
                 self.call_function(function, n_args).unwrap();
             }
         };
@@ -684,91 +654,91 @@ mod tests {
         let mut vm = VM::default();
 
         let bytecode = vec![
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(10),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::Local),
-            Opcode::constant(0),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(21),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(22),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::Argument),
-            Opcode::constant(2),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::Argument),
-            Opcode::constant(1),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(36),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::This),
-            Opcode::constant(6),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(42),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(45),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::That),
-            Opcode::constant(5),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::That),
-            Opcode::constant(2),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Constant),
-            Opcode::constant(254),
-            Opcode::constant(1),
-            Opcode::instruction(Instruction::Pop),
-            Opcode::segment(Segment::Temp),
-            Opcode::constant(6),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Local),
-            Opcode::constant(0),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::That),
-            Opcode::constant(5),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Add),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Argument),
-            Opcode::constant(1),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Sub),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::This),
-            Opcode::constant(6),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::This),
-            Opcode::constant(6),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Add),
-            Opcode::instruction(Instruction::Sub),
-            Opcode::instruction(Instruction::Push),
-            Opcode::segment(Segment::Temp),
-            Opcode::constant(6),
-            Opcode::constant(0),
-            Opcode::instruction(Instruction::Add),
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 10,
+            },
+            Instruction::Pop {
+                segment: Segment::Local,
+                index: 0,
+            },
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 21,
+            },
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 22,
+            },
+            Instruction::Pop {
+                segment: Segment::Argument,
+                index: 2,
+            },
+            Instruction::Pop {
+                segment: Segment::Argument,
+                index: 1,
+            },
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 36,
+            },
+            Instruction::Pop {
+                segment: Segment::This,
+                index: 6,
+            },
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 42,
+            },
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 45,
+            },
+            Instruction::Pop {
+                segment: Segment::That,
+                index: 5,
+            },
+            Instruction::Pop {
+                segment: Segment::That,
+                index: 2,
+            },
+            Instruction::Push {
+                segment: Segment::Constant,
+                index: 510,
+            },
+            Instruction::Pop {
+                segment: Segment::Temp,
+                index: 6,
+            },
+            Instruction::Push {
+                segment: Segment::Local,
+                index: 0,
+            },
+            Instruction::Push {
+                segment: Segment::That,
+                index: 5,
+            },
+            Instruction::Add,
+            Instruction::Push {
+                segment: Segment::Argument,
+                index: 1,
+            },
+            Instruction::Sub,
+            Instruction::Push {
+                segment: Segment::This,
+                index: 6,
+            },
+            Instruction::Push {
+                segment: Segment::This,
+                index: 6,
+            },
+            Instruction::Add,
+            Instruction::Sub,
+            Instruction::Push {
+                segment: Segment::Temp,
+                index: 6,
+            },
+            Instruction::Add,
         ];
         let program = ParsedProgram::new(bytecode, HashMap::new(), HashMap::new());
         vm.load(program);
@@ -1486,6 +1456,7 @@ mod tests {
             assert_eq!(255, vm.mem(i));
         }
     }
+
     #[test]
     fn test_should_execute_stdlib_implementation() {
         let mut by_name = HashMap::new();
@@ -1559,6 +1530,7 @@ mod tests {
         assert_eq!(vm.pop(), 24);
         assert_eq!(vm.pop(), 42);
     }
+
     #[test]
     fn test_calling_vm_from_builtin_function() {
         let mut by_name = HashMap::new();
@@ -1582,7 +1554,7 @@ mod tests {
                         Ok(StdlibOk::ContinueInNextStep(state + 1))
                     }
                 }
-                _ => Ok(StdlibOk::Finished(0)),
+                _ => Ok(StdlibOk::ContinueInNextStep(state)),
             }
         }
 
@@ -1652,7 +1624,7 @@ mod tests {
             if state == 0 {
                 vm.call("Main.main", vec![])?;
             }
-            Ok(StdlibOk::Finished(0))
+            Ok(StdlibOk::ContinueInNextStep(state))
         }
 
         by_name.insert("Sys.init", u16::MAX - 1);

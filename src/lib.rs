@@ -4,7 +4,6 @@ use wasm_bindgen::prelude::*;
 mod definitions;
 mod parse;
 mod simulators;
-mod util;
 
 use parse::bytecode::Parser;
 use parse::bytecode::SourceFile;
@@ -37,6 +36,7 @@ impl App {
         let output = include_str!("../res/stdlib/Output.vm");
         let screen = include_str!("../res/stdlib/Screen.vm");
         let string = include_str!("../res/stdlib/String.vm");
+
         let main = include_str!("../res/tetris/Main.vm");
         let random = include_str!("../res/tetris/Random.vm");
         let render = include_str!("../res/tetris/Render.vm");
@@ -51,6 +51,7 @@ impl App {
             SourceFile::new("Output.vm", output),
             SourceFile::new("Screen.vm", screen),
             SourceFile::new("String.vm", string),
+            // tetris
             SourceFile::new("Main.vm", main),
             SourceFile::new("Random.vm", random),
             SourceFile::new("Render.vm", render),
