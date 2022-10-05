@@ -32,6 +32,13 @@ Im Code ist dies mit einer Kombination aus Enums und Unions umgesetzt. Opcode is
 
 Mit diesem System verbrauchen Instruktionen nur genau soviel Speicher wie notwendig, was eine effizientere Cache-Auslastung und somit bessere Performance ermöglicht.
 
+Das war zumindest die Annahme, allerdings führt dieser Ansatz zu einer Reihe an Problemen. Goto und IfGoto verwenden absolute Sprungaddressen. Wenn jede Instruktion eine Instanz eines einzigen Enums ist, benötigt jede Instruktion auch nur eine einzige Addresse im Programmvektor. Im obigen Ansatz ist der Programmvektor allerdings ein Bytearray, was bedeutet, dass Instruktionen welche größer sind als ein Byte mehrere Addressen belegen. Somit schrumpft die Anzahl adressierbarer drastisch.
+Der beschriebene Performance Vorteil ist auch nicht wirklich relevant, da die Ein-Byte-Instruktionen in echten Programmen relativ selten sind. Push und Pop belegen die meisten Plätze im Bytecode. Diese sind mindestens 4 Byte groß, nur Call Instruktionen sind größer mit 6 Bytes.
+Da also der Großteil der Instruktionen sowieso relativ groß sind, ist der Performance Vorteil in echten Programmen nicht spürbar, man hat also keinen wirklichen Vorteil, jedoch aber eine Reihe an Nachteilen.
+Die Umwandlung von VM Code in Textform in den Programmvektor und die darauf folgende Interpretierung dieses Vektors sind im ersten Ansazt komplexer.
+Viel wichtiger jedoch ist, dass durch die geringere Anzahl adressierbarer Instruktionen eine Reihe an komplexen Jack Programmen nicht mehr ausführbar sind.
+Außerdem ist es so unmöglich anhand des Program Counters die Zeile im originalen VM Quellcode zu bestimmen, was jedoch benötigt wird um in der UI den Code Schritt für Schritt auszuführen.
+
 \subsection{Parsing}
 Da die Anwendung eine Reihe an Parsern enthält, macht es Sinn gemeinsame Komponenten auszulagern.
 
