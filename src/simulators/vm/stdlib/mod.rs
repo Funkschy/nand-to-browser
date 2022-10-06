@@ -12,21 +12,13 @@ use std::collections::HashMap;
 use std::fmt;
 
 macro_rules! call_vm {
-    ($vm:ident, $state:ident, $fn:expr, $args:expr) => {
-        if let VMCallOk::WasBuiltinFunction = $vm.call($fn, $args)? {
-            // TODO: error handling
-            let ret = $vm.pop();
-            // function was a builtin continue immediately
-            Ok(StdlibOk::Finished(ret))
-        } else {
-            // function was VM bytecode, so this needs to be continued after the VM function returned
-            Ok(StdlibOk::ContinueInNextStep($state + 1))
-        }
-    };
+    ($vm:ident, $state:ident, $fn:expr, $args:expr) => {{
+        $vm.call($fn, $args)?;
+        Ok(StdlibOk::ContinueInNextStep($state + 1))
+    }};
 }
 
-// for unit tests in vm/mod.rs
-#[cfg(test)]
+// make this public in the entire crate for unit tests in vm/mod.rs
 pub(crate) use call_vm;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
