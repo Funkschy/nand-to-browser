@@ -31,8 +31,8 @@ impl App {
         let sys = include_str!("../res/stdlib/Sys.vm");
         let array = include_str!("../res/stdlib/Array.vm");
         let keyboard = include_str!("../res/stdlib/Keyboard.vm");
-        let math = include_str!("../res/stdlib/Math.vm");
-        let memory = include_str!("../res/stdlib/Memory.vm");
+        // let math = include_str!("../res/stdlib/Math.vm");
+        // let memory = include_str!("../res/stdlib/Memory.vm");
         let output = include_str!("../res/stdlib/Output.vm");
         let screen = include_str!("../res/stdlib/Screen.vm");
         let string = include_str!("../res/stdlib/String.vm");
@@ -52,8 +52,8 @@ impl App {
         let programs = vec![
             SourceFile::new("Sys.vm", sys),
             SourceFile::new("Keyboard.vm", keyboard),
-            SourceFile::new("Math.vm", math),
-            SourceFile::new("Memory.vm", memory),
+            // SourceFile::new("Math.vm", math),
+            // SourceFile::new("Memory.vm", memory),
             SourceFile::new("Array.vm", array),
             SourceFile::new("Output.vm", output),
             SourceFile::new("Screen.vm", screen),

@@ -17,3 +17,6 @@ pub type Address = usize;
 pub type Word = i16;
 
 pub const INIT_SP: Word = 256;
+
+pub const HEAP_START: usize = 2048;
+pub const HEAP_END: usize = 16383;

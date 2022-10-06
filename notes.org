@@ -4,14 +4,14 @@
 - [X] alle commands implementieren
 - [X] command parsing
 - [X] funktionen erkennen die aufgerufen aber nicht deklariert werden
-- [-] native stdlib implementieren [1/8]
+- [-] native stdlib implementieren [2/8]
   - [X] Math
   - [ ] String
   - [ ] Array
   - [ ] Output
   - [ ] Screen
   - [ ] Keyboard
-  - [ ] Memory
+  - [X] MemorY
   - [ ] Sys
 - [X] unbekannte funktionen in stdlib suchen und adden falls nötig
 - [X] Start der Ausführung bei Sys.init falls vorhanden

@@ -44,6 +44,9 @@ pub enum StdlibError {
 
     MathDivideByZero,
     MathNegativeSqrt,
+
+    MemoryAllocNonPositiveSize,
+    MemoryHeapOverflow,
 }
 
 pub type StdResult = Result<StdlibOk, StdlibError>;
