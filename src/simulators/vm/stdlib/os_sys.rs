@@ -4,7 +4,7 @@ pub fn init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> S
     println!("Sys.init");
     match state {
         0 => {
-            if VMCallOk::WasBuiltinFunction == vm.call("Memory.init", vec![])? {
+            if VMCallOk::WasBuiltinFunction == vm.call("Memory.init", &[])? {
                 // continue immediately
                 init(vm, state + 1, params)
             } else {
@@ -12,7 +12,7 @@ pub fn init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> S
             }
         }
         1 => {
-            if VMCallOk::WasBuiltinFunction == vm.call("Main.main", vec![])? {
+            if VMCallOk::WasBuiltinFunction == vm.call("Main.main", &[])? {
                 // continue immediately
                 init(vm, state + 1, params)
             } else {

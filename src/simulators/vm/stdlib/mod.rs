@@ -11,6 +11,24 @@ use crate::definitions::{Address, Symbol, Word};
 use std::collections::HashMap;
 use std::fmt;
 
+macro_rules! call_vm {
+    ($vm:ident, $state:ident, $fn:expr, $args:expr) => {
+        if let VMCallOk::WasBuiltinFunction = $vm.call($fn, $args)? {
+            // TODO: error handling
+            let ret = $vm.pop();
+            // function was a builtin continue immediately
+            Ok(StdlibOk::Finished(ret))
+        } else {
+            // function was VM bytecode, so this needs to be continued after the VM function returned
+            Ok(StdlibOk::ContinueInNextStep($state + 1))
+        }
+    };
+}
+
+// for unit tests in vm/mod.rs
+#[cfg(test)]
+pub(crate) use call_vm;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VMCallOk {
     WasVMFunction,
@@ -21,7 +39,9 @@ pub trait VirtualMachine {
     fn mem(&self, address: Address) -> Word;
     fn set_mem(&mut self, address: Address, value: Word);
 
-    fn call(&mut self, name: &str, params: Vec<i16>) -> Result<VMCallOk, StdlibError>;
+    fn pop(&mut self) -> Word;
+
+    fn call(&mut self, name: &str, params: &[Word]) -> Result<VMCallOk, StdlibError>;
 }
 
 pub type State = usize;

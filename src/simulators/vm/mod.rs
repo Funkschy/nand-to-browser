@@ -25,6 +25,7 @@ enum ReturnAddress {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CallState {
+    TopLevel,
     // the state the function is in and the original args
     Builtin(State, Vec<Word>),
     VM,
@@ -39,6 +40,14 @@ struct CallStackEntry {
 
 impl CallStackEntry {
     pub fn top_level() -> Self {
+        Self {
+            ret_addr: ReturnAddress::EndOfProgram,
+            function: None,
+            state: CallState::TopLevel,
+        }
+    }
+
+    pub fn top_level_vm() -> Self {
         Self {
             ret_addr: ReturnAddress::EndOfProgram,
             function: None,
@@ -109,11 +118,10 @@ macro_rules! trace_calls {
 
 macro_rules! tos_binary {
     ($vm:expr, $op:tt) => {{
-        trace_vm!({
-            println!("{}", stringify!($op));
-        });
-
         let sp = $vm.memory[SP] as Address;
+        trace_vm!({
+            println!("{} {} {}", $vm.memory[sp - 2], stringify!($op), $vm.memory[sp - 1]);
+        });
         // cast up to i32 so that no overflow checks get triggered in debug mode
         $vm.memory[sp - 2] = ($vm.memory[sp - 2] as i32 $op $vm.memory[sp - 1] as i32) as Word;
         $vm.memory[SP] -= 1;
@@ -126,7 +134,6 @@ macro_rules! tos_binary_bool {
         trace_vm!({
             println!("{}", stringify!($op));
         });
-
         let sp = $vm.memory[SP] as Address;
         // in the hack architecture, true is actually -1 not 1 so we have to invert the tos
         // if it was already 0 (false) it will stay zero, if it was 1 it will be -1
@@ -141,7 +148,6 @@ macro_rules! tos_unary {
         trace_vm!({
             println!("{}", stringify!($op));
         });
-
         let sp = $vm.memory[SP] as Address;
         $vm.memory[sp - 1] = $op($vm.memory[sp - 1] as Word);
         $vm.pc += 1;
@@ -159,7 +165,13 @@ impl VirtualMachine for VM {
         self.memory[address] = value;
     }
 
-    fn call(&mut self, name: &str, params: Vec<i16>) -> Result<VMCallOk, StdlibError> {
+    #[inline]
+    fn pop(&mut self) -> Word {
+        self.add_to_mem(SP, -1);
+        self.mem_indirect(SP, 0)
+    }
+
+    fn call(&mut self, name: &str, params: &[Word]) -> Result<VMCallOk, StdlibError> {
         trace_calls!({
             println!("Calling {} by name", name);
         });
@@ -170,10 +182,20 @@ impl VirtualMachine for VM {
             .copied()
             .ok_or(StdlibError::CallingNonExistendFunction)?;
 
-        dbg!(name);
-        dbg!(address);
+        if let Some(&stdlib_function) = self.stdlib.by_address(address) {
+            trace_calls!({
+                println!("{} is a builtin function", stdlib_function.name());
+            });
 
-        self.call_function(address, params.len() as Word)
+            self.call_builtin_function(stdlib_function, params);
+            Ok(VMCallOk::WasBuiltinFunction)
+        } else {
+            for &p in params {
+                self.push(p);
+            }
+            self.call_vm_function(address, params.len() as Word);
+            Ok(VMCallOk::WasVMFunction)
+        }
     }
 }
 
@@ -204,12 +226,6 @@ impl VM {
     #[inline]
     fn add_to_mem(&mut self, address: Address, relative_value: Word) {
         self.set_mem(address, self.mem(address) + relative_value);
-    }
-
-    #[inline]
-    fn pop(&mut self) -> Word {
-        self.add_to_mem(SP, -1);
-        self.mem_indirect(SP, 0)
     }
 
     #[inline]
@@ -274,10 +290,17 @@ impl VM {
         self.call_stack.clear();
         self.push_call(CallStackEntry::top_level());
 
-        if let Some(sys_init_address) = info.sys_init_address() {
-            if sys_init_address != 0 {
+        match info.sys_init_address() {
+            Some(sys_init_address) if sys_init_address != 0 => {
                 println!("Sys.init at {}", sys_init_address);
                 self.sys_init = Some(sys_init_address);
+                self.push_call(CallStackEntry::top_level());
+            }
+            _ => {
+                // the vm must behave slightly differently if there is no Sys.init function
+                // in this case the execution will simply begin at the zero'th instruction, instead
+                // of calling Sys.init, which means that the top level function is a VM function
+                self.push_call(CallStackEntry::top_level_vm());
             }
         }
     }
@@ -315,6 +338,7 @@ impl VM {
     fn return_address(&mut self) -> Option<ReturnAddress> {
         let current_call = self.peek_call()?;
         match current_call.state {
+            CallState::TopLevel => Some(ReturnAddress::EndOfProgram),
             CallState::Builtin(state, _) => Some(ReturnAddress::Builtin(state + 1)),
             CallState::VM => Some(ReturnAddress::VM(self.pc as Symbol + 1)),
         }
@@ -338,7 +362,11 @@ impl VM {
         let this_call = self.pop_call().unwrap();
         if let ReturnAddress::Builtin(state) = this_call.ret_addr {
             self.update_call_stack_tos_next_state(state);
+        } else if let ReturnAddress::VM(ret_addr) = this_call.ret_addr {
+            // -1 because it will be incremented a couple lines further down
+            self.pc = ret_addr as usize - 1;
         }
+
         self.push(ret_val);
         self.pc += 1;
     }
@@ -356,6 +384,9 @@ impl VM {
         } else {
             panic!("trying to continue vm function");
         };
+        // the call continuation might call another function, so we need to save the index of the
+        // current function to use it when updating the call state
+        let this_call_idx = self.call_stack.len() - 1;
         let ret_val = function.continue_call(self, state, &args).unwrap();
 
         match ret_val {
@@ -370,7 +401,7 @@ impl VM {
                 self.handle_builtin_finished(ret_val);
             }
             ContinueInNextStep(next_state) => {
-                self.update_call_stack_tos_next_state(next_state);
+                self.update_call_stack_index_next_state(this_call_idx, next_state);
             }
         }
     }
@@ -396,7 +427,7 @@ impl VM {
             args.to_owned(),
         ));
         // TODO: handle error return value
-        let ret_val = function.call(self, &args).unwrap();
+        let ret_val = function.call(self, args).unwrap();
 
         match ret_val {
             Finished(ret_val) => {
@@ -485,14 +516,13 @@ impl VM {
             return;
         }
 
-        let currently_in_builtin_f = match self.peek_call() {
+        let currently_in_builtin_f = matches!(
+            self.peek_call(),
             Some(CallStackEntry {
                 state: CallState::Builtin(_, _),
-                ret_addr,
                 ..
-            }) => *ret_addr != ReturnAddress::EndOfProgram,
-            _ => false,
-        };
+            })
+        );
 
         if currently_in_builtin_f {
             let peeked = self.peek_call().unwrap().clone();
@@ -1539,7 +1569,7 @@ mod tests {
         fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
             match state {
                 0 => {
-                    if VMCallOk::WasBuiltinFunction == vm.call("Memory.init", vec![])? {
+                    if VMCallOk::WasBuiltinFunction == vm.call("Memory.init", &[])? {
                         // continue immediately
                         sys_init(vm, state + 1, params)
                     } else {
@@ -1547,7 +1577,7 @@ mod tests {
                     }
                 }
                 1 => {
-                    if VMCallOk::WasBuiltinFunction == vm.call("Main.main", vec![])? {
+                    if VMCallOk::WasBuiltinFunction == vm.call("Main.main", &[])? {
                         // continue immediately
                         sys_init(vm, state + 1, params)
                     } else {
@@ -1592,7 +1622,7 @@ mod tests {
 
         vm.load(program);
 
-        for _ in 0..10 {
+        for _ in 0..20 {
             vm.step();
         }
 
@@ -1622,7 +1652,7 @@ mod tests {
 
         fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, _: &[Word]) -> StdResult {
             if state == 0 {
-                vm.call("Main.main", vec![])?;
+                vm.call("Main.main", &[])?;
             }
             Ok(StdlibOk::ContinueInNextStep(state))
         }
@@ -1668,5 +1698,148 @@ mod tests {
         }
 
         assert_eq!(vm.pop(), 42);
+    }
+
+    #[test]
+    fn test_use_return_value_of_vm_function_in_builtin_function() {
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        fn calc<VM: VirtualMachine>(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
+            match state {
+                0 => {
+                    // technically this is wrong because the return value isn't incremented, but Main.f
+                    // will always be a VM function, so it's no problem
+                    stdlib::call_vm!(vm, state, "Main.f", &[])
+                }
+                1 => {
+                    let vm_ret = vm.pop();
+                    Ok(StdlibOk::Finished(vm_ret + 1))
+                }
+                _ => panic!(""),
+            }
+        }
+
+        by_name.insert("Math.calc", u16::MAX - 1);
+        by_address.insert(
+            u16::MAX - 1,
+            BuiltinFunction::new(u16::MAX - 1, "Math.calc", 0, &calc),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+
+        let mut vm = VM::new(stdlib.clone());
+
+        let src = r#"
+            function Main.main 0
+            call Math.calc 0
+            call Main.f 0
+            push constant 1
+            sub
+            call Math.calc 0
+            call Math.calc 0
+            label END
+            goto END
+
+            function Main.f 0
+            push constant 41
+            return
+            "#;
+
+        let programs = vec![SourceFile::new("Main.vm", src)];
+        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..30 {
+            vm.step();
+        }
+
+        assert_eq!(vm.pop(), 42);
+        assert_eq!(vm.pop(), 42);
+        assert_eq!(vm.pop(), 40);
+        assert_eq!(vm.pop(), 42);
+    }
+
+    #[test]
+    fn test_calling_vm_from_builtin_function_multiple_times() {
+        let mut by_name = HashMap::new();
+        let mut by_address = HashMap::new();
+
+        fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+            match state {
+                0 => {
+                    if let VMCallOk::WasBuiltinFunction = vm.call("Memory.init", &[])? {
+                        // continue immediately
+                        sys_init(vm, state + 1, params)
+                    } else {
+                        Ok(StdlibOk::ContinueInNextStep(state + 1))
+                    }
+                }
+                1 => {
+                    if let VMCallOk::WasBuiltinFunction = vm.call("Main.main", &[])? {
+                        // continue immediately
+                        sys_init(vm, state + 1, params)
+                    } else {
+                        Ok(StdlibOk::ContinueInNextStep(state + 1))
+                    }
+                }
+                // endless loop
+                _ => Ok(StdlibOk::ContinueInNextStep(state)),
+            }
+        }
+
+        by_name.insert("Sys.init", u16::MAX);
+        by_address.insert(
+            u16::MAX,
+            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &sys_init),
+        );
+
+        let stdlib = Stdlib::of(by_name, by_address);
+
+        let mut vm = VM::new(stdlib.clone());
+
+        let src = r#"
+            function Memory.init 0
+            push constant 0
+            pop static 0
+            push constant 2048
+            push static 0
+            add
+            push constant 14334
+            pop temp 0
+            pop pointer 1
+            push temp 0
+            pop that 0
+            push constant 2049
+            push static 0
+            add
+            push constant 2050
+            pop temp 0
+            pop pointer 1
+            push temp 0
+            pop that 0
+            push constant 0
+            return
+
+            function Main.main 0
+            call Memory.init 0
+            push constant 22
+            add
+            return // return to Sys.init
+            "#;
+
+        let programs = vec![SourceFile::new("Main.vm", src)];
+        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        for _ in 0..300 {
+            vm.step();
+        }
+
+        assert_eq!(vm.pop(), 22);
     }
 }
