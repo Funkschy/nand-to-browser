@@ -50,15 +50,20 @@ pub enum StdlibOk {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StdlibError {
+    // general/internal errors
     IncorrectNumberOfArgs,
     CallingNonExistendFunction,
     NoReturnValueFromStdlibFunction,
+    ContinuingFinishedFunction,
 
     MathDivideByZero,
     MathNegativeSqrt,
 
     MemoryAllocNonPositiveSize,
     MemoryHeapOverflow,
+
+    // Array.vm errors
+    ArrayNewNonPositiveSize,
 }
 
 pub type StdResult = Result<StdlibOk, StdlibError>;
