@@ -19,6 +19,7 @@ default = ["console_error_panic_hook"]
 [dependencies]
 # dependencies for the web ui
 wasm-bindgen = "0.2"
+lazy_static = "1.4"
 
 # optional dependencies
 

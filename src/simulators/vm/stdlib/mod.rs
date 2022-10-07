@@ -18,8 +18,15 @@ macro_rules! call_vm {
     }};
 }
 
+macro_rules! set_mutex {
+    ($mutex:ident, $value:expr, $error:expr) => {
+        *$mutex.lock().map_err(|_| $error)? = $value;
+    };
+}
+
 // make this public in the entire crate for unit tests in vm/mod.rs
 pub(crate) use call_vm;
+use set_mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VMCallOk {
@@ -64,6 +71,10 @@ pub enum StdlibError {
 
     // Array.vm errors
     ArrayNewNonPositiveSize,
+
+    // Screen.vm errors
+    ScreenBlockedColorMutex,
+    ScreenIllegalCoords,
 
     // String.vm errors
     StringNewNegativeLength,
