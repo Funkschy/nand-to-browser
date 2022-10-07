@@ -20,3 +20,5 @@ pub const INIT_SP: Word = 256;
 
 pub const HEAP_START: usize = 2048;
 pub const HEAP_END: usize = 16383;
+pub const NEWLINE_KEY: Word = 128;
+pub const BACKSPACE_KEY: Word = 129;

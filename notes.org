@@ -4,9 +4,9 @@
 - [X] alle commands implementieren
 - [X] command parsing
 - [X] funktionen erkennen die aufgerufen aber nicht deklariert werden
-- [-] native stdlib implementieren [3/8]
+- [-] native stdlib implementieren [4/8]
   - [X] Math
-  - [ ] String
+  - [X] String
   - [X] Array
   - [ ] Output
   - [ ] Screen

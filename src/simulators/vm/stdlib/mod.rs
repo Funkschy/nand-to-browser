@@ -64,6 +64,14 @@ pub enum StdlibError {
 
     // Array.vm errors
     ArrayNewNonPositiveSize,
+
+    // String.vm errors
+    StringNewNegativeLength,
+    StringCharAtIllegalIndex,
+    StringSetCharAtIllegalIndex,
+    StringAppendCharFull,
+    StringEraseLastCharEmtpy,
+    StringSetIntInsufficientCapacity,
 }
 
 pub type StdResult = Result<StdlibOk, StdlibError>;
