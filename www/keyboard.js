@@ -46,6 +46,10 @@ const action_key_codes = {
   'F11': f11_key,
   'F12': f12_key,
   'Insert': insert_key,
+  'Backspace': backspace_key,
+  'Enter': newline_key,
+  'Escape': esc_key,
+  'Delete': delete_key
 };
 
 // javascript translation of Definitions.getkeyCode in the official Tools
@@ -56,18 +60,11 @@ export const get_key_code = ({key, keyCode}) => {
   const code = keyCode;
 
   if (letter.length !== 1) {
-    if (letter === 'Backspace'){
-      ret_key = backspace_key;
-      // TODO: newline, esc, delete
-    } else {
-      ret_key = action_key_codes[letter];
-    }
+    ret_key = action_key_codes[letter];
+  } else if (code >= 65 && code <= 90) {
+    ret_key = code;
   } else {
-    if (code >= 65 && code <= 90) {
-      ret_key = code;
-    } else {
-      ret_key = letter.charCodeAt(0);
-    }
+    ret_key = letter.charCodeAt(0);
   }
 
   return ret_key;
