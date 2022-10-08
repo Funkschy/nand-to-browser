@@ -39,6 +39,38 @@ Die Umwandlung von VM Code in Textform in den Programmvektor und die darauf folg
 Viel wichtiger jedoch ist, dass durch die geringere Anzahl adressierbarer Instruktionen eine Reihe an komplexen Jack Programmen nicht mehr ausführbar sind.
 Außerdem ist es so unmöglich anhand des Program Counters die Zeile im originalen VM Quellcode zu bestimmen, was jedoch benötigt wird um in der UI den Code Schritt für Schritt auszuführen.
 
+\begin{lstlisting}
+pub enum Segment {
+    Argument,
+    Local,
+    Static,
+    Constant,
+    This,
+    That,
+    Pointer,
+    Temp,
+}
+
+pub enum Instruction {
+    Add,
+    Sub,
+    Eq,
+    Gt,
+    Lt,
+    And,
+    Or,
+    Not,
+    Neg,
+    Push { segment: Segment, index: Word },
+    Pop { segment: Segment, index: Word },
+    Goto { instruction: Symbol },
+    IfGoto { instruction: Symbol },
+    Function { n_locals: Word },
+    Call { function: Symbol, n_args: Word },
+    Return,
+}
+\end{lstlisting}
+
 \subsection{Parsing}
 Da die Anwendung eine Reihe an Parsern enthält, macht es Sinn gemeinsame Komponenten auszulagern.
 
@@ -52,10 +84,11 @@ Tracing via macros (conditional compilation), kann über feature flags angeschal
 
 \subsection{Stdlib}
 Die Standardlibrary ist aus zwei Gründen kompliziert. Erstens ist es nicht akzeptabel den aktuellen Thread zu blockieren, da die WebAssembly Anwendung in nur einem Thread läuft. Deswegen können Funktionen wie Sys.wait nicht einfach wie in der Java version mit einem Thread.sleep implementiert werden.
-Zweitens sollten Stdlib Funktionen in der Lage sein, VM Funktionen aufzurufen, damit die Standardlibrary in den Projekten 10 & 11 Stück für Stück entwickelt werden kann. Dies ist kompliziert, da die VM Schrittweise ausgeführt wird. Die Stdlib kann nicht einfach die gesamte VM Funktion ausführen, da diese möglicherweise Endlosschleifen enthält. Dies ist z.B. der Fall wenn Sys.init (Stdlib) die Main.main (VM) Funktion aufruft, welche normalerweise eine Endlosschleife enthält.
+Zweitens sollten Stdlib Funktionen in der Lage sein, VM Funktionen aufzurufen, damit die Standardlibrary in den Projekten 10 und 11 Stück für Stück entwickelt werden kann. Dies ist kompliziert, da die VM Schrittweise ausgeführt wird. Die Stdlib kann nicht einfach die gesamte VM Funktion ausführen, da diese möglicherweise Endlosschleifen enthält. Dies ist z.B. der Fall wenn Sys.init (Stdlib) die Main.main (VM) Funktion aufruft, welche normalerweise eine Endlosschleife enthält.
 Es muss also möglich sein, Stdlibfunktionen, welche in Rust implementiert sind, zu pausieren und dann im nächsten VM Tick fortzusetzen.
 Hierfür verwaltet die VM einen internen Callstack. Jedes Element in diesem enthält eine Rücksprungaddresse und die aktuelle Funktion (optional da auch Programme ohne Funktionen zulässig sind).
 Zusätzlich gibt es ein State Feld, welches nur für Stdlib Funktionen relevant ist. Dieses enthält die ursprüngliche Parameterliste und den Zustand der Funktion
 Jede Stdlib Funktion erhält beim Aufruf die originalen Parameter und ihren Zustand.
 nachdem die Funktion den Code für ihren aktuellen Zustand ausgeführt hat, gibt diese den nächsten Zustand zurück.
 Der Zustand kann genutzt werden, um die Schritte zu zählen, welche bereits in der Funktion verbracht wurden, womit sich Sys.wait implementieren lässt, oder aber um die Stelle in der Funktion zu finden, wo die Ausführung zuletzt unterbrochen wurde. So ruft Sys.init z.B. bei einem Zustand von 0 Memory.init auf und gibt dann einen nächsten Zustand von 1 zurück. Wird Sys.init dann beim nächsten Mal mit einem Zustand von 1 aufgerufen, führt diese die nächste Init Funktion aus.
+Die Implementierungen sind zum größten Teil direkte Übersetzungen der Funktionen aus der offiziellen Implementierung. Jedoch mussten einige Funktionen deutlich komplizierter geschrieben werden, um mit der Asynchronität der Stdlib umgehen zu können (z.B. Output.printString).
