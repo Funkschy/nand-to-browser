@@ -177,10 +177,6 @@ pub struct Parser<'src> {
 }
 
 impl<'src> Parser<'src> {
-    pub fn new(sources: Vec<SourceFile<'src>>) -> Self {
-        Self::with_stdlib(sources, Stdlib::default())
-    }
-
     pub fn with_stdlib(sources: Vec<SourceFile<'src>>, stdlib: Stdlib<'static, VM>) -> Self {
         Self {
             module_index: 0,
@@ -513,6 +509,12 @@ impl ProgramInfo for ParsedProgram {
 mod tests {
     use super::*;
     use crate::simulators::vm::stdlib::{BuiltinFunction, StdlibOk};
+
+    impl<'src> Parser<'src> {
+        pub fn new(sources: Vec<SourceFile<'src>>) -> Self {
+            Self::with_stdlib(sources, Stdlib::default())
+        }
+    }
 
     #[test]
     fn parser_should_report_unresolved_labels() {

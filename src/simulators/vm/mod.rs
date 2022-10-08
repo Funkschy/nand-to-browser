@@ -315,10 +315,6 @@ impl VM {
         self.call_stack.last_mut()
     }
 
-    fn update_call_stack_tos_next_state(&mut self, next_state: State) {
-        self.update_call_stack_index_next_state(self.call_stack.len() - 1, next_state);
-    }
-
     fn update_call_stack_index_next_state(&mut self, index: usize, next_state: State) {
         let call = self.call_stack.get_mut(index).unwrap();
 
@@ -339,7 +335,7 @@ impl VM {
         let current_call = self.peek_call()?;
         match current_call.state {
             CallState::TopLevel => Some(ReturnAddress::EndOfProgram),
-            CallState::Builtin(state, _) => Some(ReturnAddress::Builtin(0)),
+            CallState::Builtin(..) => Some(ReturnAddress::Builtin(0)),
             CallState::VM => Some(ReturnAddress::VM(self.pc as Symbol + 1)),
         }
     }

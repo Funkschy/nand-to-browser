@@ -3,12 +3,10 @@ use parse::bytecode::{Parser, SourceFile};
 use simulators::vm::VM;
 
 mod definitions;
+#[cfg(feature = "desktop")]
 mod keyboard;
 mod parse;
 mod simulators;
-
-#[macro_use]
-extern crate lazy_static;
 
 #[cfg(feature = "desktop")]
 fn run_desktop(vm: &mut VM) {

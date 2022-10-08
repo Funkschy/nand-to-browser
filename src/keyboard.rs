@@ -1,5 +1,31 @@
-use crate::definitions::*;
+use crate::definitions::{Word, BACKSPACE_KEY, NEWLINE_KEY};
 use std::collections::HashMap;
+
+use lazy_static::lazy_static;
+
+const LEFT_KEY: Word = 130;
+const UP_KEY: Word = 131;
+const RIGHT_KEY: Word = 132;
+const DOWN_KEY: Word = 133;
+const HOME_KEY: Word = 134;
+const END_KEY: Word = 135;
+const PAGE_UP_KEY: Word = 136;
+const PAGE_DOWN_KEY: Word = 137;
+const INSERT_KEY: Word = 138;
+const DELETE_KEY: Word = 139;
+const ESC_KEY: Word = 140;
+const F1_KEY: Word = 141;
+const F2_KEY: Word = 142;
+const F3_KEY: Word = 143;
+const F4_KEY: Word = 144;
+const F5_KEY: Word = 145;
+const F6_KEY: Word = 146;
+const F7_KEY: Word = 147;
+const F8_KEY: Word = 148;
+const F9_KEY: Word = 149;
+const F10_KEY: Word = 150;
+const F11_KEY: Word = 151;
+const F12_KEY: Word = 152;
 
 lazy_static! {
     static ref ACTION_KEY_CODES: HashMap<&'static str, Word> = {
