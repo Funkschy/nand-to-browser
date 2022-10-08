@@ -48,8 +48,12 @@ pub enum Instruction {
     Or,
     Not,
     Neg,
+
+    // memory commands
     Push { segment: Segment, index: Word },
     Pop { segment: Segment, index: Word },
+
+    // jump commands
     Goto { instruction: Symbol },
     IfGoto { instruction: Symbol },
     Function { n_locals: Word },

@@ -1,12 +1,18 @@
+use crate::simulators::vm::stdlib::Stdlib;
 use parse::bytecode::{Parser, SourceFile};
 use simulators::vm::VM;
 
 mod definitions;
+mod keyboard;
 mod parse;
 mod simulators;
 
+#[macro_use]
+extern crate lazy_static;
+
 #[cfg(feature = "desktop")]
 fn run_desktop(vm: &mut VM) {
+    use keyboard::{get_key_code, get_special_code};
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::pixels::{Color, PixelFormatEnum};
@@ -56,19 +62,65 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::Left),
                     ..
                 } => {
-                    vm.set_input_key(130);
+                    if let Some(code) = get_special_code("ArrowLeft") {
+                        vm.set_input_key(code)
+                    }
                 }
                 Event::KeyDown {
                     keycode: Some(Keycode::Up),
                     ..
                 } => {
-                    vm.set_input_key(131);
+                    if let Some(code) = get_special_code("ArrowUp") {
+                        vm.set_input_key(code)
+                    }
                 }
                 Event::KeyDown {
                     keycode: Some(Keycode::Right),
                     ..
                 } => {
-                    vm.set_input_key(132);
+                    if let Some(code) = get_special_code("ArrowRight") {
+                        vm.set_input_key(code)
+                    }
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Down),
+                    ..
+                } => {
+                    if let Some(code) = get_special_code("ArrowDown") {
+                        vm.set_input_key(code)
+                    }
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::PageDown),
+                    ..
+                } => {
+                    if let Some(code) = get_special_code("PageDown") {
+                        vm.set_input_key(code)
+                    }
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Backspace),
+                    ..
+                } => {
+                    if let Some(code) = get_special_code("Backspace") {
+                        vm.set_input_key(code)
+                    }
+                }
+                Event::KeyDown {
+                    keycode: Some(Keycode::Return),
+                    ..
+                } => {
+                    if let Some(code) = get_special_code("Enter") {
+                        vm.set_input_key(code)
+                    }
+                }
+                Event::KeyDown {
+                    keycode: Some(keycode),
+                    ..
+                } => {
+                    if let Some(code) = get_key_code("", keycode as i32) {
+                        vm.set_input_key(code)
+                    }
                 }
                 Event::KeyUp { .. } => {
                     vm.set_input_key(0);
@@ -120,37 +172,41 @@ fn run_desktop(vm: &mut VM) {
 }
 
 fn main() {
-    let mut vm = VM::default();
+    let mut vm = VM::new(Stdlib::new());
 
-    let sys = include_str!("../res/stdlib/Sys.vm");
-    let array = include_str!("../res/stdlib/Array.vm");
+    // let sys = include_str!("../res/stdlib/Sys.vm");
+    // let array = include_str!("../res/stdlib/Array.vm");
     let keyboard = include_str!("../res/stdlib/Keyboard.vm");
-    let math = include_str!("../res/stdlib/Math.vm");
-    let memory = include_str!("../res/stdlib/Memory.vm");
-    let output = include_str!("../res/stdlib/Output.vm");
-    let screen = include_str!("../res/stdlib/Screen.vm");
-    let string = include_str!("../res/stdlib/String.vm");
-    let main = include_str!("../res/tetris/Main.vm");
-    let random = include_str!("../res/tetris/Random.vm");
-    let render = include_str!("../res/tetris/Render.vm");
-    let tetromino = include_str!("../res/tetris/Tetromino.vm");
+    // let math = include_str!("../res/stdlib/Math.vm");
+    // let memory = include_str!("../res/stdlib/Memory.vm");
+    // let output = include_str!("../res/stdlib/Output.vm");
+    // let screen = include_str!("../res/stdlib/Screen.vm");
+    // let string = include_str!("../res/stdlib/String.vm");
+
+    let main = include_str!("../res/hackenstein/Main.vm");
+    let display = include_str!("../res/hackenstein/Display.vm");
+    let walls = include_str!("../res/hackenstein/Walls.vm");
+    let player = include_str!("../res/hackenstein/Player.vm");
+
+    // let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/KeyboardTest/Main.vm");
 
     let programs = vec![
-        SourceFile::new("Sys.vm", sys),
+        // SourceFile::new("Sys.vm", sys),
         SourceFile::new("Keyboard.vm", keyboard),
-        SourceFile::new("Math.vm", math),
-        SourceFile::new("Memory.vm", memory),
-        SourceFile::new("Array.vm", array),
-        SourceFile::new("Output.vm", output),
-        SourceFile::new("Screen.vm", screen),
-        SourceFile::new("String.vm", string),
+        // SourceFile::new("Math.vm", math),
+        // SourceFile::new("Memory.vm", memory),
+        // SourceFile::new("Array.vm", array),
+        // SourceFile::new("Output.vm", output),
+        // SourceFile::new("Screen.vm", screen),
+        // SourceFile::new("String.vm", string),
+        // SourceFile::new("Test.vm", test),
         SourceFile::new("Main.vm", main),
-        SourceFile::new("Random.vm", random),
-        SourceFile::new("Render.vm", render),
-        SourceFile::new("Tetromino.vm", tetromino),
+        SourceFile::new("Display.vm", display),
+        SourceFile::new("Walls.vm", walls),
+        SourceFile::new("Player.vm", player),
     ];
 
-    let mut bytecode_parser = Parser::new(programs);
+    let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
     let program = bytecode_parser.parse().unwrap();
 
     vm.load(program);
