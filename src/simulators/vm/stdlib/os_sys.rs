@@ -1,36 +1,65 @@
 use super::*;
 
-pub fn init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
-    println!("Sys.init");
+pub fn init<VM: VirtualMachine>(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
     match state {
         0 => {
-            if VMCallOk::WasBuiltinFunction == vm.call("Memory.init", &[])? {
-                // continue immediately
-                init(vm, state + 1, params)
-            } else {
-                Ok(StdlibOk::ContinueInNextStep(state + 1))
-            }
+            call_vm!(vm, state, "Memory.init", &[])
         }
         1 => {
-            if VMCallOk::WasBuiltinFunction == vm.call("Main.main", &[])? {
-                // continue immediately
-                init(vm, state + 1, params)
-            } else {
-                Ok(StdlibOk::ContinueInNextStep(state + 1))
-            }
+            vm.pop();
+            call_vm!(vm, state, "Math.init", &[])
         }
-        _ => Ok(StdlibOk::Finished(0)),
+        2 => {
+            vm.pop();
+            call_vm!(vm, state, "Screen.init", &[])
+        }
+        3 => {
+            vm.pop();
+            call_vm!(vm, state, "Output.init", &[])
+        }
+        4 => {
+            vm.pop();
+            call_vm!(vm, state, "Keyboard.init", &[])
+        }
+        5 => {
+            vm.pop();
+            call_vm!(vm, state, "Main.main", &[])
+        }
+        _ => {
+            vm.pop();
+            vm.call("Sys.halt", &[])?;
+            Ok(StdlibOk::Finished(0))
+        }
     }
 }
 
-pub fn halt<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
-    Ok(StdlibOk::Finished(0))
+pub fn halt<VM: VirtualMachine>(_vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
+    // endless loop
+    Ok(StdlibOk::ContinueInNextStep(state))
 }
 
-pub fn error<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
-    Ok(StdlibOk::Finished(0))
+pub fn error<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+    Err(StdlibError::SysError(params[0]))
 }
 
-pub fn wait<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
-    Ok(StdlibOk::Finished(0))
+pub fn wait<VM: VirtualMachine>(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+    if params[0] < 0 {
+        return Err(StdlibError::SysWaitNegativeDuration);
+    }
+
+    let duration = params[0] as State * 1000;
+
+    if state == 0 {
+        if duration < 2 {
+            return Ok(StdlibOk::Finished(params[0]));
+        }
+        // 2 because one tick is already used
+        return Ok(StdlibOk::ContinueInNextStep(2));
+    }
+
+    if duration > state {
+        return Ok(StdlibOk::ContinueInNextStep(state + 1));
+    }
+
+    Ok(StdlibOk::Finished(params[0]))
 }

@@ -1,7 +1,7 @@
 use super::*;
 
 pub fn init<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
-    unimplemented!()
+    Ok(StdlibOk::Finished(0))
 }
 
 pub fn key_pressed<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {

@@ -70,9 +70,15 @@ pub enum StdlibError {
     NoReturnValueFromStdlibFunction,
     ContinuingFinishedFunction,
 
+    // Sys.vm errors
+    SysError(Word), // returned by the Sys.err function
+    SysWaitNegativeDuration,
+
+    // Math.vm errors
     MathDivideByZero,
     MathNegativeSqrt,
 
+    // Memory.vm errors
     MemoryAllocNonPositiveSize,
     MemoryHeapOverflow,
 
