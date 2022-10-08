@@ -1,4 +1,20 @@
 #+title: Notes
+* Tests mit Abgaben
+** Tetris (Felix Schoeller)
+*** Absturz bei manchen Tetrominos wenn diese gedreht und an den rechten Bildschirmrand bewegt werden
+*** Absturz auch in offiziellem Emulator (bei VM stdlib) -> kein Bug
+*** Wird wahrscheinlich nicht mehr crashen, wenn alle stdlib Funktionen nativ sind
+** Minesweeper (Patrick Müller)
+*** Absturz nach zu vielen Moves
+*** Absturz auch in offiziellem Emulator -> kein Bug
+*** Fehler war Memory leak, ist im offiziellen Emulator nicht so schnell aufgefallen, da dieser langsamer ist
+** Doom (Jona Leon Heywinkel)
+*** Absturz wenn man ein bisschen nach Rechts geht, dann nach vorne (in den Dämon)
+*** Absturz auch in offiziellem Emulator -> kein Bug
+** Raycaster (Julius Armbrüster)
+*** läuft ohne Probleme
+*** Performance wie in offiziellem Emulator, aber mit weniger jittering
+*** Performance ist sehr abhängig von nativer Screen Implementierung
 * TODOs
 ** TODO VM Emulator [5/12]
 - [X] alle commands implementieren
