@@ -25,6 +25,7 @@ pub fn dispose<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -
     if state == 0 {
         call_vm!(vm, state, "Memory.deAlloc", params)
     } else {
+        vm.pop(); // pop deAlloc result
         Ok(StdlibOk::Finished(0))
     }
 }
