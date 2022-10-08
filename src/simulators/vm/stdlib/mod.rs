@@ -24,8 +24,15 @@ macro_rules! set_mutex {
     };
 }
 
+macro_rules! get_mutex {
+    ($mutex:ident, $error:expr) => {
+        *$mutex.lock().map_err(|_| $error)?
+    };
+}
+
 // make this public in the entire crate for unit tests in vm/mod.rs
 pub(crate) use call_vm;
+use get_mutex;
 use set_mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +90,12 @@ pub enum StdlibError {
     StringAppendCharFull,
     StringEraseLastCharEmtpy,
     StringSetIntInsufficientCapacity,
+
+    // Output.vm errors
+    OutputBlockedAddressMutex,
+    OutputBlockedFirstInWordMutex,
+    OutputBlockedWordInLineMutex,
+    OutputMoveCursorIllegalPosition,
 }
 
 pub type StdResult = Result<StdlibOk, StdlibError>;

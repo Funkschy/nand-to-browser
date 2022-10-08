@@ -339,7 +339,7 @@ impl VM {
         let current_call = self.peek_call()?;
         match current_call.state {
             CallState::TopLevel => Some(ReturnAddress::EndOfProgram),
-            CallState::Builtin(state, _) => Some(ReturnAddress::Builtin(state + 1)),
+            CallState::Builtin(state, _) => Some(ReturnAddress::Builtin(0)),
             CallState::VM => Some(ReturnAddress::VM(self.pc as Symbol + 1)),
         }
     }
@@ -360,22 +360,22 @@ impl VM {
 
     fn handle_builtin_finished(&mut self, ret_val: Word) {
         let this_call = self.pop_call().unwrap();
-        if let ReturnAddress::Builtin(state) = this_call.ret_addr {
-            self.update_call_stack_tos_next_state(state);
-        } else if let ReturnAddress::VM(ret_addr) = this_call.ret_addr {
-            // -1 because it will be incremented a couple lines further down
-            self.pc = ret_addr as usize - 1;
-        }
-
         self.push(ret_val);
-        self.pc += 1;
+        if let ReturnAddress::VM(ret_addr) = this_call.ret_addr {
+            // jump to the appropriate position
+            self.pc = ret_addr as usize;
+        }
     }
 
     fn continue_builtin_function(&mut self, entry: CallStackEntry) {
         use StdlibOk::*;
 
         trace_calls!({
-            println!("continuing {:?}", entry);
+            println!(
+                "continuing {:?} {:?}",
+                entry.function.and_then(|f| self.debug_symbols.get(&f)),
+                entry
+            );
         });
 
         let function = *self.stdlib.by_address(entry.function.unwrap()).unwrap();
@@ -627,20 +627,14 @@ impl VM {
                     self.pc = ret;
                 }
 
-                if let CallStackEntry {
-                    ret_addr: ReturnAddress::Builtin(next_state),
-                    ..
-                } = popped
-                {
-                    self.update_call_stack_tos_next_state(next_state);
-                }
-
-                // TODO: use debug symbols here
                 trace_calls!({
-                    print!("returning from {:?}", popped.function); //self.debug_symbols[&(ret_from as u16)]);
+                    print!(
+                        "returning from {:?}",
+                        popped.function.map(|f| &self.debug_symbols[&f])
+                    );
 
                     if let Some(ret_to) = self.call_stack.last() {
-                        println!(" to {:?}", ret_to); //self.debug_symbols[&(ret_to as u16)]);
+                        println!(" to {:?}", ret_to.function.map(|f| &self.debug_symbols[&f]));
                         println!("LCL changed from {} to {}", frame, self.memory[LCL]);
                     } else {
                         println!(" to nowhere");
@@ -1643,7 +1637,7 @@ mod tests {
                 return Ok(StdlibOk::ContinueInNextStep(2));
             }
 
-            if params[0] as usize > state {
+            if params[0] as State > state {
                 return Ok(StdlibOk::ContinueInNextStep(state + 1));
             }
 
@@ -1653,6 +1647,7 @@ mod tests {
         fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, _: &[Word]) -> StdResult {
             if state == 0 {
                 vm.call("Main.main", &[])?;
+                return Ok(StdlibOk::ContinueInNextStep(state + 1));
             }
             Ok(StdlibOk::ContinueInNextStep(state))
         }
@@ -1693,7 +1688,7 @@ mod tests {
 
         vm.load(program);
 
-        for _ in 0..22 {
+        for _ in 0..100 {
             vm.step();
         }
 
