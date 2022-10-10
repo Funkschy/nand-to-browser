@@ -92,3 +92,7 @@ Jede Stdlib Funktion erhält beim Aufruf die originalen Parameter und ihren Zust
 nachdem die Funktion den Code für ihren aktuellen Zustand ausgeführt hat, gibt diese den nächsten Zustand zurück.
 Der Zustand kann genutzt werden, um die Schritte zu zählen, welche bereits in der Funktion verbracht wurden, womit sich Sys.wait implementieren lässt, oder aber um die Stelle in der Funktion zu finden, wo die Ausführung zuletzt unterbrochen wurde. So ruft Sys.init z.B. bei einem Zustand von 0 Memory.init auf und gibt dann einen nächsten Zustand von 1 zurück. Wird Sys.init dann beim nächsten Mal mit einem Zustand von 1 aufgerufen, führt diese die nächste Init Funktion aus.
 Die Implementierungen sind zum größten Teil direkte Übersetzungen der Funktionen aus der offiziellen Implementierung. Jedoch mussten einige Funktionen deutlich komplizierter geschrieben werden, um mit der Asynchronität der Stdlib umgehen zu können (z.B. Output.printString).
+
+\subsection{Keyboard}
+Immer uppercase mit Absicht, da dies ein Bug im offiziellen Emulator ist
+In Rust um Code Duplikation zu vermeiden
