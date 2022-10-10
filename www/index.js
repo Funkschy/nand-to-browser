@@ -1,5 +1,4 @@
-import {App} from "nand-to-tetris-web";
-import {get_key_code} from "./keyboard.js";
+import {App, get_key_code} from "nand-to-tetris-web";
 
 let steps_per_tick = 12000;
 
@@ -76,8 +75,8 @@ const handle_input = (key) => {
   }
 };
 
-document.addEventListener('keydown', (e) => {
-  handle_input(get_key_code(e));
+document.addEventListener('keydown', ({key}) => {
+  handle_input(get_key_code(key));
 });
 
 document.addEventListener('keyup', (e) => {

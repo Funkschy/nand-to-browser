@@ -3,12 +3,18 @@ use crate::simulators::vm::stdlib::Stdlib;
 use wasm_bindgen::prelude::*;
 
 mod definitions;
+mod keyboard;
 mod parse;
 mod simulators;
 
 use parse::bytecode::Parser;
 use parse::bytecode::SourceFile;
 use simulators::vm::VM;
+
+#[wasm_bindgen]
+pub fn get_key_code(letter: &str) -> Option<Word> {
+    keyboard::get_key_code(letter)
+}
 
 #[wasm_bindgen]
 pub struct App {

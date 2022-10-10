@@ -3,6 +3,7 @@ use std::collections::HashMap;
 
 use lazy_static::lazy_static;
 
+const SPACE_KEY: Word = 32;
 const LEFT_KEY: Word = 130;
 const UP_KEY: Word = 131;
 const RIGHT_KEY: Word = 132;
@@ -30,6 +31,7 @@ const F12_KEY: Word = 152;
 lazy_static! {
     static ref ACTION_KEY_CODES: HashMap<&'static str, Word> = {
         let mut map = HashMap::new();
+        map.insert("Space", SPACE_KEY);
         map.insert("PageUp", PAGE_UP_KEY);
         map.insert("PageDown", PAGE_DOWN_KEY);
         map.insert("End", END_KEY);
@@ -59,15 +61,17 @@ lazy_static! {
     };
 }
 
-pub fn get_special_code(letter: &str) -> Option<Word> {
-    get_key_code(letter, 0)
-}
-
-pub fn get_key_code(letter: &str, keycode: i32) -> Option<Word> {
-    if letter.len() <= 1 {
-        let b: u8 = keycode.try_into().ok()?;
-        let c: char = b.try_into().ok()?;
-        Some(c.to_ascii_uppercase() as Word)
+pub fn get_key_code(letter: &str) -> Option<Word> {
+    if letter.len() == 1 {
+        letter
+            .chars()
+            .next()
+            // in my opinion, this behaviour is actually a bug in the original emulator
+            // a lot of games rely on all keys being uppercase however, so it would be
+            // a bad move to change that
+            .map(|c| c.to_ascii_uppercase())
+            .and_then(|l| l.try_into().ok())
+            .and_then(|l: u32| l.try_into().ok())
     } else {
         ACTION_KEY_CODES.get(letter).copied()
     }

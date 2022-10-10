@@ -10,9 +10,9 @@ mod simulators;
 
 #[cfg(feature = "desktop")]
 fn run_desktop(vm: &mut VM) {
-    use keyboard::{get_key_code, get_special_code};
+    use keyboard::get_key_code;
     use sdl2::event::Event;
-    use sdl2::keyboard::Keycode;
+    use sdl2::keyboard::{Keycode, Mod};
     use sdl2::pixels::{Color, PixelFormatEnum};
 
     let logical_width = 512;
@@ -60,7 +60,7 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::Left),
                     ..
                 } => {
-                    if let Some(code) = get_special_code("ArrowLeft") {
+                    if let Some(code) = get_key_code("ArrowLeft") {
                         vm.set_input_key(code)
                     }
                 }
@@ -68,7 +68,7 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::Up),
                     ..
                 } => {
-                    if let Some(code) = get_special_code("ArrowUp") {
+                    if let Some(code) = get_key_code("ArrowUp") {
                         vm.set_input_key(code)
                     }
                 }
@@ -76,7 +76,7 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::Right),
                     ..
                 } => {
-                    if let Some(code) = get_special_code("ArrowRight") {
+                    if let Some(code) = get_key_code("ArrowRight") {
                         vm.set_input_key(code)
                     }
                 }
@@ -84,7 +84,7 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::Down),
                     ..
                 } => {
-                    if let Some(code) = get_special_code("ArrowDown") {
+                    if let Some(code) = get_key_code("ArrowDown") {
                         vm.set_input_key(code)
                     }
                 }
@@ -92,7 +92,7 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::PageDown),
                     ..
                 } => {
-                    if let Some(code) = get_special_code("PageDown") {
+                    if let Some(code) = get_key_code("PageDown") {
                         vm.set_input_key(code)
                     }
                 }
@@ -100,7 +100,7 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::Backspace),
                     ..
                 } => {
-                    if let Some(code) = get_special_code("Backspace") {
+                    if let Some(code) = get_key_code("Backspace") {
                         vm.set_input_key(code)
                     }
                 }
@@ -108,7 +108,7 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(Keycode::Return),
                     ..
                 } => {
-                    if let Some(code) = get_special_code("Enter") {
+                    if let Some(code) = get_key_code("Enter") {
                         vm.set_input_key(code)
                     }
                 }
@@ -116,8 +116,10 @@ fn run_desktop(vm: &mut VM) {
                     keycode: Some(keycode),
                     ..
                 } => {
-                    if let Some(code) = get_key_code("", keycode as i32) {
-                        vm.set_input_key(code)
+                    // pretty inefficient, but the js version already receives a string
+                    // and since that is the main frontend, this can be tolerated
+                    if let Some(code) = get_key_code(&keycode.to_string()) {
+                        vm.set_input_key(code);
                     }
                 }
                 Event::KeyUp { .. } => {
@@ -174,7 +176,7 @@ fn main() {
 
     // let sys = include_str!("../res/stdlib/Sys.vm");
     // let array = include_str!("../res/stdlib/Array.vm");
-    let keyboard = include_str!("../res/stdlib/Keyboard.vm");
+    // let keyboard = include_str!("../res/stdlib/Keyboard.vm");
     // let math = include_str!("../res/stdlib/Math.vm");
     // let memory = include_str!("../res/stdlib/Memory.vm");
     // let output = include_str!("../res/stdlib/Output.vm");
@@ -189,14 +191,6 @@ fn main() {
     // let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/KeyboardTest/Main.vm");
 
     let programs = vec![
-        // SourceFile::new("Sys.vm", sys),
-        SourceFile::new("Keyboard.vm", keyboard),
-        // SourceFile::new("Math.vm", math),
-        // SourceFile::new("Memory.vm", memory),
-        // SourceFile::new("Array.vm", array),
-        // SourceFile::new("Output.vm", output),
-        // SourceFile::new("Screen.vm", screen),
-        // SourceFile::new("String.vm", string),
         // SourceFile::new("Test.vm", test),
         SourceFile::new("Main.vm", main),
         SourceFile::new("Display.vm", display),
