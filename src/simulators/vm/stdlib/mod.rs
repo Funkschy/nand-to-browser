@@ -45,13 +45,15 @@ pub trait VirtualMachine {
     fn mem(&self, address: Address) -> Word;
     fn set_mem(&mut self, address: Address, value: Word);
 
+    fn push(&mut self, value: Word);
     fn pop(&mut self) -> Word;
 
     fn call(&mut self, name: &str, params: &[Word]) -> Result<VMCallOk, StdlibError>;
 }
 
-pub type State = usize;
+pub type State = u32;
 
+#[derive(Debug)]
 pub enum StdlibOk {
     // The function finished successfully. The Word is the return value
     Finished(Word),

@@ -171,6 +171,12 @@ impl VirtualMachine for VM {
         self.mem_indirect(SP, 0)
     }
 
+    #[inline]
+    fn push(&mut self, value: Word) {
+        self.set_mem_indirect(SP, 0, value);
+        self.add_to_mem(SP, 1);
+    }
+
     fn call(&mut self, name: &str, params: &[Word]) -> Result<VMCallOk, StdlibError> {
         trace_calls!({
             println!("Calling {} by name", name);
@@ -226,12 +232,6 @@ impl VM {
     #[inline]
     fn add_to_mem(&mut self, address: Address, relative_value: Word) {
         self.set_mem(address, self.mem(address) + relative_value);
-    }
-
-    #[inline]
-    fn push(&mut self, value: Word) {
-        self.set_mem_indirect(SP, 0, value);
-        self.add_to_mem(SP, 1);
     }
 
     #[inline]
