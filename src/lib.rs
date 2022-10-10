@@ -1,4 +1,4 @@
-use crate::definitions::Word;
+use crate::definitions::{Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS};
 use crate::simulators::vm::stdlib::Stdlib;
 use wasm_bindgen::prelude::*;
 
@@ -10,6 +10,9 @@ mod simulators;
 use parse::bytecode::Parser;
 use parse::bytecode::SourceFile;
 use simulators::vm::VM;
+
+use wasm_bindgen::Clamped;
+use web_sys::ImageData;
 
 #[wasm_bindgen]
 pub fn get_key_code(letter: &str) -> Option<Word> {
@@ -120,12 +123,39 @@ impl App {
         self.vm.step();
     }
 
-    pub fn display_buffer(&self) -> Vec<Word> {
-        // TODO: maybe do this without copying, or even better do the entire rendering inside of wasm
-        self.vm.display().to_vec()
-    }
-
     pub fn set_input_key(&mut self, key: Word) {
         self.vm.set_input_key(key);
+    }
+
+    pub fn data_buffer_size() -> usize {
+        const BYTES_PER_PIXEL: usize = 4; // rgba
+        BYTES_PER_PIXEL * SCREEN_WIDTH * SCREEN_HEIGHT
+    }
+
+    pub fn display_data(&self) -> ImageData {
+        let display = self.vm.display();
+        let mut data = Vec::with_capacity(Self::data_buffer_size());
+        for row_idx in 0..SCREEN_HEIGHT {
+            for word_idx in 0..SCREEN_WIDTH_IN_WORDS {
+                let word = display[row_idx * SCREEN_WIDTH_IN_WORDS + word_idx];
+                for pixel_idx in 0..BITS_PER_WORD {
+                    let mask = 1 << pixel_idx;
+                    let value = word & mask;
+                    let color = if value == 0 { 255 } else { 0 };
+
+                    data.push(color);
+                    data.push(color);
+                    data.push(color);
+                    data.push(255);
+                }
+            }
+        }
+
+        ImageData::new_with_u8_clamped_array_and_sh(
+            Clamped(data.as_slice()),
+            SCREEN_WIDTH as u32,
+            SCREEN_HEIGHT as u32,
+        )
+        .unwrap()
     }
 }

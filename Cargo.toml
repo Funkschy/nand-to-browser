@@ -16,13 +16,19 @@ trace_calls = []   # if this is enabled, calls will be traced even if trace_vm i
 desktop = ["sdl2"] # run the application as a desktop app by rendering to an SDL window
 default = ["console_error_panic_hook"]
 
+# make some javascript functions/types accessible from rust
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    'ImageData' # the wasm renders into an imagedata object and the js code only puts that data onto the canvas
+]
+
 [dependencies]
 # dependencies for the web ui
 wasm-bindgen = "0.2"
 lazy_static = "1.4"
 
 # optional dependencies
-
 # logs panics with console.err which is nice for debugging
 console_error_panic_hook = { version = "0.1.7", optional = true }
 # for the desktop version

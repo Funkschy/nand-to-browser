@@ -14,27 +14,7 @@ const height_px = 256;
 const bytes_per_pixel = 4;
 const data = new Uint8ClampedArray(width_px * height_px * bytes_per_pixel);
 
-const render = (display_memory) => {
-  let i = 0;
-
-  // TODO: move this into rust
-  for (let row_idx = 0; row_idx < height_px; row_idx++) {
-    for (let word_idx = 0; word_idx < words_per_row; word_idx++) {
-      const word = display_memory[row_idx * words_per_row + word_idx];
-      for (let pixel_idx = 0; pixel_idx < 16; pixel_idx++) {
-        const mask = 1 << pixel_idx;
-        const value = word & mask;
-        const color = value == 0 ? 255 : 0;
-
-        data[i++] = color;
-        data[i++] = color;
-        data[i++] = color;
-        data[i++] = 255;
-      }
-    }
-  }
-
-  let img_data = new ImageData(data, width_px, height_px);
+const render = (img_data) => {
   ctx.putImageData(img_data, 0, 0);
 };
 
