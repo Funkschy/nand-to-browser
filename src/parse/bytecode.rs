@@ -1,5 +1,6 @@
 use super::{Spanned, StringLexer};
 use crate::simulators::vm::command::{ByteCodeParseError, Instruction, Segment};
+use crate::simulators::vm::meta::{FunctionInfo, MetaInfo};
 use crate::simulators::vm::stdlib::Stdlib;
 use crate::simulators::vm::ProgramInfo;
 use crate::VM;
@@ -364,10 +365,13 @@ impl<'src> Parser<'src> {
                 Token::Identifier("function") => {
                     let symbol = code.len() as Symbol;
                     let label = self.consume_label(symbol, false)?;
-                    debug_symbols.insert(symbol, label.to_owned());
-                    function_addresses.insert(label.to_owned(), symbol);
-
                     let n_locals = self.consume_int()?;
+
+                    debug_symbols.insert(
+                        code.len() as u16,
+                        FunctionInfo::vm(label.to_owned(), n_locals, self.module_index),
+                    );
+                    function_addresses.insert(label.to_owned(), symbol);
                     self.function_symbols.push(SymbolTable::default());
 
                     push_instr(&mut code, Instruction::Function { n_locals });
@@ -433,6 +437,7 @@ impl<'src> Parser<'src> {
                             label: label.to_string(),
                             function_name: debug_symbols
                                 .get(&(function_offset as u16))
+                                .map(|f| &f.name)
                                 .unwrap_or(&"unknown".to_string())
                                 .clone(),
                         });
@@ -446,8 +451,12 @@ impl<'src> Parser<'src> {
         // can call each other
         for (&name, &addr) in self.stdlib.by_name() {
             if self.global_symbols.lookup(name).is_none() {
+                let func = self.stdlib.by_address(addr).unwrap();
                 function_addresses.insert(name.to_owned(), addr);
-                debug_symbols.insert(addr, name.to_owned());
+                debug_symbols.insert(
+                    addr,
+                    FunctionInfo::builtin(func.name().to_string(), 0, func.file()),
+                );
             }
         }
 
@@ -466,42 +475,29 @@ impl<'src> Parser<'src> {
 #[derive(Debug)]
 pub struct ParsedProgram {
     pub instructions: Vec<Instruction>,
-    // a map from positions in the bytecode to their corresponding names in the bytecode
-    // this is need to display infos in the UI (like the callstack) and for debugging the VM
-    pub debug_symbols: HashMap<Symbol, String>,
-    // the vm should be able to call functions by their names. This is needed for the stdlib
-    pub function_by_name: HashMap<String, Symbol>,
+    pub meta: MetaInfo,
 }
 
 impl ParsedProgram {
     pub fn new(
         instructions: Vec<Instruction>,
-        debug_symbols: HashMap<Symbol, String>,
+        function_meta: HashMap<Symbol, FunctionInfo>,
         function_by_name: HashMap<String, Symbol>,
     ) -> Self {
         Self {
             instructions,
-            debug_symbols,
-            function_by_name,
+            meta: MetaInfo::new(function_meta, function_by_name),
         }
     }
 }
 
 impl ProgramInfo for ParsedProgram {
-    fn instructions(&self) -> &Vec<Instruction> {
-        &self.instructions
+    fn take_instructions(&mut self) -> Vec<Instruction> {
+        std::mem::take(&mut self.instructions)
     }
 
-    fn debug_symbols(&self) -> &HashMap<u16, String> {
-        &self.debug_symbols
-    }
-
-    fn function_by_name(&self) -> &HashMap<String, Symbol> {
-        &self.function_by_name
-    }
-
-    fn sys_init_address(&self) -> Option<u16> {
-        self.function_by_name.get("Sys.init").copied()
+    fn take_meta(&mut self) -> MetaInfo {
+        std::mem::take(&mut self.meta)
     }
 }
 
@@ -1246,7 +1242,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+            BuiltinFunction::new(u16::MAX, "Sys.init", "Sys", 0, &|_, _, _| {
                 Ok(StdlibOk::Finished(0))
             }),
         );
@@ -1290,7 +1286,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+            BuiltinFunction::new(u16::MAX, "Sys.init", "Sys", 0, &|_, _, _| {
                 Ok(StdlibOk::Finished(0))
             }),
         );
@@ -1336,7 +1332,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &|_, _, _| {
+            BuiltinFunction::new(u16::MAX, "Sys.init", "Sys", 0, &|_, _, _| {
                 Ok(StdlibOk::Finished(0))
             }),
         );

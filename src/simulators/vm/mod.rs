@@ -1,80 +1,20 @@
 pub mod command;
-
-#[allow(dead_code)]
+pub mod meta;
 pub mod stdlib;
+
+mod calls;
 
 use crate::definitions::SCREEN_START;
 use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SP, THAT, THIS};
+use crate::simulators::vm::meta::FunctionInfo;
+use calls::*;
 use command::{Instruction, Segment};
-use std::collections::HashMap;
+use meta::MetaInfo;
 use stdlib::{BuiltinFunction, State, Stdlib, StdlibError, StdlibOk, VMCallOk, VirtualMachine};
 
 pub trait ProgramInfo {
-    fn instructions(&self) -> &Vec<Instruction>;
-    fn debug_symbols(&self) -> &HashMap<Symbol, String>;
-    fn function_by_name(&self) -> &HashMap<String, Symbol>;
-    fn sys_init_address(&self) -> Option<Symbol>;
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ReturnAddress {
-    EndOfProgram, // the return for the first function in the program (usually Sys.init)
-    VM(Symbol),
-    Builtin(State),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum CallState {
-    TopLevel,
-    // the state the function is in and the original args
-    Builtin(State, Vec<Word>),
-    VM,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct CallStackEntry {
-    ret_addr: ReturnAddress,
-    function: Option<Symbol>,
-    state: CallState,
-}
-
-impl CallStackEntry {
-    pub fn top_level() -> Self {
-        Self {
-            ret_addr: ReturnAddress::EndOfProgram,
-            function: None,
-            state: CallState::TopLevel,
-        }
-    }
-
-    pub fn top_level_vm() -> Self {
-        Self {
-            ret_addr: ReturnAddress::EndOfProgram,
-            function: None,
-            state: CallState::VM,
-        }
-    }
-
-    pub fn builtin(
-        ret_addr: ReturnAddress,
-        function: Symbol,
-        state: State,
-        args: Vec<Word>,
-    ) -> Self {
-        Self {
-            ret_addr,
-            function: Some(function),
-            state: CallState::Builtin(state, args),
-        }
-    }
-
-    pub fn vm(ret_addr: ReturnAddress, function: Symbol) -> Self {
-        Self {
-            ret_addr,
-            function: Some(function),
-            state: CallState::VM,
-        }
-    }
+    fn take_instructions(&mut self) -> Vec<Instruction>;
+    fn take_meta(&mut self) -> MetaInfo;
 }
 
 pub struct VM {
@@ -82,10 +22,7 @@ pub struct VM {
     pc: usize,
     program: Vec<Instruction>,
 
-    // debug information which is used in the UI and for internal debugging
-    debug_symbols: HashMap<Symbol, String>,
-    function_by_name: HashMap<String, Symbol>,
-
+    meta: MetaInfo,
     call_stack: Vec<CallStackEntry>,
 
     stdlib: Stdlib<'static, Self>,
@@ -183,6 +120,7 @@ impl VirtualMachine for VM {
         });
 
         let address = self
+            .meta
             .function_by_name
             .get(name)
             .copied()
@@ -210,11 +148,10 @@ impl VM {
         Self {
             pc: 0,
             program: vec![],
-            debug_symbols: HashMap::new(),
+            meta: MetaInfo::default(),
             call_stack: Vec::with_capacity(32),
             memory: Box::new([0; MEM_SIZE]),
             stdlib,
-            function_by_name: HashMap::new(),
             sys_init: None,
         }
     }
@@ -274,10 +211,12 @@ impl VM {
         self.set_mem(KBD, key);
     }
 
-    pub fn load(&mut self, info: impl ProgramInfo) {
-        self.program = info.instructions().clone();
-        self.debug_symbols = info.debug_symbols().clone();
-        self.function_by_name = info.function_by_name().clone();
+    pub fn load(&mut self, mut info: impl ProgramInfo) {
+        self.program = info.take_instructions();
+        let meta = info.take_meta();
+        let sys_init = meta.sys_init_address();
+        self.meta = meta;
+
         self.pc = 0;
         for i in 0..self.memory.len() {
             self.memory[i] = 0;
@@ -290,7 +229,7 @@ impl VM {
         self.call_stack.clear();
         self.push_call(CallStackEntry::top_level());
 
-        match info.sys_init_address() {
+        match sys_init {
             Some(sys_init_address) if sys_init_address != 0 => {
                 println!("Sys.init at {}", sys_init_address);
                 self.sys_init = Some(sys_init_address);
@@ -303,6 +242,10 @@ impl VM {
                 self.push_call(CallStackEntry::top_level_vm());
             }
         }
+    }
+
+    fn function_meta(&self, function: Symbol) -> Option<&FunctionInfo> {
+        self.meta.function_meta.get(&function)
     }
 
     fn push_call(&mut self, entry: CallStackEntry) -> usize {
@@ -349,7 +292,7 @@ impl VM {
             .iter()
             .filter_map(|c| {
                 c.function
-                    .and_then(|f| self.debug_symbols.get(&f).map(String::as_str))
+                    .and_then(|f| self.function_meta(f).map(|f| f.name.as_str()))
             })
             .collect()
     }
@@ -369,7 +312,7 @@ impl VM {
         trace_calls!({
             println!(
                 "continuing {:?} {:?}",
-                entry.function.and_then(|f| self.debug_symbols.get(&f)),
+                entry.function.and_then(|f| self.function_meta(f)),
                 entry
             );
         });
@@ -446,7 +389,7 @@ impl VM {
         // TODO: handle error if calling a non existing function
 
         trace_calls!({
-            println!("call {} at {}", self.debug_symbols[&function], function);
+            println!("call {:?} at {}", self.function_meta(function), function);
             println!("{:?}", self.call_stack_names());
         });
 
@@ -489,13 +432,6 @@ impl VM {
         } else {
             self.call_vm_function(function, n_args);
             Ok(VMCallOk::WasVMFunction)
-        }
-    }
-
-    pub fn run(&mut self) {
-        self.pc = 0;
-        while self.pc < self.program.len() {
-            self.step();
         }
     }
 
@@ -580,7 +516,12 @@ impl VM {
             }
             Function { n_locals } => {
                 trace_calls!({
-                    println!("function {}", self.debug_symbols[&(self.pc as u16)]);
+                    println!(
+                        "function {}",
+                        self.function_meta(self.pc as u16)
+                            .map(|f| f.name.as_str())
+                            .unwrap_or_default()
+                    );
                     println!("SP   {}", self.mem(SP));
                     println!("LCL  {}", self.mem(LCL));
                     println!("ARG  {}", self.mem(ARG));
@@ -626,11 +567,11 @@ impl VM {
                 trace_calls!({
                     print!(
                         "returning from {:?}",
-                        popped.function.map(|f| &self.debug_symbols[&f])
+                        popped.function.map(|f| self.function_meta(f))
                     );
 
                     if let Some(ret_to) = self.call_stack.last() {
-                        println!(" to {:?}", ret_to.function.map(|f| &self.debug_symbols[&f]));
+                        println!(" to {:?}", ret_to.function.map(|f| self.function_meta(f)));
                         println!("LCL changed from {} to {}", frame, self.memory[LCL]);
                     } else {
                         println!(" to nowhere");
@@ -668,6 +609,7 @@ mod tests {
     use crate::definitions::SCREEN_START;
     use crate::parse::bytecode::{ParsedProgram, Parser, SourceFile};
     use crate::simulators::vm::stdlib::{BuiltinFunction, StdResult};
+    use std::collections::HashMap;
 
     #[test]
     fn basic_test_vme_no_parse() {
@@ -1485,7 +1427,7 @@ mod tests {
         by_name.insert("Math.abs", u16::MAX);
         by_address.insert(
             u16::MAX,
-            BuiltinFunction::new(u16::MAX, "Math.abs", 1, &|_, _, params| {
+            BuiltinFunction::new(u16::MAX, "Math.abs", "Math", 1, &|_, _, params| {
                 Ok(StdlibOk::Finished(params[0].abs()))
             }),
         );
@@ -1581,7 +1523,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX - 1);
         by_address.insert(
             u16::MAX - 1,
-            BuiltinFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
+            BuiltinFunction::new(u16::MAX - 1, "Sys.init", "Sys", 0, &sys_init),
         );
 
         fn mem_init<VM: VirtualMachine>(_: &mut VM, _: State, _: &[Word]) -> StdResult {
@@ -1591,7 +1533,7 @@ mod tests {
         by_name.insert("Memory.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            BuiltinFunction::new(u16::MAX, "Memory.init", 0, &mem_init),
+            BuiltinFunction::new(u16::MAX, "Memory.init", "Memory", 0, &mem_init),
         );
 
         let stdlib = Stdlib::of(by_name, by_address);
@@ -1651,13 +1593,13 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX - 1);
         by_address.insert(
             u16::MAX - 1,
-            BuiltinFunction::new(u16::MAX - 1, "Sys.init", 0, &sys_init),
+            BuiltinFunction::new(u16::MAX - 1, "Sys.init", "Sys", 0, &sys_init),
         );
 
         by_name.insert("Sys.wait", u16::MAX);
         by_address.insert(
             u16::MAX,
-            BuiltinFunction::new(u16::MAX, "Sys.wait", 1, &sys_wait),
+            BuiltinFunction::new(u16::MAX, "Sys.wait", "Sys", 1, &sys_wait),
         );
 
         let stdlib = Stdlib::of(by_name, by_address);
@@ -1714,7 +1656,7 @@ mod tests {
         by_name.insert("Math.calc", u16::MAX - 1);
         by_address.insert(
             u16::MAX - 1,
-            BuiltinFunction::new(u16::MAX - 1, "Math.calc", 0, &calc),
+            BuiltinFunction::new(u16::MAX - 1, "Math.calc", "Math", 0, &calc),
         );
 
         let stdlib = Stdlib::of(by_name, by_address);
@@ -1784,7 +1726,7 @@ mod tests {
         by_name.insert("Sys.init", u16::MAX);
         by_address.insert(
             u16::MAX,
-            BuiltinFunction::new(u16::MAX, "Sys.init", 0, &sys_init),
+            BuiltinFunction::new(u16::MAX, "Sys.init", "Sys", 0, &sys_init),
         );
 
         let stdlib = Stdlib::of(by_name, by_address);

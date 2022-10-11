@@ -170,7 +170,8 @@ pub fn draw_rectangle<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]
             let last_address_in_line = address + diff;
             update_location(vm, address, first_mask)?;
             address += 1;
-            for _ in address..last_address_in_line {
+            let start = address; // don't modify loop range, because clippy does not like that
+            for _ in start..last_address_in_line {
                 update_location(vm, address, 0xFFFF)?;
                 address += 1;
             }
@@ -211,7 +212,8 @@ fn draw_two_horizontal<VM: VirtualMachine>(
         address1 += 1;
         address2 += 1;
 
-        for _ in address1..last_address_in_line {
+        let start = address1; // don't modify loop range, because clippy does not like that
+        for _ in start..last_address_in_line {
             update_location(vm, address1, 0xFFFF)?;
             update_location(vm, address2, 0xFFFF)?;
             address1 += 1;

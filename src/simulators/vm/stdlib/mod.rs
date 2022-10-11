@@ -2,7 +2,11 @@ mod os_array;
 mod os_keyboard;
 mod os_math;
 mod os_memory;
+// wasm does not support atomics at this moment, so the warning about using atomics instead of
+// mutexes is meaningless
+#[allow(clippy::mutex_atomic)]
 mod os_output;
+#[allow(clippy::mutex_atomic)]
 mod os_screen;
 mod os_string;
 mod os_sys;
@@ -69,7 +73,6 @@ pub enum StdlibError {
     // general/internal errors
     IncorrectNumberOfArgs,
     CallingNonExistendFunction,
-    NoReturnValueFromStdlibFunction,
     ContinuingFinishedFunction,
 
     // Sys.vm errors
@@ -115,6 +118,7 @@ pub struct BuiltinFunction<'f, VM: VirtualMachine> {
     // aren't actually in the bytecode
     virtual_address: Symbol,
     name: &'static str,
+    file: &'static str,
     num_args: usize,
     function: &'f dyn Fn(&mut VM, State, &[Word]) -> StdResult,
 }
@@ -131,6 +135,7 @@ impl<'f, VM: VirtualMachine> Clone for BuiltinFunction<'f, VM> {
         Self {
             virtual_address: self.virtual_address,
             name: self.name,
+            file: self.file,
             num_args: self.num_args,
             function: self.function,
         }
@@ -143,12 +148,14 @@ impl<'f, VM: VirtualMachine> BuiltinFunction<'f, VM> {
     pub fn new(
         virtual_address: Symbol,
         name: &'static str,
+        file: &'static str,
         num_args: usize,
         function: &'f dyn Fn(&mut VM, State, &[Word]) -> StdResult,
     ) -> Self {
         Self {
             virtual_address,
             name,
+            file,
             num_args,
             function,
         }
@@ -178,6 +185,10 @@ impl<'f, VM: VirtualMachine> BuiltinFunction<'f, VM> {
     pub fn name(&self) -> &'static str {
         self.name
     }
+
+    pub fn file(&self) -> &'static str {
+        self.file
+    }
 }
 
 #[derive(Default)]
@@ -206,16 +217,6 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
         }
     }
 
-    pub fn of(
-        by_name: HashMap<&'static str, Symbol>,
-        by_address: HashMap<Symbol, BuiltinFunction<'f, VM>>,
-    ) -> Self {
-        Self {
-            by_name,
-            by_address,
-        }
-    }
-
     pub fn by_address(&self, function: Symbol) -> Option<&BuiltinFunction<'f, VM>> {
         self.by_address.get(&function)
     }
@@ -226,12 +227,25 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
             .and_then(|&address| self.by_address(address))
     }
 
+    pub fn by_name(&self) -> &HashMap<&'static str, Symbol> {
+        &self.by_name
+    }
+}
+
+#[cfg(test)]
+impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
     pub fn len(&self) -> usize {
         self.by_address.len()
     }
 
-    pub fn by_name(&self) -> &HashMap<&'static str, Symbol> {
-        &self.by_name
+    pub fn of(
+        by_name: HashMap<&'static str, Symbol>,
+        by_address: HashMap<Symbol, BuiltinFunction<'f, VM>>,
+    ) -> Self {
+        Self {
+            by_name,
+            by_address,
+        }
     }
 }
 
@@ -246,9 +260,9 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
     let mut by_name = HashMap::with_capacity(NUMBER_OF_STDLIB_FUNCTIONS);
     let mut by_address = HashMap::with_capacity(NUMBER_OF_STDLIB_FUNCTIONS);
 
-    let mut def = |name, n_args, f| {
+    let mut def = |file, name, n_args, f| {
         let address = virtual_function_offset + by_address.len() as u16;
-        let function = BuiltinFunction::new(address, name, n_args, f);
+        let function = BuiltinFunction::new(address, name, file, n_args, f);
         by_address.insert(address, function);
         by_name.insert(name, address);
     };
@@ -256,13 +270,13 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
     // Math
     {
         use os_math::{abs, divide, init, max, min, multiply, sqrt};
-        def("Math.init", 0, &init);
-        def("Math.abs", 1, &abs);
-        def("Math.multiply", 2, &multiply);
-        def("Math.divide", 2, &divide);
-        def("Math.min", 2, &min);
-        def("Math.max", 2, &max);
-        def("Math.sqrt", 1, &sqrt);
+        def("Math", "Math.init", 0, &init);
+        def("Math", "Math.abs", 1, &abs);
+        def("Math", "Math.multiply", 2, &multiply);
+        def("Math", "Math.divide", 2, &divide);
+        def("Math", "Math.min", 2, &min);
+        def("Math", "Math.max", 2, &max);
+        def("Math", "Math.sqrt", 1, &sqrt);
     }
 
     // String
@@ -271,25 +285,25 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
             append_char, backspace, char_at, dispose, double_quote, erase_last_char, int_value,
             length, new, newline, set_char_at, set_int,
         };
-        def("String.new", 1, &new);
-        def("String.dispose", 1, &dispose);
-        def("String.length", 1, &length);
-        def("String.charAt", 2, &char_at);
-        def("String.setCharAt", 3, &set_char_at);
-        def("String.appendChar", 2, &append_char);
-        def("String.eraseLastChar", 1, &erase_last_char);
-        def("String.intValue", 1, &int_value);
-        def("String.setInt", 2, &set_int);
-        def("String.backSpace", 0, &backspace);
-        def("String.doubleQuote", 0, &double_quote);
-        def("String.newLine", 0, &newline);
+        def("String", "String.new", 1, &new);
+        def("String", "String.dispose", 1, &dispose);
+        def("String", "String.length", 1, &length);
+        def("String", "String.charAt", 2, &char_at);
+        def("String", "String.setCharAt", 3, &set_char_at);
+        def("String", "String.appendChar", 2, &append_char);
+        def("String", "String.eraseLastChar", 1, &erase_last_char);
+        def("String", "String.intValue", 1, &int_value);
+        def("String", "String.setInt", 2, &set_int);
+        def("String", "String.backSpace", 0, &backspace);
+        def("String", "String.doubleQuote", 0, &double_quote);
+        def("String", "String.newLine", 0, &newline);
     }
 
     // Array
     {
         use os_array::{dispose, new};
-        def("Array.new", 1, &new);
-        def("Array.dispose", 1, &dispose);
+        def("Array", "Array.new", 1, &new);
+        def("Array", "Array.dispose", 1, &dispose);
     }
 
     // Output
@@ -297,13 +311,13 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
         use os_output::{
             backspace, init, move_cursor, print_char, print_int, print_string, println,
         };
-        def("Output.init", 0, &init);
-        def("Output.moveCursor", 2, &move_cursor);
-        def("Output.printChar", 1, &print_char);
-        def("Output.printString", 1, &print_string);
-        def("Output.printInt", 1, &print_int);
-        def("Output.println", 0, &println);
-        def("Output.backSpace", 0, &backspace);
+        def("Output", "Output.init", 0, &init);
+        def("Output", "Output.moveCursor", 2, &move_cursor);
+        def("Output", "Output.printChar", 1, &print_char);
+        def("Output", "Output.printString", 1, &print_string);
+        def("Output", "Output.printInt", 1, &print_int);
+        def("Output", "Output.println", 0, &println);
+        def("Output", "Output.backSpace", 0, &backspace);
     }
 
     // Screen
@@ -311,42 +325,42 @@ fn stdlib<'f, VM: VirtualMachine>() -> (
         use os_screen::{
             clear_screen, draw_circle, draw_line, draw_pixel, draw_rectangle, init, set_color,
         };
-        def("Screen.init", 0, &init);
-        def("Screen.clearScreen", 0, &clear_screen);
-        def("Screen.setColor", 1, &set_color);
-        def("Screen.drawPixel", 2, &draw_pixel);
-        def("Screen.drawLine", 4, &draw_line);
-        def("Screen.drawRectangle", 4, &draw_rectangle);
-        def("Screen.drawCircle", 3, &draw_circle);
+        def("Screen", "Screen.init", 0, &init);
+        def("Screen", "Screen.clearScreen", 0, &clear_screen);
+        def("Screen", "Screen.setColor", 1, &set_color);
+        def("Screen", "Screen.drawPixel", 2, &draw_pixel);
+        def("Screen", "Screen.drawLine", 4, &draw_line);
+        def("Screen", "Screen.drawRectangle", 4, &draw_rectangle);
+        def("Screen", "Screen.drawCircle", 3, &draw_circle);
     }
 
     // Keyboard
     {
         use os_keyboard::{init, key_pressed, read_char, read_int, read_line};
-        def("Keyboard.init", 0, &init);
-        def("Keyboard.keyPressed", 0, &key_pressed);
-        def("Keyboard.readChar", 0, &read_char);
-        def("Keyboard.readLine", 1, &read_line);
-        def("Keyboard.readInt", 1, &read_int);
+        def("Keyboard", "Keyboard.init", 0, &init);
+        def("Keyboard", "Keyboard.keyPressed", 0, &key_pressed);
+        def("Keyboard", "Keyboard.readChar", 0, &read_char);
+        def("Keyboard", "Keyboard.readLine", 1, &read_line);
+        def("Keyboard", "Keyboard.readInt", 1, &read_int);
     }
 
     // Memory
     {
         use os_memory::{alloc, de_alloc, init, peek, poke};
-        def("Memory.init", 0, &init);
-        def("Memory.peek", 1, &peek);
-        def("Memory.poke", 2, &poke);
-        def("Memory.alloc", 1, &alloc);
-        def("Memory.deAlloc", 1, &de_alloc);
+        def("Memory", "Memory.init", 0, &init);
+        def("Memory", "Memory.peek", 1, &peek);
+        def("Memory", "Memory.poke", 2, &poke);
+        def("Memory", "Memory.alloc", 1, &alloc);
+        def("Memory", "Memory.deAlloc", 1, &de_alloc);
     }
 
     // Sys
     {
         use os_sys::{error, halt, init, wait};
-        def("Sys.init", 0, &init);
-        def("Sys.halt", 0, &halt);
-        def("Sys.error", 1, &error);
-        def("Sys.wait", 1, &wait);
+        def("Sys", "Sys.init", 0, &init);
+        def("Sys", "Sys.halt", 0, &halt);
+        def("Sys", "Sys.error", 1, &error);
+        def("Sys", "Sys.wait", 1, &wait);
     }
 
     (by_name, by_address)

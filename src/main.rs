@@ -12,7 +12,7 @@ mod simulators;
 fn run_desktop(vm: &mut VM) {
     use keyboard::get_key_code;
     use sdl2::event::Event;
-    use sdl2::keyboard::{Keycode, Mod};
+    use sdl2::keyboard::Keycode;
     use sdl2::pixels::{Color, PixelFormatEnum};
 
     let logical_width = 512;
@@ -129,7 +129,7 @@ fn run_desktop(vm: &mut VM) {
             }
         }
 
-        for _ in 0..10000 {
+        for _ in 0..20000 {
             vm.step();
         }
 
@@ -168,7 +168,9 @@ fn run_desktop(vm: &mut VM) {
 
 #[cfg(not(feature = "desktop"))]
 fn run_desktop(vm: &mut VM) {
-    vm.run();
+    loop {
+        vm.step();
+    }
 }
 
 fn main() {
@@ -183,19 +185,19 @@ fn main() {
     // let screen = include_str!("../res/stdlib/Screen.vm");
     // let string = include_str!("../res/stdlib/String.vm");
 
-    let main = include_str!("../res/hackenstein/Main.vm");
-    let display = include_str!("../res/hackenstein/Display.vm");
-    let walls = include_str!("../res/hackenstein/Walls.vm");
-    let player = include_str!("../res/hackenstein/Player.vm");
+    // let main = include_str!("../res/hackenstein/Main.vm");
+    // let display = include_str!("../res/hackenstein/Display.vm");
+    // let walls = include_str!("../res/hackenstein/Walls.vm");
+    // let player = include_str!("../res/hackenstein/Player.vm");
 
-    // let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/KeyboardTest/Main.vm");
+    let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/ScreenTest/Main.vm");
 
     let programs = vec![
-        // SourceFile::new("Test.vm", test),
-        SourceFile::new("Main.vm", main),
-        SourceFile::new("Display.vm", display),
-        SourceFile::new("Walls.vm", walls),
-        SourceFile::new("Player.vm", player),
+        SourceFile::new("Test.vm", test),
+        // SourceFile::new("Main.vm", main),
+        // SourceFile::new("Display.vm", display),
+        // SourceFile::new("Walls.vm", walls),
+        // SourceFile::new("Player.vm", player),
     ];
 
     let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
