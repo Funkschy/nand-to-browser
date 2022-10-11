@@ -3,7 +3,6 @@ use crate::simulators::vm::command::{ByteCodeParseError, Instruction, Segment};
 use crate::simulators::vm::meta::{FunctionInfo, MetaInfo};
 use crate::simulators::vm::stdlib::Stdlib;
 use crate::simulators::vm::ProgramInfo;
-use crate::VM;
 use std::num::ParseIntError;
 
 use std::collections::{HashMap, HashSet};
@@ -174,11 +173,11 @@ pub struct Parser<'src> {
     global_symbols: SymbolTable,
     // every entry represents the symbols in the current function (labels)
     function_symbols: Vec<SymbolTable>,
-    stdlib: Stdlib<'static, VM>,
+    stdlib: Stdlib,
 }
 
 impl<'src> Parser<'src> {
-    pub fn with_stdlib(sources: Vec<SourceFile<'src>>, stdlib: Stdlib<'static, VM>) -> Self {
+    pub fn with_stdlib(sources: Vec<SourceFile<'src>>, stdlib: Stdlib) -> Self {
         Self {
             module_index: 0,
             sources,

@@ -1,48 +1,49 @@
 use super::*;
+use crate::simulators::vm::VM;
 
-pub fn init<VM: VirtualMachine>(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
+pub fn init(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
     match state {
         0 => {
             call_vm!(vm, state, "Memory.init", &[])
         }
         1 => {
-            vm.pop();
+            vm.pop()?;
             call_vm!(vm, state, "Math.init", &[])
         }
         2 => {
-            vm.pop();
+            vm.pop()?;
             call_vm!(vm, state, "Screen.init", &[])
         }
         3 => {
-            vm.pop();
+            vm.pop()?;
             call_vm!(vm, state, "Output.init", &[])
         }
         4 => {
-            vm.pop();
+            vm.pop()?;
             call_vm!(vm, state, "Keyboard.init", &[])
         }
         5 => {
-            vm.pop();
+            vm.pop()?;
             call_vm!(vm, state, "Main.main", &[])
         }
         _ => {
-            vm.pop();
+            vm.pop()?;
             vm.call("Sys.halt", &[])?;
             Ok(StdlibOk::Finished(0))
         }
     }
 }
 
-pub fn halt<VM: VirtualMachine>(_vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
+pub fn halt(_vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
     // endless loop
     Ok(StdlibOk::ContinueInNextStep(state))
 }
 
-pub fn error<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn error(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     Err(StdlibError::SysError(params[0]))
 }
 
-pub fn wait<VM: VirtualMachine>(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+pub fn wait(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     if params[0] < 0 {
         return Err(StdlibError::SysWaitNegativeDuration);
     }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::definitions::{Address, Word, SCREEN_END, SCREEN_HEIGHT, SCREEN_START, SCREEN_WIDTH};
+use crate::simulators::vm::VM;
 
 use lazy_static::lazy_static;
 use std::sync::Mutex;
@@ -21,30 +22,26 @@ fn set_black(value: bool) -> Result<(), StdlibError> {
     Ok(())
 }
 
-pub fn init<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+pub fn init(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
     set_black(true)?;
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn clear_screen<VM: VirtualMachine>(vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+pub fn clear_screen(vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
     for i in SCREEN_START..=SCREEN_END {
-        vm.set_mem(i, 0);
+        vm.set_mem(i, 0)?;
     }
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn set_color<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn set_color(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     set_black(params[0] != 0)?;
     Ok(StdlibOk::Finished(0))
 }
 
-fn update_location<VM: VirtualMachine>(
-    vm: &mut VM,
-    address: Address,
-    mask: u16,
-) -> Result<(), StdlibError> {
+fn update_location(vm: &mut VM, address: Address, mask: u16) -> Result<(), StdlibError> {
     let address = address + SCREEN_START;
-    let mut value = vm.mem(address) as u16;
+    let mut value = vm.mem(address)? as u16;
 
     if is_black()? {
         value |= mask;
@@ -52,7 +49,7 @@ fn update_location<VM: VirtualMachine>(
         value &= !mask;
     }
 
-    vm.set_mem(address, value as Word);
+    vm.set_mem(address, value as Word)?;
     Ok(())
 }
 
@@ -64,7 +61,7 @@ fn check_bounds(x: Word, y: Word) -> Result<(), StdlibError> {
     }
 }
 
-pub fn draw_pixel<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn draw_pixel(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let x = params[0];
     let y = params[1];
 
@@ -77,12 +74,7 @@ pub fn draw_pixel<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) ->
     Ok(StdlibOk::Finished(0))
 }
 
-fn draw_conditional<VM: VirtualMachine>(
-    vm: &mut VM,
-    x: Word,
-    y: Word,
-    exchange: bool,
-) -> Result<(), StdlibError> {
+fn draw_conditional(vm: &mut VM, x: Word, y: Word, exchange: bool) -> Result<(), StdlibError> {
     let (a, b) = if exchange {
         // upcast to handle overflows while multiplying
         (y as i32, x as i32)
@@ -94,7 +86,7 @@ fn draw_conditional<VM: VirtualMachine>(
     update_location(vm, address as usize, mask)
 }
 
-pub fn draw_line<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn draw_line(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let mut x1 = params[0];
     let mut y1 = params[1];
     let mut x2 = params[2];
@@ -143,7 +135,7 @@ pub fn draw_line<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> 
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn draw_rectangle<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn draw_rectangle(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let x1 = params[0];
     let y1 = params[1];
     let x2 = params[2];
@@ -183,7 +175,7 @@ pub fn draw_rectangle<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]
     Ok(StdlibOk::Finished(0))
 }
 
-fn draw_two_horizontal<VM: VirtualMachine>(
+fn draw_two_horizontal(
     vm: &mut VM,
     y1: Word,
     y2: Word,
@@ -227,7 +219,7 @@ fn draw_two_horizontal<VM: VirtualMachine>(
     Ok(())
 }
 
-pub fn draw_circle<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn draw_circle(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let x = params[0];
     let y = params[1];
     let r = params[2];

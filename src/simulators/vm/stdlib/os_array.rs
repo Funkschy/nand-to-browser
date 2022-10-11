@@ -1,6 +1,7 @@
 use super::*;
+use crate::simulators::vm::VM;
 
-pub fn new<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+pub fn new(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     if params[0] <= 0 {
         return Err(StdlibError::ArrayNewNonPositiveSize);
     }
@@ -10,20 +11,20 @@ pub fn new<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> St
             call_vm!(vm, state, "Memory.alloc", params)
         }
         1 => {
-            let addr = vm.pop();
+            let addr = vm.pop()?;
             Ok(StdlibOk::Finished(addr))
         }
         _ => Err(StdlibError::ContinuingFinishedFunction),
     }
 }
 
-pub fn dispose<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+pub fn dispose(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     match state {
         0 => {
             call_vm!(vm, state, "Memory.deAlloc", params)
         }
         1 => {
-            let addr = vm.pop();
+            let addr = vm.pop()?;
             Ok(StdlibOk::Finished(addr))
         }
         _ => Err(StdlibError::ContinuingFinishedFunction),
@@ -210,12 +211,12 @@ mod tests {
         vm.load(program);
 
         for _ in 0..1000000 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(222, vm.mem(8000));
-        assert_eq!(122, vm.mem(8001));
-        assert_eq!(100, vm.mem(8002));
-        assert_eq!(10, vm.mem(8003));
+        assert_eq!(Ok(222), vm.mem(8000));
+        assert_eq!(Ok(122), vm.mem(8001));
+        assert_eq!(Ok(100), vm.mem(8002));
+        assert_eq!(Ok(10), vm.mem(8003));
     }
 }

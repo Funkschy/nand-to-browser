@@ -1,21 +1,22 @@
 use super::*;
+use crate::simulators::vm::VM;
 
-pub fn init<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+pub fn init(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn abs<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn abs(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     Ok(StdlibOk::Finished(params[0].abs()))
 }
 
-pub fn multiply<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn multiply(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     // java doesn't handle overflows for ints, so this casting is needed for compatibility
     Ok(StdlibOk::Finished(
         (params[0] as i32 * params[1] as i32) as i16,
     ))
 }
 
-pub fn divide<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn divide(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     if params[1] != 0 {
         Ok(StdlibOk::Finished(params[0] / params[1]))
     } else {
@@ -23,15 +24,15 @@ pub fn divide<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> St
     }
 }
 
-pub fn min<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn min(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     Ok(StdlibOk::Finished(params[0].min(params[1])))
 }
 
-pub fn max<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn max(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     Ok(StdlibOk::Finished(params[0].max(params[1])))
 }
 
-pub fn sqrt<VM: VirtualMachine>(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn sqrt(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     if params[0] >= 0 {
         Ok(StdlibOk::Finished((params[0] as f64).sqrt() as Word))
     } else {
@@ -250,22 +251,22 @@ mod tests {
         vm.load(program);
 
         for _ in 0..1000000 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(6, vm.mem(8000));
-        assert_eq!(-180, vm.mem(8001));
-        assert_eq!(-18000, vm.mem(8002));
-        assert_eq!(-18000, vm.mem(8003));
-        assert_eq!(0, vm.mem(8004));
-        assert_eq!(3, vm.mem(8005));
-        assert_eq!(-3000, vm.mem(8006));
-        assert_eq!(0, vm.mem(8007));
-        assert_eq!(3, vm.mem(8008));
-        assert_eq!(181, vm.mem(8009));
-        assert_eq!(123, vm.mem(8010));
-        assert_eq!(123, vm.mem(8011));
-        assert_eq!(27, vm.mem(8012));
-        assert_eq!(32767, vm.mem(8013));
+        assert_eq!(Ok(6), vm.mem(8000));
+        assert_eq!(Ok(-180), vm.mem(8001));
+        assert_eq!(Ok(-18000), vm.mem(8002));
+        assert_eq!(Ok(-18000), vm.mem(8003));
+        assert_eq!(Ok(0), vm.mem(8004));
+        assert_eq!(Ok(3), vm.mem(8005));
+        assert_eq!(Ok(-3000), vm.mem(8006));
+        assert_eq!(Ok(0), vm.mem(8007));
+        assert_eq!(Ok(3), vm.mem(8008));
+        assert_eq!(Ok(181), vm.mem(8009));
+        assert_eq!(Ok(123), vm.mem(8010));
+        assert_eq!(Ok(123), vm.mem(8011));
+        assert_eq!(Ok(27), vm.mem(8012));
+        assert_eq!(Ok(32767), vm.mem(8013));
     }
 }

@@ -1,3 +1,4 @@
+mod error;
 mod os_array;
 mod os_keyboard;
 mod os_math;
@@ -12,6 +13,8 @@ mod os_string;
 mod os_sys;
 
 use crate::definitions::{Address, Symbol, Word};
+use crate::simulators::vm::VM;
+pub use error::StdlibError;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -45,16 +48,6 @@ pub enum VMCallOk {
     WasBuiltinFunction,
 }
 
-pub trait VirtualMachine {
-    fn mem(&self, address: Address) -> Word;
-    fn set_mem(&mut self, address: Address, value: Word);
-
-    fn push(&mut self, value: Word);
-    fn pop(&mut self) -> Word;
-
-    fn call(&mut self, name: &str, params: &[Word]) -> Result<VMCallOk, StdlibError>;
-}
-
 pub type State = u32;
 
 #[derive(Debug)]
@@ -68,50 +61,10 @@ pub enum StdlibOk {
     ContinueInNextStep(State),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StdlibError {
-    // general/internal errors
-    IncorrectNumberOfArgs,
-    CallingNonExistendFunction,
-    ContinuingFinishedFunction,
-
-    // Sys.vm errors
-    SysError(Word), // returned by the Sys.err function
-    SysWaitNegativeDuration,
-
-    // Math.vm errors
-    MathDivideByZero,
-    MathNegativeSqrt,
-
-    // Memory.vm errors
-    MemoryAllocNonPositiveSize,
-    MemoryHeapOverflow,
-
-    // Array.vm errors
-    ArrayNewNonPositiveSize,
-
-    // Screen.vm errors
-    ScreenBlockedColorMutex,
-    ScreenIllegalCoords,
-
-    // String.vm errors
-    StringNewNegativeLength,
-    StringCharAtIllegalIndex,
-    StringSetCharAtIllegalIndex,
-    StringAppendCharFull,
-    StringEraseLastCharEmtpy,
-    StringSetIntInsufficientCapacity,
-
-    // Output.vm errors
-    OutputBlockedAddressMutex,
-    OutputBlockedFirstInWordMutex,
-    OutputBlockedWordInLineMutex,
-    OutputMoveCursorIllegalPosition,
-}
-
 pub type StdResult = Result<StdlibOk, StdlibError>;
 
-pub struct BuiltinFunction<'f, VM: VirtualMachine> {
+#[derive(Clone, Copy)]
+pub struct BuiltinFunction {
     // the fake address which is used to jump to this builtin function
     // Calls in the vm do not work via the function name and instead use the functions address in
     // the bytecode for better performance. This is of course a bit of an issue with functions that
@@ -120,37 +73,22 @@ pub struct BuiltinFunction<'f, VM: VirtualMachine> {
     name: &'static str,
     file: &'static str,
     num_args: usize,
-    function: &'f dyn Fn(&mut VM, State, &[Word]) -> StdResult,
+    function: &'static dyn Fn(&mut VM, State, &[Word]) -> StdResult,
 }
 
-impl<'f, VM: VirtualMachine> fmt::Debug for BuiltinFunction<'f, VM> {
+impl fmt::Debug for BuiltinFunction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.name)
     }
 }
 
-// for some weird reason, the derive implementations weren't recognized by the compiler
-impl<'f, VM: VirtualMachine> Clone for BuiltinFunction<'f, VM> {
-    fn clone(&self) -> Self {
-        Self {
-            virtual_address: self.virtual_address,
-            name: self.name,
-            file: self.file,
-            num_args: self.num_args,
-            function: self.function,
-        }
-    }
-}
-
-impl<'f, VM: VirtualMachine> std::marker::Copy for BuiltinFunction<'f, VM> {}
-
-impl<'f, VM: VirtualMachine> BuiltinFunction<'f, VM> {
+impl BuiltinFunction {
     pub fn new(
         virtual_address: Symbol,
         name: &'static str,
         file: &'static str,
         num_args: usize,
-        function: &'f dyn Fn(&mut VM, State, &[Word]) -> StdResult,
+        function: &'static dyn Fn(&mut VM, State, &[Word]) -> StdResult,
     ) -> Self {
         Self {
             virtual_address,
@@ -192,13 +130,13 @@ impl<'f, VM: VirtualMachine> BuiltinFunction<'f, VM> {
 }
 
 #[derive(Default)]
-pub struct Stdlib<'f, VM: VirtualMachine> {
+pub struct Stdlib {
     by_name: HashMap<&'static str, Symbol>,
-    by_address: HashMap<Symbol, BuiltinFunction<'f, VM>>,
+    by_address: HashMap<Symbol, BuiltinFunction>,
 }
 
 // for some weird reason, the derive implementations weren't recognized by the compiler
-impl<'f, VM: VirtualMachine> Clone for Stdlib<'f, VM> {
+impl Clone for Stdlib {
     fn clone(&self) -> Self {
         Self {
             by_name: self.by_name.clone(),
@@ -207,7 +145,7 @@ impl<'f, VM: VirtualMachine> Clone for Stdlib<'f, VM> {
     }
 }
 
-impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
+impl Stdlib {
     pub fn new() -> Self {
         let (by_name, by_address) = stdlib();
 
@@ -217,11 +155,11 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
         }
     }
 
-    pub fn by_address(&self, function: Symbol) -> Option<&BuiltinFunction<'f, VM>> {
+    pub fn by_address(&self, function: Symbol) -> Option<&BuiltinFunction> {
         self.by_address.get(&function)
     }
 
-    pub fn lookup<'s>(&self, ident: impl Into<&'s str>) -> Option<&BuiltinFunction<'f, VM>> {
+    pub fn lookup<'s>(&self, ident: impl Into<&'s str>) -> Option<&BuiltinFunction> {
         self.by_name
             .get(ident.into())
             .and_then(|&address| self.by_address(address))
@@ -233,14 +171,14 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
 }
 
 #[cfg(test)]
-impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
+impl Stdlib {
     pub fn len(&self) -> usize {
         self.by_address.len()
     }
 
     pub fn of(
         by_name: HashMap<&'static str, Symbol>,
-        by_address: HashMap<Symbol, BuiltinFunction<'f, VM>>,
+        by_address: HashMap<Symbol, BuiltinFunction>,
     ) -> Self {
         Self {
             by_name,
@@ -249,9 +187,9 @@ impl<'f, VM: VirtualMachine> Stdlib<'f, VM> {
     }
 }
 
-fn stdlib<'f, VM: VirtualMachine>() -> (
+fn stdlib() -> (
     HashMap<&'static str, Symbol>,
-    HashMap<Symbol, BuiltinFunction<'f, VM>>,
+    HashMap<Symbol, BuiltinFunction>,
 ) {
     const NUMBER_OF_STDLIB_FUNCTIONS: usize = 49;
 

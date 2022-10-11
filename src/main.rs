@@ -61,7 +61,7 @@ fn run_desktop(vm: &mut VM) {
                     ..
                 } => {
                     if let Some(code) = get_key_code("ArrowLeft") {
-                        vm.set_input_key(code)
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyDown {
@@ -69,7 +69,7 @@ fn run_desktop(vm: &mut VM) {
                     ..
                 } => {
                     if let Some(code) = get_key_code("ArrowUp") {
-                        vm.set_input_key(code)
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyDown {
@@ -77,7 +77,7 @@ fn run_desktop(vm: &mut VM) {
                     ..
                 } => {
                     if let Some(code) = get_key_code("ArrowRight") {
-                        vm.set_input_key(code)
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyDown {
@@ -85,7 +85,7 @@ fn run_desktop(vm: &mut VM) {
                     ..
                 } => {
                     if let Some(code) = get_key_code("ArrowDown") {
-                        vm.set_input_key(code)
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyDown {
@@ -93,7 +93,7 @@ fn run_desktop(vm: &mut VM) {
                     ..
                 } => {
                     if let Some(code) = get_key_code("PageDown") {
-                        vm.set_input_key(code)
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyDown {
@@ -101,7 +101,7 @@ fn run_desktop(vm: &mut VM) {
                     ..
                 } => {
                     if let Some(code) = get_key_code("Backspace") {
-                        vm.set_input_key(code)
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyDown {
@@ -109,7 +109,7 @@ fn run_desktop(vm: &mut VM) {
                     ..
                 } => {
                     if let Some(code) = get_key_code("Enter") {
-                        vm.set_input_key(code)
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyDown {
@@ -119,18 +119,18 @@ fn run_desktop(vm: &mut VM) {
                     // pretty inefficient, but the js version already receives a string
                     // and since that is the main frontend, this can be tolerated
                     if let Some(code) = get_key_code(&keycode.to_string()) {
-                        vm.set_input_key(code);
+                        vm.set_input_key(code).unwrap();
                     }
                 }
                 Event::KeyUp { .. } => {
-                    vm.set_input_key(0);
+                    vm.set_input_key(0).unwrap();
                 }
                 _ => {}
             }
         }
 
         for _ in 0..20000 {
-            vm.step();
+            vm.step().unwrap();
         }
 
         let words_per_row = 32;
@@ -169,7 +169,7 @@ fn run_desktop(vm: &mut VM) {
 #[cfg(not(feature = "desktop"))]
 fn run_desktop(vm: &mut VM) {
     loop {
-        vm.step();
+        vm.step().expect("vm error");
     }
 }
 
@@ -185,19 +185,19 @@ fn main() {
     // let screen = include_str!("../res/stdlib/Screen.vm");
     // let string = include_str!("../res/stdlib/String.vm");
 
-    // let main = include_str!("../res/hackenstein/Main.vm");
-    // let display = include_str!("../res/hackenstein/Display.vm");
-    // let walls = include_str!("../res/hackenstein/Walls.vm");
-    // let player = include_str!("../res/hackenstein/Player.vm");
+    let main = include_str!("../res/hackenstein/Main.vm");
+    let display = include_str!("../res/hackenstein/Display.vm");
+    let walls = include_str!("../res/hackenstein/Walls.vm");
+    let player = include_str!("../res/hackenstein/Player.vm");
 
-    let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/ScreenTest/Main.vm");
+    // let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/ScreenTest/Main.vm");
 
     let programs = vec![
-        SourceFile::new("Test.vm", test),
-        // SourceFile::new("Main.vm", main),
-        // SourceFile::new("Display.vm", display),
-        // SourceFile::new("Walls.vm", walls),
-        // SourceFile::new("Player.vm", player),
+        // SourceFile::new("Test.vm", test),
+        SourceFile::new("Main.vm", main),
+        SourceFile::new("Display.vm", display),
+        SourceFile::new("Walls.vm", walls),
+        SourceFile::new("Player.vm", player),
     ];
 
     let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());

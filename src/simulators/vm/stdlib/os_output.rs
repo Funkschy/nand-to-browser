@@ -5,6 +5,7 @@ use super::*;
 use crate::definitions::{
     Word, BACKSPACE_KEY, NEWLINE_KEY, SCREEN_HEIGHT, SCREEN_START, SCREEN_WIDTH,
 };
+use crate::simulators::vm::VM;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 
@@ -124,14 +125,14 @@ lazy_static! {
     };
 }
 
-pub fn init<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+pub fn init(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
     set_mutex!(WORD_IN_LINE, 0, OutputBlockedWordInLineMutex);
     set_mutex!(ADDRESS, START_ADDRESS, OutputBlockedAddressMutex);
     set_mutex!(FIRST_IN_WORD, true, OutputBlockedFirstInWordMutex);
     Ok(StdlibOk::Finished(0))
 }
 
-fn draw_char<VM: VirtualMachine>(vm: &mut VM, c: char) -> Result<(), StdlibError> {
+fn draw_char(vm: &mut VM, c: char) -> Result<(), StdlibError> {
     let c = c as u32;
     let c = if !(32..127).contains(&c) { 0 } else { c };
 
@@ -144,10 +145,10 @@ fn draw_char<VM: VirtualMachine>(vm: &mut VM, c: char) -> Result<(), StdlibError
 
     let mut j = get_mutex!(ADDRESS, OutputBlockedAddressMutex);
     for i in 0..11 {
-        let old_value = vm.mem(SCREEN_START + j);
+        let old_value = vm.mem(SCREEN_START + j)?;
         let map_value = MAP[&c][i];
         let new_value = (old_value & mask) | (map_value << shift);
-        vm.set_mem(SCREEN_START + j, new_value);
+        vm.set_mem(SCREEN_START + j, new_value)?;
         j += SCREEN_WIDTH >> 4;
     }
 
@@ -173,7 +174,7 @@ fn println_impl() -> Result<(), StdlibError> {
     Ok(())
 }
 
-fn backspace_impl<VM: VirtualMachine>(vm: &mut VM) -> Result<(), StdlibError> {
+fn backspace_impl(vm: &mut VM) -> Result<(), StdlibError> {
     let mut address = get_mutex!(ADDRESS, OutputBlockedAddressMutex);
     let mut word_in_line = get_mutex!(WORD_IN_LINE, OutputBlockedWordInLineMutex);
     let mut first_in_word = get_mutex!(FIRST_IN_WORD, OutputBlockedFirstInWordMutex);
@@ -201,7 +202,7 @@ fn backspace_impl<VM: VirtualMachine>(vm: &mut VM) -> Result<(), StdlibError> {
     draw_char(vm, ' ')
 }
 
-fn print_char_impl<VM: VirtualMachine>(vm: &mut VM, c: Word) -> Result<(), StdlibError> {
+fn print_char_impl(vm: &mut VM, c: Word) -> Result<(), StdlibError> {
     match c {
         NEWLINE_KEY => println_impl()?,
         BACKSPACE_KEY => backspace_impl(vm)?,
@@ -239,7 +240,7 @@ fn print_char_impl<VM: VirtualMachine>(vm: &mut VM, c: Word) -> Result<(), Stdli
     Ok(())
 }
 
-pub fn move_cursor<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn move_cursor(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let row = params[0];
     let col = params[1];
 
@@ -262,14 +263,14 @@ pub fn move_cursor<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn print_char<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn print_char(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let c = params[0];
     print_char_impl(vm, c)?;
 
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn print_string<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+pub fn print_string(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     // State is 32 bits wide. The upper 16 bits are used to keep the length information, while
     // the lower 16 bits are used for the actual state counter
     let string = params[0];
@@ -282,9 +283,9 @@ pub fn print_string<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Wor
     // the second call of this function is a special case, because the string length is on the
     // stack instead of in the state
     let (len, last) = if state == 1 {
-        (vm.pop() as State, 0)
+        (vm.pop()? as State, 0)
     } else {
-        ((state >> 16) & 0xFFFF, vm.pop())
+        ((state >> 16) & 0xFFFF, vm.pop()?)
     };
 
     // we need 2 ticks for each i, so divide by 2
@@ -308,7 +309,7 @@ pub fn print_string<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Wor
     }
 }
 
-pub fn print_int<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
+pub fn print_int(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let i = params[0];
     let s = i.to_string();
 
@@ -319,12 +320,12 @@ pub fn print_int<VM: VirtualMachine>(vm: &mut VM, _: State, params: &[Word]) -> 
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn println<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+pub fn println(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
     println_impl()?;
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn backspace<VM: VirtualMachine>(vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+pub fn backspace(vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
     backspace_impl(vm)?;
     Ok(StdlibOk::Finished(0))
 }

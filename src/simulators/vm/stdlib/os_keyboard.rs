@@ -1,21 +1,22 @@
 use super::*;
 use crate::definitions::{BACKSPACE_KEY, KBD, NEWLINE_KEY};
+use crate::simulators::vm::VM;
 
-pub fn init<VM: VirtualMachine>(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+pub fn init(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
     Ok(StdlibOk::Finished(0))
 }
 
-pub fn key_pressed<VM: VirtualMachine>(vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
-    Ok(StdlibOk::Finished(vm.mem(KBD)))
+pub fn key_pressed(vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+    Ok(StdlibOk::Finished(vm.mem(KBD)?))
 }
 
-pub fn read_char<VM: VirtualMachine>(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
+pub fn read_char(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
     match state {
         0 => {
             call_vm!(vm, state, "Output.printChar", &[0])
         }
         1 => {
-            let key = vm.mem(KBD);
+            let key = vm.mem(KBD)?;
             // stay in this state until the key state was 0 (don't allow holding the key)
             if key != 0 {
                 Ok(StdlibOk::ContinueInNextStep(state))
@@ -24,15 +25,15 @@ pub fn read_char<VM: VirtualMachine>(vm: &mut VM, state: State, _params: &[Word]
             }
         }
         2 => {
-            let key = vm.mem(KBD);
+            let key = vm.mem(KBD)?;
             // stay in this state until the user presses a key
             if key == 0 {
                 Ok(StdlibOk::ContinueInNextStep(state))
             } else {
                 // alternatively we could keep the key inside of state, similar to the way
                 // Output.printString does it
-                vm.push(key);
-                vm.push(key);
+                vm.push(key)?;
+                vm.push(key)?;
                 Ok(StdlibOk::ContinueInNextStep(state + 1))
             }
         }
@@ -40,20 +41,20 @@ pub fn read_char<VM: VirtualMachine>(vm: &mut VM, state: State, _params: &[Word]
             call_vm!(vm, state, "Output.printChar", &[BACKSPACE_KEY])
         }
         4 => {
-            vm.pop(); // printChar backspace result
-            let key = vm.pop();
+            vm.pop()?; // printChar backspace result
+            let key = vm.pop()?;
             call_vm!(vm, state, "Output.printChar", &[key])
         }
         _ => {
-            vm.pop(); // printChar key result
-            let key = vm.pop();
-            vm.pop(); // printChar 0 result
+            vm.pop()?; // printChar key result
+            let key = vm.pop()?;
+            vm.pop()?; // printChar 0 result
             Ok(StdlibOk::Finished(key))
         }
     }
 }
 
-pub fn read_line<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+pub fn read_line(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     // use the upper 16 bits for the string address and the lower 16 bits for the actual state
     let string_s = (state >> 16) & 0xFFFF;
     let line = string_s as Word;
@@ -65,7 +66,7 @@ pub fn read_line<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word])
             call_vm!(vm, state, "Output.printString", &[message])
         }
         1 => {
-            vm.pop(); // printChar 0
+            vm.pop()?; // printChar 0
             let max_line_length = 80; // same as in the official Keyboard.vm code
             call_vm!(vm, state, "String.new", &[max_line_length])
         }
@@ -73,13 +74,13 @@ pub fn read_line<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word])
             call_vm!(vm, state, "Keyboard.readChar", &[])
         }
         3 => {
-            let c = vm.pop();
-            let string = vm.pop() as State;
-            vm.push(c);
+            let c = vm.pop()?;
+            let string = vm.pop()? as State;
+            vm.push(c)?;
             Ok(StdlibOk::ContinueInNextStep((string << 16) | 4))
         }
         4 => {
-            let c = vm.pop();
+            let c = vm.pop()?;
 
             match c {
                 NEWLINE_KEY => Ok(StdlibOk::Finished(line)),
@@ -94,7 +95,7 @@ pub fn read_line<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word])
             }
         }
         5 => {
-            vm.pop(); // String.eraseLastChar or String.appendChar
+            vm.pop()?; // String.eraseLastChar or String.appendChar
             vm.call("Keyboard.readChar", &[])?;
             Ok(StdlibOk::ContinueInNextStep((string_s << 16) | 4))
         }
@@ -102,15 +103,15 @@ pub fn read_line<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word])
     }
 }
 
-pub fn read_int<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+pub fn read_int(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     match state {
         0 => call_vm!(vm, state, "Keyboard.readLine", params),
         1 => {
-            let line = vm.pop();
+            let line = vm.pop()?;
             call_vm!(vm, state, "String.intValue", &[line])
         }
         _ => {
-            let int = vm.pop();
+            let int = vm.pop()?;
             Ok(StdlibOk::Finished(int))
         }
     }

@@ -1,5 +1,6 @@
 use crate::definitions::{Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS};
 use crate::simulators::vm::stdlib::Stdlib;
+use crate::simulators::vm::VMError;
 use wasm_bindgen::prelude::*;
 
 mod definitions;
@@ -28,6 +29,12 @@ pub struct App {
 impl Default for App {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl From<VMError> for JsValue {
+    fn from(error: VMError) -> Self {
+        JsValue::from(error.to_string())
     }
 }
 
@@ -66,18 +73,19 @@ impl App {
         self.vm.load(program);
     }
 
-    pub fn step_times(&mut self, times: u32) {
+    pub fn step_times(&mut self, times: u32) -> Result<(), JsValue> {
         for _ in 0..times {
-            self.vm.step();
+            self.vm.step()?;
         }
+        Ok(())
     }
 
     pub fn step(&mut self) {
-        self.vm.step();
+        self.vm.step().unwrap();
     }
 
     pub fn set_input_key(&mut self, key: Word) {
-        self.vm.set_input_key(key);
+        self.vm.set_input_key(key).unwrap();
     }
 
     pub fn data_buffer_size() -> usize {

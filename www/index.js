@@ -20,7 +20,13 @@ const render = (img_data) => {
 
 
 const run = () => {
-  app.step_times(steps_per_tick);
+  try {
+    app.step_times(steps_per_tick);
+  } catch (error) {
+    clearInterval(interval);
+    interval = null;
+    alert(error);
+  }
 };
 
 const pause = () => {

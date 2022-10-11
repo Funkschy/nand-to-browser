@@ -1,21 +1,27 @@
 pub mod command;
+pub mod error;
 pub mod meta;
 pub mod stdlib;
 
 mod calls;
 
-use crate::definitions::SCREEN_START;
-use crate::definitions::{Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SP, THAT, THIS};
-use crate::simulators::vm::meta::FunctionInfo;
+pub use error::VMError;
+
+use crate::definitions::{
+    Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SCREEN_START, SP, THAT, THIS,
+};
 use calls::*;
 use command::{Instruction, Segment};
+use meta::FunctionInfo;
 use meta::MetaInfo;
-use stdlib::{BuiltinFunction, State, Stdlib, StdlibError, StdlibOk, VMCallOk, VirtualMachine};
+use stdlib::{BuiltinFunction, State, Stdlib, StdlibError, StdlibOk, VMCallOk};
 
 pub trait ProgramInfo {
     fn take_instructions(&mut self) -> Vec<Instruction>;
     fn take_meta(&mut self) -> MetaInfo;
 }
+
+pub type VMResult<T = ()> = Result<T, VMError>;
 
 pub struct VM {
     // the program counter / instruction pointer
@@ -25,7 +31,7 @@ pub struct VM {
     meta: MetaInfo,
     call_stack: Vec<CallStackEntry>,
 
-    stdlib: Stdlib<'static, Self>,
+    stdlib: Stdlib,
     // if this is set to Some(address) the vm will jump to Sys.init on the next step
     sys_init: Option<Symbol>,
 
@@ -56,26 +62,30 @@ macro_rules! trace_calls {
 macro_rules! tos_binary {
     ($vm:expr, $op:tt) => {{
         let sp = $vm.memory[SP] as Address;
-        trace_vm!({
-            println!("{} {} {}", $vm.memory[sp - 2], stringify!($op), $vm.memory[sp - 1]);
-        });
         // cast up to i32 so that no overflow checks get triggered in debug mode
-        $vm.memory[sp - 2] = ($vm.memory[sp - 2] as i32 $op $vm.memory[sp - 1] as i32) as Word;
-        $vm.memory[SP] -= 1;
+        let l = $vm.mem(sp - 2)? as i32;
+        let r = $vm.mem(sp - 1)? as i32;
+        trace_vm!({
+            println!("{} {} {}", l, stringify!($op), r);
+        });
+        $vm.set_mem(sp - 2, (l $op r) as Word)?;
+        $vm.add_to_mem(SP, -1)?;
         $vm.pc += 1;
     }};
 }
 
 macro_rules! tos_binary_bool {
     ($vm:expr, $op:tt) => {{
+        let sp = $vm.mem(SP)? as Address;
+        let l = $vm.mem(sp - 2)?;
+        let r = $vm.mem(sp - 1)?;
         trace_vm!({
-            println!("{}", stringify!($op));
+            println!("{} {} {}", l, stringify!($op), r);
         });
-        let sp = $vm.memory[SP] as Address;
         // in the hack architecture, true is actually -1 not 1 so we have to invert the tos
         // if it was already 0 (false) it will stay zero, if it was 1 it will be -1
-        $vm.memory[sp - 2] = -(($vm.memory[sp - 2] $op $vm.memory[sp - 1]) as Word);
-        $vm.memory[SP] -= 1;
+        $vm.set_mem(sp - 2, -((l $op r) as Word))?;
+        $vm.add_to_mem(SP,-1)?;
         $vm.pc += 1;
     }};
 }
@@ -85,36 +95,54 @@ macro_rules! tos_unary {
         trace_vm!({
             println!("{}", stringify!($op));
         });
-        let sp = $vm.memory[SP] as Address;
-        $vm.memory[sp - 1] = $op($vm.memory[sp - 1] as Word);
+        let sp = $vm.mem(SP)? as Address;
+        $vm.set_mem(sp - 1, $op($vm.mem(sp - 1)? as Word))?;
         $vm.pc += 1;
     }};
 }
 
-impl VirtualMachine for VM {
-    #[inline]
-    fn mem(&self, address: Address) -> Word {
-        self.memory[address]
+impl VM {
+    pub fn new(stdlib: Stdlib) -> Self {
+        Self {
+            pc: 0,
+            program: vec![],
+            meta: MetaInfo::default(),
+            call_stack: Vec::with_capacity(32),
+            memory: Box::new([0; MEM_SIZE]),
+            stdlib,
+            sys_init: None,
+        }
+    }
+
+    fn mem(&self, address: Address) -> VMResult<Word> {
+        self.memory
+            .get(address)
+            .copied()
+            .ok_or(VMError::IllegalMemoryAddress(address))
     }
 
     #[inline]
-    fn set_mem(&mut self, address: Address, value: Word) {
-        self.memory[address] = value;
+    fn set_mem(&mut self, address: Address, value: Word) -> VMResult {
+        *self
+            .memory
+            .get_mut(address)
+            .ok_or(VMError::IllegalMemoryAddress(address))? = value;
+        Ok(())
     }
 
     #[inline]
-    fn pop(&mut self) -> Word {
-        self.add_to_mem(SP, -1);
+    fn pop(&mut self) -> VMResult<Word> {
+        self.add_to_mem(SP, -1)?;
         self.mem_indirect(SP, 0)
     }
 
     #[inline]
-    fn push(&mut self, value: Word) {
-        self.set_mem_indirect(SP, 0, value);
-        self.add_to_mem(SP, 1);
+    fn push(&mut self, value: Word) -> VMResult {
+        self.set_mem_indirect(SP, 0, value)?;
+        self.add_to_mem(SP, 1)
     }
 
-    fn call(&mut self, name: &str, params: &[Word]) -> Result<VMCallOk, StdlibError> {
+    fn call(&mut self, name: &str, params: &[Word]) -> VMResult<VMCallOk> {
         trace_calls!({
             println!("Calling {} by name", name);
         });
@@ -131,75 +159,67 @@ impl VirtualMachine for VM {
                 println!("{} is a builtin function", stdlib_function.name());
             });
 
-            self.call_builtin_function(stdlib_function, params);
+            self.call_builtin_function(stdlib_function, params)?;
             Ok(VMCallOk::WasBuiltinFunction)
         } else {
             for &p in params {
-                self.push(p);
+                self.push(p)?;
             }
-            self.call_vm_function(address, params.len() as Word);
+            self.call_vm_function(address, params.len() as Word)?;
             Ok(VMCallOk::WasVMFunction)
         }
     }
-}
-
-impl VM {
-    pub fn new(stdlib: Stdlib<'static, Self>) -> Self {
-        Self {
-            pc: 0,
-            program: vec![],
-            meta: MetaInfo::default(),
-            call_stack: Vec::with_capacity(32),
-            memory: Box::new([0; MEM_SIZE]),
-            stdlib,
-            sys_init: None,
-        }
+    #[inline]
+    fn mem_indirect(&self, address_of_address: Address, offset: usize) -> VMResult<Word> {
+        let address = self.mem(address_of_address)? as Address + offset;
+        self.mem(address)
     }
 
     #[inline]
-    fn mem_indirect(&self, address_of_address: Address, offset: usize) -> Word {
-        self.memory[self.memory[address_of_address] as Address + offset]
+    fn set_mem_indirect(
+        &mut self,
+        address_of_address: Address,
+        offset: usize,
+        value: Word,
+    ) -> VMResult {
+        let address = self.mem(address_of_address)? as Address + offset;
+        self.set_mem(address, value)
     }
 
     #[inline]
-    fn set_mem_indirect(&mut self, address_of_address: Address, offset: usize, value: Word) {
-        self.set_mem(self.memory[address_of_address] as Address + offset, value);
+    fn add_to_mem(&mut self, address: Address, relative_value: Word) -> VMResult {
+        self.set_mem(address, self.mem(address)? + relative_value)
     }
 
     #[inline]
-    fn add_to_mem(&mut self, address: Address, relative_value: Word) {
-        self.set_mem(address, self.mem(address) + relative_value);
+    fn tos(&self) -> VMResult<Word> {
+        let sp = self.mem(SP)? as Address;
+        self.mem(sp - 1)
     }
 
-    #[inline]
-    fn tos(&self) -> Word {
-        let sp = self.memory[SP] as Address;
-        self.memory[sp - 1]
-    }
-
-    fn get_seg_address(&self, segment: Segment, index: i16) -> Address {
+    fn get_seg_address(&self, segment: Segment, index: i16) -> VMResult<Address> {
         let offset = match segment {
-            Segment::Local => self.memory[LCL],
-            Segment::Argument => self.memory[ARG],
-            Segment::This => self.memory[THIS],
-            Segment::That => self.memory[THAT],
+            Segment::Local => self.mem(LCL)?,
+            Segment::Argument => self.mem(ARG)?,
+            Segment::This => self.mem(THIS)?,
+            Segment::That => self.mem(THAT)?,
             Segment::Temp => 5,
             Segment::Pointer => 3,
             // Static memory segments are actually resolved in the ByteCode Parser
             // The parser will simply set the index to an offset unique for the source file
             // it is currently parsing.
             Segment::Static => 0,
-            Segment::Constant => panic!("cannot get address of constant"),
+            Segment::Constant => return Err(VMError::CannotGetAddressOfConstant),
         };
-        offset as Address + index as Address
+        Ok(offset as Address + index as Address)
     }
 
-    fn get_value(&self, segment: Segment, index: i16) -> Word {
+    fn get_value(&self, segment: Segment, index: i16) -> VMResult<Word> {
         if segment == Segment::Constant {
-            index
+            Ok(index)
         } else {
-            let addr = self.get_seg_address(segment, index);
-            self.memory[addr]
+            let addr = self.get_seg_address(segment, index)?;
+            self.mem(addr)
         }
     }
 
@@ -207,8 +227,8 @@ impl VM {
         &self.memory[SCREEN_START..(SCREEN_START + 8192)]
     }
 
-    pub fn set_input_key(&mut self, key: i16) {
-        self.set_mem(KBD, key);
+    pub fn set_input_key(&mut self, key: i16) -> VMResult {
+        self.set_mem(KBD, key)
     }
 
     pub fn load(&mut self, mut info: impl ProgramInfo) {
@@ -224,7 +244,7 @@ impl VM {
         // page 162 of the book:
         // the VM implementation c
         // an start by generating assembly code that sets SP=256
-        self.set_mem(SP, INIT_SP);
+        self.set_mem(SP, INIT_SP).unwrap(); // cannot fail
 
         self.call_stack.clear();
         self.push_call(CallStackEntry::top_level());
@@ -254,12 +274,20 @@ impl VM {
         idx
     }
 
-    fn peek_call(&mut self) -> Option<&mut CallStackEntry> {
-        self.call_stack.last_mut()
+    fn peek_call(&mut self) -> VMResult<&mut CallStackEntry> {
+        self.call_stack
+            .last_mut()
+            .ok_or(VMError::AccessingEmptyCallStack)
     }
 
-    fn update_call_stack_index_next_state(&mut self, index: usize, next_state: State) {
-        let call = self.call_stack.get_mut(index).unwrap();
+    fn call_at(&mut self, index: usize) -> VMResult<&mut CallStackEntry> {
+        self.call_stack
+            .get_mut(index)
+            .ok_or(VMError::IllegalCallStackIndex)
+    }
+
+    fn update_call_stack_index_next_state(&mut self, index: usize, next_state: State) -> VMResult {
+        let call = self.call_at(index)?;
 
         if let CallState::Builtin(ref mut old_state, _) = call.state {
             trace_calls!({
@@ -269,22 +297,25 @@ impl VM {
                 );
             });
             *old_state = next_state;
+            Ok(())
         } else {
-            panic!("trying to continue a vm function");
+            Err(VMError::TryingToContinueVMFunction)
         }
     }
 
-    fn return_address(&mut self) -> Option<ReturnAddress> {
+    fn return_address(&mut self) -> VMResult<ReturnAddress> {
         let current_call = self.peek_call()?;
         match current_call.state {
-            CallState::TopLevel => Some(ReturnAddress::EndOfProgram),
-            CallState::Builtin(..) => Some(ReturnAddress::Builtin(0)),
-            CallState::VM => Some(ReturnAddress::VM(self.pc as Symbol + 1)),
+            CallState::TopLevel => Ok(ReturnAddress::EndOfProgram),
+            CallState::Builtin(..) => Ok(ReturnAddress::Builtin(0)),
+            CallState::VM => Ok(ReturnAddress::VM(self.pc as Symbol + 1)),
         }
     }
 
-    fn pop_call(&mut self) -> Option<CallStackEntry> {
-        self.call_stack.pop()
+    fn pop_call(&mut self) -> VMResult<CallStackEntry> {
+        self.call_stack
+            .pop()
+            .ok_or(VMError::AccessingEmptyCallStack)
     }
 
     pub fn call_stack_names(&self) -> Vec<&str> {
@@ -297,16 +328,23 @@ impl VM {
             .collect()
     }
 
-    fn handle_builtin_finished(&mut self, ret_val: Word) {
-        let this_call = self.pop_call().unwrap();
-        self.push(ret_val);
+    fn handle_builtin_finished(&mut self, ret_val: Word) -> VMResult {
+        let this_call = self.pop_call()?;
+        self.push(ret_val)?;
         if let ReturnAddress::VM(ret_addr) = this_call.ret_addr {
             // jump to the appropriate position
             self.pc = ret_addr as usize;
         }
+        Ok(())
     }
 
-    fn continue_builtin_function(&mut self, entry: CallStackEntry) {
+    fn lookup_stdlib_function(&self, f: Symbol) -> VMResult<&BuiltinFunction> {
+        self.stdlib
+            .by_address(f)
+            .ok_or(VMError::NonExistingStdlibFunction)
+    }
+
+    fn continue_builtin_function(&mut self, entry: CallStackEntry) -> VMResult {
         use StdlibOk::*;
 
         trace_calls!({
@@ -317,16 +355,20 @@ impl VM {
             );
         });
 
-        let function = *self.stdlib.by_address(entry.function.unwrap()).unwrap();
+        let function = *entry
+            .function
+            .ok_or(VMError::TryingToContinueTopLevelCode)
+            .and_then(|f| self.lookup_stdlib_function(f))?;
+
         let (state, args) = if let CallState::Builtin(state, args) = entry.state {
             (state, args)
         } else {
-            panic!("trying to continue vm function");
+            return Err(VMError::TryingToContinueVMFunction);
         };
         // the call continuation might call another function, so we need to save the index of the
         // current function to use it when updating the call state
         let this_call_idx = self.call_stack.len() - 1;
-        let ret_val = function.continue_call(self, state, &args).unwrap();
+        let ret_val = function.continue_call(self, state, &args)?;
 
         match ret_val {
             Finished(ret_val) => {
@@ -337,15 +379,15 @@ impl VM {
                         ret_val
                     );
                 });
-                self.handle_builtin_finished(ret_val);
+                self.handle_builtin_finished(ret_val)
             }
             ContinueInNextStep(next_state) => {
-                self.update_call_stack_index_next_state(this_call_idx, next_state);
+                self.update_call_stack_index_next_state(this_call_idx, next_state)
             }
         }
     }
 
-    fn call_builtin_function(&mut self, function: BuiltinFunction<'static, Self>, args: &[Word]) {
+    fn call_builtin_function(&mut self, function: BuiltinFunction, args: &[Word]) -> VMResult {
         use StdlibOk::{ContinueInNextStep, Finished};
 
         trace_calls!({
@@ -357,7 +399,7 @@ impl VM {
             println!("{:?}", self.call_stack_names());
         });
 
-        let ret_addr = self.return_address().unwrap();
+        let ret_addr = self.return_address()?;
         let init_state = 0;
         let index = self.push_call(CallStackEntry::builtin(
             ret_addr,
@@ -365,8 +407,7 @@ impl VM {
             init_state,
             args.to_owned(),
         ));
-        // TODO: handle error return value
-        let ret_val = function.call(self, args).unwrap();
+        let ret_val = function.call(self, args)?;
 
         match ret_val {
             Finished(ret_val) => {
@@ -377,15 +418,15 @@ impl VM {
                         ret_val
                     );
                 });
-                self.handle_builtin_finished(ret_val);
+                self.handle_builtin_finished(ret_val)
             }
             ContinueInNextStep(next_state) => {
-                self.update_call_stack_index_next_state(index, next_state);
+                self.update_call_stack_index_next_state(index, next_state)
             }
         }
     }
 
-    fn call_vm_function(&mut self, function: Symbol, n_args: i16) {
+    fn call_vm_function(&mut self, function: Symbol, n_args: i16) -> VMResult {
         // TODO: handle error if calling a non existing function
 
         trace_calls!({
@@ -394,28 +435,29 @@ impl VM {
         });
 
         let ret_addr = self.pc + 1;
-        self.push(ret_addr as Word);
+        self.push(ret_addr as Word)?;
 
-        let lcl = self.mem(LCL);
-        self.push(lcl);
-        let arg = self.mem(ARG);
-        self.push(arg);
-        let this = self.mem(THIS);
-        self.push(this);
-        let that = self.mem(THAT);
-        self.push(that);
+        let lcl = self.mem(LCL)?;
+        self.push(lcl)?;
+        let arg = self.mem(ARG)?;
+        self.push(arg)?;
+        let this = self.mem(THIS)?;
+        self.push(this)?;
+        let that = self.mem(THAT)?;
+        self.push(that)?;
 
-        let sp = self.mem(SP);
+        let sp = self.mem(SP)?;
         let arg = sp - n_args - 5;
-        self.set_mem(ARG, arg);
-        self.set_mem(LCL, sp);
+        self.set_mem(ARG, arg)?;
+        self.set_mem(LCL, sp)?;
 
-        let ret_addr = self.return_address().unwrap();
+        let ret_addr = self.return_address()?;
         self.push_call(CallStackEntry::vm(ret_addr, function));
         self.pc = function as usize;
+        Ok(())
     }
 
-    fn call_function(&mut self, function: Symbol, n_args: i16) -> Result<VMCallOk, StdlibError> {
+    fn call_function(&mut self, function: Symbol, n_args: i16) -> VMResult<VMCallOk> {
         if let Some(&stdlib_function) = self.stdlib.by_address(function) {
             trace_calls!({
                 println!("{} is a builtin function", stdlib_function.name());
@@ -423,19 +465,19 @@ impl VM {
 
             // TODO: assert that if this was called by bytecode, the n_args matches
             let n_args = stdlib_function.num_args();
-            let sp = self.mem(SP) as usize;
+            let sp = self.mem(SP)? as usize;
             let args = Vec::from(&self.memory[sp - n_args..sp]);
-            self.set_mem(SP, (sp - n_args) as i16);
+            self.set_mem(SP, (sp - n_args) as i16)?;
 
-            self.call_builtin_function(stdlib_function, &args);
+            self.call_builtin_function(stdlib_function, &args)?;
             Ok(VMCallOk::WasBuiltinFunction)
         } else {
-            self.call_vm_function(function, n_args);
+            self.call_vm_function(function, n_args)?;
             Ok(VMCallOk::WasVMFunction)
         }
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> VMResult {
         use Instruction::{
             Add, And, Call, Eq, Function, Goto, Gt, IfGoto, Lt, Neg, Not, Or, Pop, Push, Return,
             Sub,
@@ -443,26 +485,28 @@ impl VM {
 
         if let Some(sys_init_address) = self.sys_init {
             println!("jumping to Sys.init at {}", sys_init_address);
-            self.call_function(sys_init_address, 0).unwrap();
             self.sys_init = None;
-            return;
+            self.call_function(sys_init_address, 0)?;
+            return Ok(());
         }
 
         let currently_in_builtin_f = matches!(
             self.peek_call(),
-            Some(CallStackEntry {
+            Ok(CallStackEntry {
                 state: CallState::Builtin(_, _),
                 ..
             })
         );
 
         if currently_in_builtin_f {
-            let peeked = self.peek_call().unwrap().clone();
-            self.continue_builtin_function(peeked);
-            return;
+            let peeked = self.peek_call()?.clone();
+            return self.continue_builtin_function(peeked);
         }
 
-        let instr = self.program[self.pc];
+        let instr = *self
+            .program
+            .get(self.pc)
+            .ok_or(VMError::IllegalProgramCounter(self.pc))?;
 
         match instr {
             Add => tos_binary!(self, +),
@@ -475,24 +519,24 @@ impl VM {
             Gt => tos_binary_bool!(self, >),
             Lt => tos_binary_bool!(self, <),
             Push { segment, index } => {
-                let value = self.get_value(segment, index);
+                let value = self.get_value(segment, index)?;
 
                 trace_vm!({
                     println!("push {:?} {} {}", segment, index, value);
                 });
 
-                self.push(value);
+                self.push(value)?;
                 self.pc += 1;
             }
             Pop { segment, index } => {
-                let address = self.get_seg_address(segment, index);
-                let value = self.pop();
+                let address = self.get_seg_address(segment, index)?;
+                let value = self.pop()?;
 
                 trace_vm!({
                     println!("pop {:?} {} {} {}", segment, index, address, value);
                 });
 
-                self.set_mem(address, value);
+                self.set_mem(address, value)?;
                 self.pc += 1;
             }
             Goto { instruction } => {
@@ -503,7 +547,7 @@ impl VM {
                 self.pc = instruction as usize;
             }
             IfGoto { instruction } => {
-                let condition = self.pop();
+                let condition = self.pop()?;
                 trace_vm!({
                     println!("if-goto {} {}", condition, instruction);
                 });
@@ -522,16 +566,16 @@ impl VM {
                             .map(|f| f.name.as_str())
                             .unwrap_or_default()
                     );
-                    println!("SP   {}", self.mem(SP));
-                    println!("LCL  {}", self.mem(LCL));
-                    println!("ARG  {}", self.mem(ARG));
-                    println!("THIS {}", self.mem(THIS));
-                    println!("THAT {}", self.mem(THAT));
+                    println!("SP   {}", self.mem(SP)?);
+                    println!("LCL  {}", self.mem(LCL)?);
+                    println!("ARG  {}", self.mem(ARG)?);
+                    println!("THIS {}", self.mem(THIS)?);
+                    println!("THAT {}", self.mem(THAT)?);
                     println!("PC   {}", self.pc);
                 });
 
                 for _ in 0..n_locals {
-                    self.push(0);
+                    self.push(0)?;
                 }
                 self.pc += 1;
             }
@@ -540,25 +584,25 @@ impl VM {
                     println!("return");
                 });
 
-                let frame = self.mem(LCL) as Address;
+                let frame = self.mem(LCL)? as Address;
                 if frame < 5 {
                     panic!("{} {} {:?}", frame, self.pc, self.call_stack_names());
                 }
                 // the return address
-                let ret = self.mem(frame - 5) as Address;
+                let ret = self.mem(frame - 5)? as Address;
 
                 // reposition the return value for the caller
-                let return_value = self.pop();
-                self.set_mem_indirect(ARG, 0, return_value);
+                let return_value = self.pop()?;
+                self.set_mem_indirect(ARG, 0, return_value)?;
 
                 // restore the stack for the caller
-                self.set_mem(SP, self.mem(ARG) + 1);
-                self.set_mem(THAT, self.mem(frame - 1));
-                self.set_mem(THIS, self.mem(frame - 2));
-                self.set_mem(ARG, self.mem(frame - 3));
-                self.set_mem(LCL, self.mem(frame - 4));
+                self.set_mem(SP, self.mem(ARG)? + 1)?;
+                self.set_mem(THAT, self.mem(frame - 1)?)?;
+                self.set_mem(THIS, self.mem(frame - 2)?)?;
+                self.set_mem(ARG, self.mem(frame - 3)?)?;
+                self.set_mem(LCL, self.mem(frame - 4)?)?;
 
-                let popped = self.pop_call().unwrap();
+                let popped = self.pop_call()?;
 
                 if popped.ret_addr != ReturnAddress::EndOfProgram {
                     self.pc = ret;
@@ -580,7 +624,7 @@ impl VM {
                 });
             }
             Call { function, n_args } => {
-                self.call_function(function, n_args).unwrap();
+                self.call_function(function, n_args)?;
             }
         };
 
@@ -591,8 +635,10 @@ impl VM {
             dbg!(self.memory[ARG]);
             dbg!(self.memory[THIS]);
             dbg!(self.memory[THAT]);
-            dbg!(self.tos());
+            dbg!(self.tos()?);
         });
+
+        Ok(())
     }
 }
 
@@ -705,24 +751,24 @@ mod tests {
         let program = ParsedProgram::new(bytecode, HashMap::new(), HashMap::new());
         vm.load(program);
 
-        vm.set_mem(SP, 256);
-        vm.set_mem(LCL, 300);
-        vm.set_mem(ARG, 400);
-        vm.set_mem(THIS, 3000);
-        vm.set_mem(THAT, 3010);
+        vm.set_mem(SP, 256).unwrap();
+        vm.set_mem(LCL, 300).unwrap();
+        vm.set_mem(ARG, 400).unwrap();
+        vm.set_mem(THIS, 3000).unwrap();
+        vm.set_mem(THAT, 3010).unwrap();
 
         for _ in 0..25 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(472, vm.mem(256));
-        assert_eq!(10, vm.mem(300));
-        assert_eq!(21, vm.mem(401));
-        assert_eq!(22, vm.mem(402));
-        assert_eq!(36, vm.mem(3006));
-        assert_eq!(42, vm.mem(3012));
-        assert_eq!(45, vm.mem(3015));
-        assert_eq!(510, vm.mem(11));
+        assert_eq!(Ok(472), vm.mem(256));
+        assert_eq!(Ok(10), vm.mem(300));
+        assert_eq!(Ok(21), vm.mem(401));
+        assert_eq!(Ok(22), vm.mem(402));
+        assert_eq!(Ok(36), vm.mem(3006));
+        assert_eq!(Ok(42), vm.mem(3012));
+        assert_eq!(Ok(45), vm.mem(3015));
+        assert_eq!(Ok(510), vm.mem(11));
     }
 
     #[test]
@@ -762,24 +808,24 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(SP, 256);
-        vm.set_mem(LCL, 300);
-        vm.set_mem(ARG, 400);
-        vm.set_mem(THIS, 3000);
-        vm.set_mem(THAT, 3010);
+        vm.set_mem(SP, 256).unwrap();
+        vm.set_mem(LCL, 300).unwrap();
+        vm.set_mem(ARG, 400).unwrap();
+        vm.set_mem(THIS, 3000).unwrap();
+        vm.set_mem(THAT, 3010).unwrap();
 
         for _ in 0..25 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(472, vm.mem(256));
-        assert_eq!(10, vm.mem(300));
-        assert_eq!(21, vm.mem(401));
-        assert_eq!(22, vm.mem(402));
-        assert_eq!(36, vm.mem(3006));
-        assert_eq!(42, vm.mem(3012));
-        assert_eq!(45, vm.mem(3015));
-        assert_eq!(510, vm.mem(11));
+        assert_eq!(Ok(472), vm.mem(256));
+        assert_eq!(Ok(10), vm.mem(300));
+        assert_eq!(Ok(21), vm.mem(401));
+        assert_eq!(Ok(22), vm.mem(402));
+        assert_eq!(Ok(36), vm.mem(3006));
+        assert_eq!(Ok(42), vm.mem(3012));
+        assert_eq!(Ok(45), vm.mem(3015));
+        assert_eq!(Ok(510), vm.mem(11));
     }
 
     #[test]
@@ -809,17 +855,17 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(0, 256);
+        vm.set_mem(0, 256).unwrap();
 
         for _ in 0..15 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(6084, vm.mem(256));
-        assert_eq!(3030, vm.mem(3));
-        assert_eq!(3040, vm.mem(4));
-        assert_eq!(32, vm.mem(3032));
-        assert_eq!(46, vm.mem(3046));
+        assert_eq!(Ok(6084), vm.mem(256));
+        assert_eq!(Ok(3030), vm.mem(3));
+        assert_eq!(Ok(3040), vm.mem(4));
+        assert_eq!(Ok(32), vm.mem(3032));
+        assert_eq!(Ok(46), vm.mem(3046));
     }
 
     #[test]
@@ -845,13 +891,13 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(0, 256);
+        vm.set_mem(0, 256).unwrap();
 
         for _ in 0..11 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(1110, vm.mem(256));
+        assert_eq!(Ok(1110), vm.mem(256));
     }
 
     #[test]
@@ -869,14 +915,14 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(0, 256);
+        vm.set_mem(0, 256).unwrap();
 
         for _ in 0..3 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(257, vm.mem(0));
-        assert_eq!(15, vm.mem(256));
+        assert_eq!(Ok(257), vm.mem(0));
+        assert_eq!(Ok(15), vm.mem(256));
     }
 
     #[test]
@@ -929,23 +975,23 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(0, 256);
+        vm.set_mem(0, 256).unwrap();
 
         for _ in 0..38 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(266, vm.mem(0));
-        assert_eq!(-1, vm.mem(256));
-        assert_eq!(0, vm.mem(257));
-        assert_eq!(0, vm.mem(258));
-        assert_eq!(0, vm.mem(259));
-        assert_eq!(-1, vm.mem(260));
-        assert_eq!(0, vm.mem(261));
-        assert_eq!(-1, vm.mem(262));
-        assert_eq!(0, vm.mem(263));
-        assert_eq!(0, vm.mem(264));
-        assert_eq!(-91, vm.mem(265));
+        assert_eq!(Ok(266), vm.mem(0));
+        assert_eq!(Ok(-1), vm.mem(256));
+        assert_eq!(Ok(0), vm.mem(257));
+        assert_eq!(Ok(0), vm.mem(258));
+        assert_eq!(Ok(0), vm.mem(259));
+        assert_eq!(Ok(-1), vm.mem(260));
+        assert_eq!(Ok(0), vm.mem(261));
+        assert_eq!(Ok(-1), vm.mem(262));
+        assert_eq!(Ok(0), vm.mem(263));
+        assert_eq!(Ok(0), vm.mem(264));
+        assert_eq!(Ok(-91), vm.mem(265));
     }
 
     #[test]
@@ -977,17 +1023,17 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(SP, 256);
-        vm.set_mem(LCL, 300);
-        vm.set_mem(ARG, 400);
-        vm.set_mem_indirect(ARG, 0, 3);
+        vm.set_mem(SP, 256).unwrap();
+        vm.set_mem(LCL, 300).unwrap();
+        vm.set_mem(ARG, 400).unwrap();
+        vm.set_mem_indirect(ARG, 0, 3).unwrap();
 
         for _ in 0..33 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(257, vm.mem(0));
-        assert_eq!(6, vm.mem(256));
+        assert_eq!(Ok(257), vm.mem(0));
+        assert_eq!(Ok(6), vm.mem(256));
     }
 
     #[test]
@@ -1046,22 +1092,22 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(SP, 256);
-        vm.set_mem(LCL, 300);
-        vm.set_mem(ARG, 400);
-        vm.set_mem_indirect(ARG, 0, 6);
+        vm.set_mem(SP, 256).unwrap();
+        vm.set_mem(LCL, 300).unwrap();
+        vm.set_mem(ARG, 400).unwrap();
+        vm.set_mem_indirect(ARG, 0, 6).unwrap();
 
-        vm.set_mem_indirect(ARG, 1, 3000);
+        vm.set_mem_indirect(ARG, 1, 3000).unwrap();
         for _ in 0..73 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(0, vm.mem(3000));
-        assert_eq!(1, vm.mem(3001));
-        assert_eq!(1, vm.mem(3002));
-        assert_eq!(2, vm.mem(3003));
-        assert_eq!(3, vm.mem(3004));
-        assert_eq!(5, vm.mem(3005));
+        assert_eq!(Ok(0), vm.mem(3000));
+        assert_eq!(Ok(1), vm.mem(3001));
+        assert_eq!(Ok(1), vm.mem(3002));
+        assert_eq!(Ok(2), vm.mem(3003));
+        assert_eq!(Ok(3), vm.mem(3004));
+        assert_eq!(Ok(5), vm.mem(3005));
     }
 
     #[test]
@@ -1116,14 +1162,14 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(SP, 261);
+        vm.set_mem(SP, 261).unwrap();
 
         for _ in 0..110 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(262, vm.mem(0));
-        assert_eq!(3, vm.mem(261));
+        assert_eq!(Ok(262), vm.mem(0));
+        assert_eq!(Ok(3), vm.mem(261));
     }
 
     #[test]
@@ -1131,14 +1177,14 @@ mod tests {
         let mut vm = VM::default();
 
         for i in 261..=299 {
-            vm.set_mem(i, -1);
+            vm.set_mem(i, -1).unwrap();
         }
 
-        vm.set_mem(SP, 261);
-        vm.set_mem(LCL, 261);
-        vm.set_mem(ARG, 256);
-        vm.set_mem(THIS, 3000);
-        vm.set_mem(THAT, 4000);
+        vm.set_mem(SP, 261).unwrap();
+        vm.set_mem(LCL, 261).unwrap();
+        vm.set_mem(ARG, 256).unwrap();
+        vm.set_mem(THIS, 3000).unwrap();
+        vm.set_mem(THAT, 4000).unwrap();
 
         let sys = r#"
             // Sys.vm for NestedCall test.
@@ -1211,30 +1257,30 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(0, 261);
-        vm.set_mem(1, 261);
-        vm.set_mem(2, 256);
-        vm.set_mem(3, -3);
-        vm.set_mem(4, -4);
-        vm.set_mem(5, -1); // test results
-        vm.set_mem(6, -1);
-        vm.set_mem(256, 1234); // fake stack frame from call Sys.init
-        vm.set_mem(257, -1);
-        vm.set_mem(258, -2);
-        vm.set_mem(259, -3);
-        vm.set_mem(260, -4);
+        vm.set_mem(0, 261).unwrap();
+        vm.set_mem(1, 261).unwrap();
+        vm.set_mem(2, 256).unwrap();
+        vm.set_mem(3, -3).unwrap();
+        vm.set_mem(4, -4).unwrap();
+        vm.set_mem(5, -1).unwrap(); // test results
+        vm.set_mem(6, -1).unwrap();
+        vm.set_mem(256, 1234).unwrap(); // fake stack frame from call Sys.init
+        vm.set_mem(257, -1).unwrap();
+        vm.set_mem(258, -2).unwrap();
+        vm.set_mem(259, -3).unwrap();
+        vm.set_mem(260, -4).unwrap();
 
         for _ in 0..50 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(261, vm.mem(0));
-        assert_eq!(261, vm.mem(1));
-        assert_eq!(256, vm.mem(2));
-        assert_eq!(4000, vm.mem(3));
-        assert_eq!(5000, vm.mem(4));
-        assert_eq!(135, vm.mem(5));
-        assert_eq!(246, vm.mem(6));
+        assert_eq!(Ok(261), vm.mem(0));
+        assert_eq!(Ok(261), vm.mem(1));
+        assert_eq!(Ok(256), vm.mem(2));
+        assert_eq!(Ok(4000), vm.mem(3));
+        assert_eq!(Ok(5000), vm.mem(4));
+        assert_eq!(Ok(135), vm.mem(5));
+        assert_eq!(Ok(246), vm.mem(6));
     }
 
     #[test]
@@ -1259,29 +1305,29 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(SP, 317);
-        vm.set_mem(LCL, 317);
-        vm.set_mem(ARG, 310);
-        vm.set_mem(THIS, 3000);
-        vm.set_mem(THAT, 4000);
-        vm.set_mem_indirect(ARG, 0, 1234);
-        vm.set_mem_indirect(ARG, 1, 37);
-        vm.set_mem_indirect(ARG, 2, 9);
-        vm.set_mem_indirect(ARG, 3, 305);
-        vm.set_mem_indirect(ARG, 4, 300);
-        vm.set_mem_indirect(ARG, 5, 3010);
-        vm.set_mem_indirect(ARG, 6, 4010);
+        vm.set_mem(SP, 317).unwrap();
+        vm.set_mem(LCL, 317).unwrap();
+        vm.set_mem(ARG, 310).unwrap();
+        vm.set_mem(THIS, 3000).unwrap();
+        vm.set_mem(THAT, 4000).unwrap();
+        vm.set_mem_indirect(ARG, 0, 1234).unwrap();
+        vm.set_mem_indirect(ARG, 1, 37).unwrap();
+        vm.set_mem_indirect(ARG, 2, 9).unwrap();
+        vm.set_mem_indirect(ARG, 3, 305).unwrap();
+        vm.set_mem_indirect(ARG, 4, 300).unwrap();
+        vm.set_mem_indirect(ARG, 5, 3010).unwrap();
+        vm.set_mem_indirect(ARG, 6, 4010).unwrap();
 
         for _ in 0..10 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(311, vm.mem(0));
-        assert_eq!(305, vm.mem(1));
-        assert_eq!(300, vm.mem(2));
-        assert_eq!(3010, vm.mem(3));
-        assert_eq!(4010, vm.mem(4));
-        assert_eq!(1196, vm.mem(310));
+        assert_eq!(Ok(311), vm.mem(0));
+        assert_eq!(Ok(305), vm.mem(1));
+        assert_eq!(Ok(300), vm.mem(2));
+        assert_eq!(Ok(3010), vm.mem(3));
+        assert_eq!(Ok(4010), vm.mem(4));
+        assert_eq!(Ok(1196), vm.mem(310));
     }
 
     #[test]
@@ -1352,15 +1398,15 @@ mod tests {
 
         vm.load(program);
 
-        vm.set_mem(SP, 261);
+        vm.set_mem(SP, 261).unwrap();
 
         for _ in 0..36 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(263, vm.mem(0));
-        assert_eq!(-2, vm.mem(261));
-        assert_eq!(8, vm.mem(262));
+        assert_eq!(Ok(263), vm.mem(0));
+        assert_eq!(Ok(-2), vm.mem(261));
+        assert_eq!(Ok(8), vm.mem(262));
     }
 
     #[test]
@@ -1411,11 +1457,11 @@ mod tests {
         vm.load(program);
 
         for _ in 0..500000 {
-            vm.step();
+            vm.step().unwrap();
         }
 
         for i in SCREEN_START..KBD {
-            assert_eq!(255, vm.mem(i));
+            assert_eq!(Ok(255), vm.mem(i));
         }
     }
 
@@ -1453,10 +1499,10 @@ mod tests {
         vm.load(program);
 
         for _ in 0..100 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(vm.pop(), 42);
+        assert_eq!(vm.pop(), Ok(42));
     }
 
     #[test]
@@ -1486,11 +1532,11 @@ mod tests {
         vm.load(program);
 
         for _ in 0..20 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(vm.pop(), 24);
-        assert_eq!(vm.pop(), 42);
+        assert_eq!(vm.pop(), Ok(24));
+        assert_eq!(vm.pop(), Ok(42));
     }
 
     #[test]
@@ -1498,7 +1544,7 @@ mod tests {
         let mut by_name = HashMap::new();
         let mut by_address = HashMap::new();
 
-        fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+        fn sys_init(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
             match state {
                 0 => {
                     if VMCallOk::WasBuiltinFunction == vm.call("Memory.init", &[])? {
@@ -1526,7 +1572,7 @@ mod tests {
             BuiltinFunction::new(u16::MAX - 1, "Sys.init", "Sys", 0, &sys_init),
         );
 
-        fn mem_init<VM: VirtualMachine>(_: &mut VM, _: State, _: &[Word]) -> StdResult {
+        fn mem_init(_: &mut VM, _: State, _: &[Word]) -> StdResult {
             Ok(StdlibOk::Finished(20))
         }
 
@@ -1555,10 +1601,10 @@ mod tests {
         vm.load(program);
 
         for _ in 0..20 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(vm.pop(), 42);
+        assert_eq!(vm.pop(), Ok(42));
     }
 
     #[test]
@@ -1566,7 +1612,7 @@ mod tests {
         let mut by_name = HashMap::new();
         let mut by_address = HashMap::new();
 
-        fn sys_wait<VM: VirtualMachine>(_: &mut VM, state: State, params: &[Word]) -> StdResult {
+        fn sys_wait(_: &mut VM, state: State, params: &[Word]) -> StdResult {
             if state == 0 {
                 if params[0] < 2 {
                     return Ok(StdlibOk::Finished(params[0]));
@@ -1582,7 +1628,7 @@ mod tests {
             Ok(StdlibOk::Finished(params[0]))
         }
 
-        fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, _: &[Word]) -> StdResult {
+        fn sys_init(vm: &mut VM, state: State, _: &[Word]) -> StdResult {
             if state == 0 {
                 vm.call("Main.main", &[])?;
                 return Ok(StdlibOk::ContinueInNextStep(state + 1));
@@ -1627,10 +1673,10 @@ mod tests {
         vm.load(program);
 
         for _ in 0..100 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(vm.pop(), 42);
+        assert_eq!(vm.pop(), Ok(42));
     }
 
     #[test]
@@ -1638,7 +1684,7 @@ mod tests {
         let mut by_name = HashMap::new();
         let mut by_address = HashMap::new();
 
-        fn calc<VM: VirtualMachine>(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
+        fn calc(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
             match state {
                 0 => {
                     // technically this is wrong because the return value isn't incremented, but Main.f
@@ -1646,7 +1692,7 @@ mod tests {
                     stdlib::call_vm!(vm, state, "Main.f", &[])
                 }
                 1 => {
-                    let vm_ret = vm.pop();
+                    let vm_ret = vm.pop()?;
                     Ok(StdlibOk::Finished(vm_ret + 1))
                 }
                 _ => panic!(""),
@@ -1686,13 +1732,13 @@ mod tests {
         vm.load(program);
 
         for _ in 0..30 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(vm.pop(), 42);
-        assert_eq!(vm.pop(), 42);
-        assert_eq!(vm.pop(), 40);
-        assert_eq!(vm.pop(), 42);
+        assert_eq!(vm.pop(), Ok(42));
+        assert_eq!(vm.pop(), Ok(42));
+        assert_eq!(vm.pop(), Ok(40));
+        assert_eq!(vm.pop(), Ok(42));
     }
 
     #[test]
@@ -1700,7 +1746,7 @@ mod tests {
         let mut by_name = HashMap::new();
         let mut by_address = HashMap::new();
 
-        fn sys_init<VM: VirtualMachine>(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
+        fn sys_init(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
             match state {
                 0 => {
                     if let VMCallOk::WasBuiltinFunction = vm.call("Memory.init", &[])? {
@@ -1770,9 +1816,9 @@ mod tests {
         vm.load(program);
 
         for _ in 0..300 {
-            vm.step();
+            vm.step().unwrap();
         }
 
-        assert_eq!(vm.pop(), 22);
+        assert_eq!(vm.pop(), Ok(22));
     }
 }
