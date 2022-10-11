@@ -23,6 +23,34 @@ const run = () => {
   app.step_times(steps_per_tick);
 };
 
+const pause = () => {
+  console.log('pause');
+  clearInterval(interval);
+  interval = null;
+};
+
+const handle_file_upload = (evt) => {
+  pause();
+  app.reset_files();
+
+  const files = evt.target.files;
+  let loaded = 0;
+
+  for (let file of files) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target.result;
+      app.add_file(file.name, content);
+      if (++loaded == files.length) {
+        app.load_files();
+      }
+    }
+    reader.readAsText(file);
+  }
+};
+document.getElementById('upload').addEventListener('change', handle_file_upload);
+
+
 const start_button = document.getElementById('start-button');
 start_button.onclick = () => {
   console.log('starting');
@@ -36,11 +64,7 @@ start_button.onclick = () => {
 };
 
 const stop_button = document.getElementById('stop-button');
-stop_button.onclick = () => {
-  console.log('pause');
-  clearInterval(interval);
-  interval = null;
-};
+stop_button.onclick = pause;
 
 const step_button = document.getElementById('step-button');
 step_button.onclick = () => {
@@ -64,7 +88,7 @@ document.addEventListener('keyup', (e) => {
 });
 
 const render_loop = () => {
-  const data = app.display_buffer();
+  const data = app.display_data();
   render(data);
   requestAnimationFrame(render_loop);
 }
