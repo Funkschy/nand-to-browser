@@ -16,31 +16,30 @@
 *** Performance wie in offiziellem Emulator, aber mit weniger jittering
 *** Performance ist sehr abhängig von nativer Screen Implementierung
 * TODOs
-** TODO VM Emulator [5/12]
+** TODO VM Emulator [9/13]
 - [X] alle commands implementieren
 - [X] command parsing
 - [X] funktionen erkennen die aufgerufen aber nicht deklariert werden
-- [-] native stdlib implementieren [7/8]
+- [X] native stdlib implementieren [8/8]
   - [X] Math
   - [X] String
   - [X] Array
   - [X] Output
   - [X] Screen
-  - [ ] Keyboard
+  - [X] Keyboard
   - [X] Memory
   - [X] Sys
 - [X] unbekannte funktionen in stdlib suchen und adden falls nötig
 - [X] Start der Ausführung bei Sys.init falls vorhanden
-- [ ] checken ob Funktionsname zu Klassennamen passt
-- [ ] Debug Infos für Funktionen
+- [X] Debug Infos für Funktionen
 - [ ] Debug Infos für lokale Label
 - [ ] Test Script runner
-- [ ] Erfolgreiche Ausführung verschiedener Projekt 9 Abgaben
-- [ ] Ordentliches error handling
-  - [ ] kein unwrap/expect
-  - [ ] panics bei invaliden typen durch TryInto ersetzten
-  - [ ] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
-** TODO VM Frontend [6/22]
+- [X] Erfolgreiche Ausführung verschiedener Projekt 9 Abgaben
+- [X] Ordentliches error handling
+  - [X] kein unwrap/expect
+  - [X] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
+- [ ] checken ob Funktionsname zu Klassennamen passt
+** TODO VM Frontend [7/22]
 - [X] vm step aus frontend aufrufen
 - [X] display speicher in canvas rendern
 - [X] keyboard interaktion in vm speicher schreiben
@@ -49,7 +48,7 @@
 - [X] Run Button
 - [X] Stop Button
 - [ ] Revert Button
-- [ ] Laden von User code
+- [X] Laden von User code
 - [ ] Anzeige des Bytecodes
 - [ ] Anzeige des Keyboard Inputs
 - [ ] Anzeige des Stacks

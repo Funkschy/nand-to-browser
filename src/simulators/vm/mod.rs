@@ -61,7 +61,7 @@ macro_rules! trace_calls {
 
 macro_rules! tos_binary {
     ($vm:expr, $op:tt) => {{
-        let sp = $vm.memory[SP] as Address;
+        let sp = $vm.mem(SP)? as Address;
         // cast up to i32 so that no overflow checks get triggered in debug mode
         let l = $vm.mem(sp - 2)? as i32;
         let r = $vm.mem(sp - 1)? as i32;
@@ -466,6 +466,9 @@ impl VM {
             // TODO: assert that if this was called by bytecode, the n_args matches
             let n_args = stdlib_function.num_args();
             let sp = self.mem(SP)? as usize;
+            // check if memory is accessible
+            self.mem(sp)?;
+            self.mem(sp - n_args)?;
             let args = Vec::from(&self.memory[sp - n_args..sp]);
             self.set_mem(SP, (sp - n_args) as i16)?;
 
@@ -585,9 +588,6 @@ impl VM {
                 });
 
                 let frame = self.mem(LCL)? as Address;
-                if frame < 5 {
-                    panic!("{} {} {:?}", frame, self.pc, self.call_stack_names());
-                }
                 // the return address
                 let ret = self.mem(frame - 5)? as Address;
 
@@ -616,7 +616,7 @@ impl VM {
 
                     if let Some(ret_to) = self.call_stack.last() {
                         println!(" to {:?}", ret_to.function.map(|f| self.function_meta(f)));
-                        println!("LCL changed from {} to {}", frame, self.memory[LCL]);
+                        println!("LCL changed from {} to {}", frame, self.mem(LCL)?);
                     } else {
                         println!(" to nowhere");
                     }
@@ -630,11 +630,11 @@ impl VM {
 
         trace_vm!({
             dbg!(self.pc);
-            dbg!(self.memory[SP]);
-            dbg!(self.memory[LCL]);
-            dbg!(self.memory[ARG]);
-            dbg!(self.memory[THIS]);
-            dbg!(self.memory[THAT]);
+            dbg!(self.mem(SP)?);
+            dbg!(self.mem(LCL)?);
+            dbg!(self.mem(ARG)?);
+            dbg!(self.mem(THIS)?);
+            dbg!(self.mem(THAT)?);
             dbg!(self.tos()?);
         });
 

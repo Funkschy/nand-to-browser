@@ -1,3 +1,4 @@
+use std::fmt;
 use std::str::FromStr;
 
 use crate::definitions::{Symbol, Word};
@@ -5,6 +6,12 @@ use crate::definitions::{Symbol, Word};
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ByteCodeParseError {
     IllegalSegmentString,
+}
+
+impl fmt::Display for ByteCodeParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Illegal segment string")
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

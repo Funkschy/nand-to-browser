@@ -6,11 +6,12 @@ use crate::simulators::vm::ProgramInfo;
 use std::num::ParseIntError;
 
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ParseError<'src> {
-    UnexpectedCharacter,
+    UnexpectedCharacter(char),
     // technically not a real error, but it's easier to handle it like one
     EndOfFile,
     UnexpectedEndOfFile,
@@ -38,6 +39,33 @@ impl<'src> From<ByteCodeParseError> for ParseError<'src> {
 impl<'src> From<ParseIntError> for ParseError<'src> {
     fn from(err: ParseIntError) -> Self {
         Self::InvalidIntLiteral(err)
+    }
+}
+
+impl fmt::Display for ParseError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::UnexpectedCharacter(c) => write!(f, "Unexpected character: {}", c),
+            Self::EndOfFile => write!(f, "EOF"),
+            Self::UnexpectedEndOfFile => write!(f, "Unexpected end of file"),
+            Self::InvalidIntLiteral(error) => write!(f, "Could not parse int: {}", error),
+            Self::InvalidFileIndex => write!(f, "Invalid file index"),
+            Self::InvalidFunctionIndex => write!(f, "Invalid function index"),
+            Self::Bytecode(error) => write!(f, "{}", error),
+            Self::ExpectedIdent => write!(f, "Expected identifier"),
+            Self::ExpectedSegment => write!(f, "Expected segment"),
+            Self::ExpectedInt => write!(f, "Expected integer"),
+            Self::InvalidToken => write!(f, "Invalid token"),
+            Self::UnresolvedLocalLabel {
+                label,
+                function_name,
+            } => write!(f, "Could not resolve '{}' in '{}'", label, function_name),
+            Self::UnresolvedSymbols(symbols) => write!(
+                f,
+                "Could not resolve the following symbols: {}",
+                symbols.iter().copied().collect::<Vec<_>>().join("\n")
+            ),
+        }
     }
 }
 
@@ -82,7 +110,7 @@ impl<'src> Lexer<'src> {
                     self.walker.take_chars_while(|c| c != '\n');
                     self.scan_token()
                 } else {
-                    Err(ParseError::UnexpectedCharacter)
+                    Err(ParseError::UnexpectedCharacter(current_char))
                 }
             }
             c if c.is_alphabetic() => {
@@ -98,7 +126,7 @@ impl<'src> Lexer<'src> {
                 let parsed_int = spanned.content.parse::<i16>()?;
                 Ok(spanned.with_new_content(Token::IntLiteral(parsed_int)))
             }
-            _ => Err(ParseError::UnexpectedCharacter),
+            _ => Err(ParseError::UnexpectedCharacter(current_char)),
         }
     }
 }

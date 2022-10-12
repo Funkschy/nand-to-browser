@@ -8,24 +8,21 @@ const ctx = vm_screen.getContext('2d');
 const app = App.new();
 let interval = null;
 
-const words_per_row = 32;
-const width_px = 512;
-const height_px = 256;
-const bytes_per_pixel = 4;
-const data = new Uint8ClampedArray(width_px * height_px * bytes_per_pixel);
+const showError = (error) => {
+  clearInterval(interval);
+  interval = null;
+  alert(error);
+};
 
 const render = (img_data) => {
   ctx.putImageData(img_data, 0, 0);
 };
 
-
 const run = () => {
   try {
     app.step_times(steps_per_tick);
   } catch (error) {
-    clearInterval(interval);
-    interval = null;
-    alert(error);
+    showError(error);
   }
 };
 
@@ -48,7 +45,11 @@ const handle_file_upload = (evt) => {
       const content = e.target.result;
       app.add_file(file.name, content);
       if (++loaded == files.length) {
-        app.load_files();
+        try {
+          app.load_files();
+        } catch (error) {
+          showError(error);
+        }
       }
     }
     reader.readAsText(file);

@@ -1,16 +1,14 @@
-use crate::definitions::{Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS};
-use crate::simulators::vm::stdlib::Stdlib;
-use crate::simulators::vm::VMError;
-use wasm_bindgen::prelude::*;
-
 mod definitions;
 mod keyboard;
 mod parse;
 mod simulators;
 
-use parse::bytecode::Parser;
-use parse::bytecode::SourceFile;
+use definitions::{Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS};
+use parse::bytecode::{ParseError, Parser, SourceFile};
+use simulators::vm::stdlib::Stdlib;
+use simulators::vm::VMError;
 use simulators::vm::VM;
+use wasm_bindgen::prelude::*;
 
 use wasm_bindgen::Clamped;
 use web_sys::ImageData;
@@ -38,6 +36,14 @@ impl From<VMError> for JsValue {
     }
 }
 
+impl From<ParseError<'_>> for JsValue {
+    fn from(error: ParseError<'_>) -> Self {
+        JsValue::from(error.to_string())
+    }
+}
+
+type VMResult = Result<(), JsValue>;
+
 #[wasm_bindgen]
 impl App {
     pub fn new() -> Self {
@@ -59,7 +65,8 @@ impl App {
     pub fn add_file(&mut self, name: String, content: String) {
         self.programs.push((name, content));
     }
-    pub fn load_files(&mut self) {
+
+    pub fn load_files(&mut self) -> VMResult {
         let stdlib = Stdlib::new();
         let programs = self
             .programs
@@ -68,24 +75,27 @@ impl App {
             .collect::<Vec<_>>();
 
         let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
-        let program = bytecode_parser.parse().unwrap();
+        let program = bytecode_parser.parse()?;
 
         self.vm.load(program);
+        Ok(())
     }
 
-    pub fn step_times(&mut self, times: u32) -> Result<(), JsValue> {
+    pub fn step_times(&mut self, times: u32) -> VMResult {
         for _ in 0..times {
             self.vm.step()?;
         }
         Ok(())
     }
 
-    pub fn step(&mut self) {
-        self.vm.step().unwrap();
+    pub fn step(&mut self) -> VMResult {
+        self.vm.step()?;
+        Ok(())
     }
 
-    pub fn set_input_key(&mut self, key: Word) {
-        self.vm.set_input_key(key).unwrap();
+    pub fn set_input_key(&mut self, key: Word) -> VMResult {
+        self.vm.set_input_key(key)?;
+        Ok(())
     }
 
     pub fn data_buffer_size() -> usize {
