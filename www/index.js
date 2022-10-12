@@ -1,6 +1,7 @@
 import {App, get_key_code} from "nand-to-tetris-web";
 
-let steps_per_tick = 12000;
+const speed_slider = document.getElementById('speed-slider');
+let steps_per_tick = speed_slider.value;
 
 const vm_screen = document.getElementById('screen');
 const ctx = vm_screen.getContext('2d');
@@ -77,6 +78,10 @@ const step_button = document.getElementById('step-button');
 step_button.onclick = () => {
   console.log('step');
   app.step();
+};
+
+speed_slider.oninput= (e) => {
+  steps_per_tick = e.target.value;
 };
 
 const handle_input = (key) => {

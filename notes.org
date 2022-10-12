@@ -39,11 +39,11 @@
   - [X] kein unwrap/expect
   - [X] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
 - [ ] checken ob Funktionsname zu Klassennamen passt
-** TODO VM Frontend [7/22]
+** TODO VM Frontend [8/22]
 - [X] vm step aus frontend aufrufen
 - [X] display speicher in canvas rendern
 - [X] keyboard interaktion in vm speicher schreiben
-- [ ] Geschwindigkeitsregulation
+- [X] Geschwindigkeitsregulation
 - [X] Step Button
 - [X] Run Button
 - [X] Stop Button

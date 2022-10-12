@@ -40,6 +40,17 @@
         <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
 
         <div class="vertical-container">
+            <div class="horizontal-container" style="margin-bottom: 10px;">
+                <form enctype="multipart/form-data">
+                    <input id="upload" type="file" accept="text/plain,.vm" names="files[]" multiple/>
+                </form>
+                <input id="speed-slider"
+                       type="range"
+                       min="500"
+                       max="30000"
+                       value=14750/>
+            </div>
+
             <div id="canvas-container" class="horizontal-container">
                 <canvas id="screen" width="512" height="256"></canvas>
             </div>
@@ -48,9 +59,6 @@
                 <button id="start-button">Start</button>
                 <button id="stop-button">Stop</button>
                 <button id="step-button">Step</button>
-                <form enctype="multipart/form-data">
-                    <input id="upload" type="file" accept="text/plain,.vm" names="files[]" multiple>
-                </form>
 
             </div>
         </div>
