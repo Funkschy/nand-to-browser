@@ -1,0 +1,49 @@
+.screen {
+    width: 90%;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+
+    outline: black 3px solid;
+}
+
+.canvas-container {
+    justify-content: center;
+    margin-top: 10pt;
+    margin-bottom: 10pt;
+}
+
+.vertical-container {
+    display: flex;
+    flex-direction: column
+}
+
+.horizontal-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+}
+
+input[type="file"] {
+    display: none;
+}
+
+.btn {
+    display: inline-block;
+    cursor: pointer;
+
+    padding: 0.3em 1.2em;
+    margin: 0.2em;
+
+    border: 1px solid #175aab;
+    border-radius: 0.3em;
+    background: #1d73db;
+
+    color: #FFFFFF;
+    text-decoration: none;
+    text-align: center;
+    font-family: sans-serif;
+    font-weight: 800;
+    font-size: 1em;
+}

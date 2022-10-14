@@ -7,61 +7,11 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <!-- TODO: Place favicon.ico in the root directory -->
-        <style>
-         #screen {
-             width: 80%;
-             image-rendering: -moz-crisp-edges;
-             image-rendering: -webkit-crisp-edges;
-             image-rendering: pixelated;
-             image-rendering: crisp-edges;
-
-             outline: black 3px solid;
-         }
-
-         #canvas-container {
-             justify-content: center;
-             margin-bottom: 10pt;
-         }
-
-         .vertical-container {
-             display: flex;
-             flex-direction: column
-         }
-
-         .horizontal-container {
-             display: flex;
-             flex-direction: row;
-             justify-content: center;
-         }
-
-        </style>
     </head>
     <body>
         <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
 
-        <div class="vertical-container">
-            <div class="horizontal-container" style="margin-bottom: 10px;">
-                <form enctype="multipart/form-data">
-                    <input id="upload" type="file" accept="text/plain,.vm" names="files[]" multiple/>
-                </form>
-                <input id="speed-slider"
-                       type="range"
-                       min="500"
-                       max="30000"
-                       value=14750/>
-            </div>
-
-            <div id="canvas-container" class="horizontal-container">
-                <canvas id="screen" width="512" height="256"></canvas>
-            </div>
-
-            <div class="horizontal-container">
-                <button id="start-button">Start</button>
-                <button id="stop-button">Stop</button>
-                <button id="step-button">Step</button>
-
-            </div>
-        </div>
+        <div id=app></div>
 
         <script src="./bootstrap.js"></script>
     </body>
