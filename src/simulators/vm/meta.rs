@@ -5,8 +5,23 @@ use std::collections::HashMap;
 pub enum FileInfo {
     /// the filename as a string
     Builtin(&'static str),
-    /// the module index
-    VM(usize),
+    VM {
+        module_index: usize,
+        line_in_bytecode: usize,
+    },
+}
+
+impl FileInfo {
+    pub fn line_in_bytecode(&self) -> Option<usize> {
+        if let Self::VM {
+            line_in_bytecode, ..
+        } = self
+        {
+            Some(*line_in_bytecode)
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -25,9 +40,12 @@ impl FunctionInfo {
         }
     }
 
-    pub fn vm(name: String, n_locals: Word, module_index: usize) -> Self {
+    pub fn vm(name: String, n_locals: Word, module_index: usize, start_line: usize) -> Self {
         Self {
-            file: FileInfo::VM(module_index),
+            file: FileInfo::VM {
+                module_index,
+                line_in_bytecode: start_line,
+            },
             name,
             n_locals,
         }

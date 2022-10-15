@@ -360,11 +360,17 @@ impl<'src> Parser<'src> {
         }
 
         let mut function_addresses = HashMap::new();
+        let mut file_start = 0;
 
         loop {
+            let last_module_index = self.module_index;
             let token = self.next_token();
             if let Err(ParseError::EndOfFile) = token {
                 break;
+            }
+
+            if self.module_index != last_module_index {
+                file_start = code.len();
             }
 
             match token? {
@@ -396,7 +402,7 @@ impl<'src> Parser<'src> {
 
                     debug_symbols.insert(
                         code.len() as u16,
-                        FunctionInfo::vm(label.to_owned(), n_locals, self.module_index),
+                        FunctionInfo::vm(label.to_owned(), n_locals, self.module_index, file_start),
                     );
                     function_addresses.insert(label.to_owned(), symbol);
                     self.function_symbols.push(SymbolTable::default());

@@ -12,8 +12,7 @@ use crate::definitions::{
 };
 use calls::*;
 use command::{Instruction, Segment};
-use meta::FunctionInfo;
-use meta::MetaInfo;
+use meta::{FileInfo, FunctionInfo, MetaInfo};
 use stdlib::{BuiltinFunction, State, Stdlib, StdlibError, StdlibOk, VMCallOk};
 
 pub trait ProgramInfo {
@@ -221,6 +220,48 @@ impl VM {
             let addr = self.get_seg_address(segment, index)?;
             self.mem(addr)
         }
+    }
+
+    /// Get some debug information from the function that is currently being executed
+    fn extract_current_function_debug_info<'vm, F, T>(&'vm self, f: F) -> Option<T>
+    where
+        F: FnOnce(&'vm FunctionInfo) -> Option<T> + 'vm,
+    {
+        let current_item = self.call_stack.last()?;
+        let current_func = current_item.function?;
+        self.meta.function_meta.get(&current_func).and_then(f)
+    }
+
+    pub fn current_function_name(&self) -> Option<&str> {
+        self.extract_current_function_debug_info(|f| Some(f.name.as_str()))
+    }
+
+    pub fn current_file_info(&self) -> Option<FileInfo> {
+        self.extract_current_function_debug_info(|f| Some(f.file))
+    }
+
+    pub fn current_file_offset(&self) -> Option<usize> {
+        // find the last VM function in the callstack
+        for call in self.call_stack.iter().rev() {
+            if let CallStackEntry {
+                state: CallState::VM,
+                function: Some(function),
+                ..
+            } = call
+            {
+                // get the bytecode offset of the file that contains this function
+                let file_start = self
+                    .meta
+                    .function_meta
+                    .get(&function)
+                    .and_then(|f| f.file.line_in_bytecode())
+                    .unwrap_or_default();
+
+                return Some(self.pc - file_start);
+            }
+        }
+
+        Some(self.pc)
     }
 
     pub fn display(&self) -> &[Word] {

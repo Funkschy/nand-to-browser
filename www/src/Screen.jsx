@@ -34,5 +34,5 @@ export function Screen(props) {
     // in this case is actually what we want
   }, [draw]);
 
-  return <canvas className="screen" ref={canvasRef} {...props}/>
+  return <canvas className="screen" ref={canvasRef} {...props}/>;
 }

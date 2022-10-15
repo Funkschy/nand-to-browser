@@ -5,9 +5,9 @@ mod simulators;
 
 use definitions::{Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS};
 use parse::bytecode::{ParseError, Parser, SourceFile};
+use simulators::vm::meta::FileInfo;
 use simulators::vm::stdlib::Stdlib;
-use simulators::vm::VMError;
-use simulators::vm::VM;
+use simulators::vm::{VMError, VM};
 use wasm_bindgen::prelude::*;
 
 use wasm_bindgen::Clamped;
@@ -96,6 +96,23 @@ impl App {
     pub fn set_input_key(&mut self, key: Word) -> VMResult {
         self.vm.set_input_key(key)?;
         Ok(())
+    }
+
+    pub fn current_function_name(&self) -> Option<String> {
+        self.vm.current_function_name().map(|n| n.to_owned())
+    }
+
+    pub fn current_file_name(&self) -> Option<String> {
+        match self.vm.current_file_info()? {
+            FileInfo::VM { module_index, .. } => {
+                self.programs.get(module_index).map(|p| p.0.to_owned())
+            }
+            FileInfo::Builtin(name) => Some(name.to_owned()),
+        }
+    }
+
+    pub fn current_file_offset(&self) -> Option<usize> {
+        self.vm.current_file_offset()
     }
 
     pub fn data_buffer_size() -> usize {

@@ -1,5 +1,97 @@
+/* layout */
+
+.wrapper {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 20em 1fr;
+    grid-template-areas:
+        "screen screen"
+        "left-side left-side";
+}
+
+.screen-wrapper {
+    margin-bottom: 10px;
+}
+
+.code {
+    justify-items: center;
+    display: grid;
+    grid-area: left-side;
+    height: 55vh;
+    width: 100%;
+}
+
+#toolbar {
+    margin: 1rem 5rem 1rem 5rem;
+    display: grid;
+    grid-template-columns: 2fr 3fr 2fr;
+    grid-template-areas:
+        "files control-buttons speed";
+}
+
+#speed {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+}
+
+#speed>input[type=range] {
+    width: 200px;
+}
+
+#control-buttons {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+}
+
+.code-child:nth-child(1) {
+    position: relative;
+    overflow-y: scroll;
+}
+
+@media (min-width: 1000px) {
+    .screen-wrapper {
+        height: 95%;
+    }
+
+    .code {
+        width: 100%;
+        height: 95%;
+    }
+
+    .wrapper {
+        grid-template-areas:
+            "left-side screen";
+    }
+
+    /* remove the code view */
+    .wrapper.running {
+        grid-template-areas:
+            "screen screen";
+    }
+
+    .code-inner {
+        position: absolute;
+        white-space: nowrap;
+    }
+}
+
+.screen-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    grid-area: screen;
+}
+
+/* look and feel */
+
+body {
+    font-family: sans-serif;
+}
+
 .screen {
-    width: 90%;
+    width: 95%;
     image-rendering: -moz-crisp-edges;
     image-rendering: -webkit-crisp-edges;
     image-rendering: pixelated;
@@ -8,25 +100,9 @@
     outline: black 3px solid;
 }
 
-.canvas-container {
-    justify-content: center;
-    margin-top: 10pt;
-    margin-bottom: 10pt;
-}
-
-.vertical-container {
-    display: flex;
-    flex-direction: column
-}
-
-.horizontal-container {
-    display: flex;
-    flex-direction: row;
-    justify-content: center;
-}
-
-input[type="file"] {
-    display: none;
+.code-child {
+    outline: black 3px solid;
+    width: 95%;
 }
 
 .btn {
@@ -34,16 +110,81 @@ input[type="file"] {
     cursor: pointer;
 
     padding: 0.3em 1.2em;
-    margin: 0.2em;
+    margin: 0.5em;
 
-    border: 1px solid #175aab;
-    border-radius: 0.3em;
-    background: #1d73db;
+    border: none;
+    outline: black 3px solid;
+    background: white;
 
-    color: #FFFFFF;
+    color: black;
     text-decoration: none;
     text-align: center;
     font-family: sans-serif;
     font-weight: 800;
     font-size: 1em;
+}
+
+td.highlight {
+    color: red;
+}
+
+input[type=range] {
+    -webkit-appearance: none; /* Hides the builtin slider */
+    width: 100%; /* required for Firefox. */
+    background: transparent;
+}
+
+/* for chrome/safari */
+
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    margin-top: -6px; /* this is needed in webkit for some reason */
+    border-radius: 0;
+    border: none;
+    outline: black 3px solid;
+    background-color: white;
+    width: 10px;
+    height: 20px;
+}
+
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 14.4px;
+    cursor: pointer;
+    border: black 3px solid;
+    background-color: white;
+}
+
+/* for firefox */
+
+input[type=range]::-moz-range-thumb {
+    border-radius: 0;
+    border: none;
+    outline: black 3px solid;
+    background-color: white;
+    width: 10px;
+    height: 20px;
+}
+
+input[type=range]::-moz-range-track {
+    width: 100%;
+    height: 8.4px;
+    cursor: pointer;
+    border: none;
+    outline: black 3px solid;
+    background-color: white;
+}
+
+input[type=range]:focus {
+    outline: none; /* Removes the blue border. You should probably do some kind of focus styling for accessibility reasons though. */
+}
+
+input[type=range]::-ms-track {
+    width: 100%;
+    cursor: pointer;
+
+    /* Hides the slider so custom styles can be added */
+    background: transparent;
+    border-color: transparent;
+    color: transparent;
 }
