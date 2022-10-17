@@ -3,7 +3,7 @@
 .wrapper {
     display: grid;
     gap: 10px;
-    grid-template-columns: 20em 1fr;
+    grid-template-columns: 22em 1fr;
     grid-template-areas:
         "screen screen"
         "left-side left-side";
@@ -24,9 +24,10 @@
 #toolbar {
     margin: 1rem 5rem 1rem 5rem;
     display: grid;
-    grid-template-columns: 2fr 3fr 2fr;
     grid-template-areas:
-        "files control-buttons speed";
+        "toolbar"
+        "toolbar"
+        "toolbar";
 }
 
 #speed {
@@ -45,9 +46,30 @@
     align-content: center;
 }
 
+#upload-files {
+    display: flex;
+    justify-content: center;
+    align-content: center;
+}
+
 .code-child:nth-child(1) {
     position: relative;
     overflow-y: scroll;
+}
+
+@media (min-width: 800px) {
+    #toolbar {
+        margin: 1rem 5rem 1rem 5rem;
+        display: grid;
+        grid-template-columns: 2fr 3fr 2fr;
+        grid-template-areas:
+            "files control-buttons speed";
+    }
+
+    /* don't center file upload */
+    #upload-files {
+        display: inherit;
+    }
 }
 
 @media (min-width: 1000px) {

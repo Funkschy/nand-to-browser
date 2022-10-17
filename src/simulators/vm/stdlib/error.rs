@@ -52,7 +52,7 @@ impl From<VMError> for StdlibError {
     }
 }
 
-const VM_ERRORS: [&'static str; 18] = [
+const VM_ERRORS: [&str; 18] = [
     "",
     "Duration must be positive",
     "Array size must be positive",

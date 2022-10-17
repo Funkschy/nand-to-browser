@@ -171,7 +171,7 @@ export function VMEmulatorStepper({app}) {
           <Screen
             app={app}
             width="512"
-            height="265"/>
+            height="256"/>
         </div>
       </div>
     </>);

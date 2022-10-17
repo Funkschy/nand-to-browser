@@ -10,13 +10,14 @@ mod simulators;
 
 #[cfg(feature = "desktop")]
 fn run_desktop(vm: &mut VM) {
+    use definitions::{SCREEN_HEIGHT, SCREEN_WIDTH};
     use keyboard::get_key_code;
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::pixels::{Color, PixelFormatEnum};
 
-    let logical_width = 512;
-    let logical_height = 256;
+    let logical_width = SCREEN_WIDTH as u32;
+    let logical_height = SCREEN_HEIGHT as u32;
     let scale = 4;
 
     let sdl_context = sdl2::init().unwrap();
@@ -190,7 +191,7 @@ fn main() {
     let walls = include_str!("../res/hackenstein/Walls.vm");
     let player = include_str!("../res/hackenstein/Player.vm");
 
-    // let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/ScreenTest/Main.vm");
+    // let test = include_str!("/home/felix/Downloads/nand2tetris/projects/12/OutputTest/Main.vm");
 
     let programs = vec![
         // SourceFile::new("Test.vm", test),

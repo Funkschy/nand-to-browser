@@ -222,22 +222,29 @@ impl VM {
         }
     }
 
-    /// Get some debug information from the function that is currently being executed
-    fn extract_current_function_debug_info<'vm, F, T>(&'vm self, f: F) -> Option<T>
-    where
-        F: FnOnce(&'vm FunctionInfo) -> Option<T> + 'vm,
-    {
+    pub fn current_function_name(&self) -> Option<&str> {
         let current_item = self.call_stack.last()?;
         let current_func = current_item.function?;
-        self.meta.function_meta.get(&current_func).and_then(f)
-    }
-
-    pub fn current_function_name(&self) -> Option<&str> {
-        self.extract_current_function_debug_info(|f| Some(f.name.as_str()))
+        self.meta
+            .function_meta
+            .get(&current_func)
+            .map(|f| f.name.as_str())
     }
 
     pub fn current_file_info(&self) -> Option<FileInfo> {
-        self.extract_current_function_debug_info(|f| Some(f.file))
+        // find the last VM function in the callstack
+        for call in self.call_stack.iter().rev() {
+            if let CallStackEntry {
+                state: CallState::VM,
+                function: Some(function),
+                ..
+            } = call
+            {
+                return self.meta.function_meta.get(function).map(|f| f.file);
+            }
+        }
+
+        None
     }
 
     pub fn current_file_offset(&self) -> Option<usize> {
@@ -253,7 +260,7 @@ impl VM {
                 let file_start = self
                     .meta
                     .function_meta
-                    .get(&function)
+                    .get(function)
                     .and_then(|f| f.file.line_in_bytecode())
                     .unwrap_or_default();
 
