@@ -3,10 +3,11 @@
 .wrapper {
     display: grid;
     gap: 10px;
-    grid-template-columns: 22em 1fr;
+    grid-template-columns: 24em 1fr;
     grid-template-areas:
         "screen screen"
-        "left-side left-side";
+        "left-side left-side"
+        "watches watches";
 }
 
 .screen-wrapper {
@@ -19,6 +20,14 @@
     grid-area: left-side;
     height: 55vh;
     width: 100%;
+}
+
+#watches {
+    grid-area: watches;
+    margin-top: 10pt;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 #toolbar {
@@ -70,6 +79,12 @@
     #upload-files {
         display: inherit;
     }
+
+    #watches {
+        flex-direction: row;
+        align-items: start;
+        margin-left: 10pt;
+    }
 }
 
 @media (min-width: 1000px) {
@@ -84,7 +99,8 @@
 
     .wrapper {
         grid-template-areas:
-            "left-side screen";
+            "left-side screen"
+            "watches watches";
     }
 
     /* remove the code view */
@@ -96,6 +112,10 @@
     .code-inner {
         position: absolute;
         white-space: nowrap;
+    }
+
+    #watches {
+        margin: 0;
     }
 }
 
@@ -125,6 +145,40 @@ body {
 .code-child {
     outline: black 3px solid;
     width: 95%;
+}
+
+.watch-block {
+    width: fit-content;
+}
+
+.watch {
+    width: 15em;
+    outline: black 3px solid;
+    margin: 0.5em;
+    font-family: sans-serif;
+    font-weight: 800;
+    font-size: 1em;
+}
+
+.watch-block > .block-label {
+    font-family: sans-serif;
+    font-weight: 800;
+    font-size: 1em;
+    margin-left: 0.5em;
+}
+
+.watch > .watch-label {
+    width: 46%;
+    display: inline-block;
+    box-sizing: border-box;
+    border-right: black 3px solid;
+    padding: 0.3em;
+}
+
+.watch > .watch-content {
+    width: 54%;
+    display: inline-block;
+    text-align: center;
 }
 
 .btn {

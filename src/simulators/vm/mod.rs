@@ -222,63 +222,6 @@ impl VM {
         }
     }
 
-    pub fn current_function_name(&self) -> Option<&str> {
-        let current_item = self.call_stack.last()?;
-        let current_func = current_item.function?;
-        self.meta
-            .function_meta
-            .get(&current_func)
-            .map(|f| f.name.as_str())
-    }
-
-    pub fn current_file_info(&self) -> Option<FileInfo> {
-        // find the last VM function in the callstack
-        for call in self.call_stack.iter().rev() {
-            if let CallStackEntry {
-                state: CallState::VM,
-                function: Some(function),
-                ..
-            } = call
-            {
-                return self.meta.function_meta.get(function).map(|f| f.file);
-            }
-        }
-
-        None
-    }
-
-    pub fn current_file_offset(&self) -> Option<usize> {
-        // find the last VM function in the callstack
-        for call in self.call_stack.iter().rev() {
-            if let CallStackEntry {
-                state: CallState::VM,
-                function: Some(function),
-                ..
-            } = call
-            {
-                // get the bytecode offset of the file that contains this function
-                let file_start = self
-                    .meta
-                    .function_meta
-                    .get(function)
-                    .and_then(|f| f.file.line_in_bytecode())
-                    .unwrap_or_default();
-
-                return Some(self.pc - file_start);
-            }
-        }
-
-        Some(self.pc)
-    }
-
-    pub fn display(&self) -> &[Word] {
-        &self.memory[SCREEN_START..(SCREEN_START + 8192)]
-    }
-
-    pub fn set_input_key(&mut self, key: i16) -> VMResult {
-        self.set_mem(KBD, key)
-    }
-
     pub fn load(&mut self, mut info: impl ProgramInfo) {
         self.program = info.take_instructions();
         let meta = info.take_meta();
@@ -454,6 +397,7 @@ impl VM {
             function.virtual_address(),
             init_state,
             args.to_owned(),
+            self.mem(SP)?,
         ));
         let ret_val = function.call(self, args)?;
 
@@ -500,7 +444,7 @@ impl VM {
         self.set_mem(LCL, sp)?;
 
         let ret_addr = self.return_address()?;
-        self.push_call(CallStackEntry::vm(ret_addr, function));
+        self.push_call(CallStackEntry::vm(ret_addr, function, sp));
         self.pc = function as usize;
         Ok(())
     }
@@ -687,6 +631,125 @@ impl VM {
         });
 
         Ok(())
+    }
+}
+
+// UI interaction
+impl VM {
+    pub fn memory_at(&self, address: Address) -> Option<Word> {
+        self.mem(address).ok()
+    }
+
+    pub fn current_function_name(&self) -> Option<&str> {
+        let current_item = self.call_stack.last()?;
+        let current_func = current_item.function?;
+        self.meta
+            .function_meta
+            .get(&current_func)
+            .map(|f| f.name.as_str())
+    }
+
+    pub fn current_file_info(&self) -> Option<FileInfo> {
+        // find the last VM function in the callstack
+        for call in self.call_stack.iter().rev() {
+            if let CallStackEntry {
+                state: CallState::VM,
+                function: Some(function),
+                ..
+            } = call
+            {
+                return self.meta.function_meta.get(function).map(|f| f.file);
+            }
+        }
+
+        None
+    }
+
+    pub fn current_file_offset(&self) -> Option<usize> {
+        // find the last VM function in the callstack
+        for call in self.call_stack.iter().rev() {
+            if let CallStackEntry {
+                state: CallState::VM,
+                function: Some(function),
+                ..
+            } = call
+            {
+                // get the bytecode offset of the file that contains this function
+                let file_start = self
+                    .meta
+                    .function_meta
+                    .get(function)
+                    .and_then(|f| f.file.line_in_bytecode())
+                    .unwrap_or_default();
+
+                return Some(self.pc - file_start);
+            }
+        }
+
+        Some(self.pc)
+    }
+
+    pub fn display(&self) -> &[Word] {
+        &self.memory[SCREEN_START..(SCREEN_START + 8192)]
+    }
+
+    pub fn locals(&self) -> Option<&[Word]> {
+        let entry = self.call_stack.last()?;
+        let bp = entry.base_pointer as usize;
+        let n_locals = entry
+            .function
+            .and_then(|f| self.meta.function_meta.get(&f).map(|f| f.n_locals))?
+            as usize;
+
+        Some(&self.memory[bp..(bp + n_locals)])
+    }
+
+    pub fn args(&self) -> Option<&[Word]> {
+        let entry = self.call_stack.last()?;
+
+        match entry {
+            CallStackEntry {
+                state: CallState::Builtin(_, args),
+                ..
+            } => Some(args),
+            CallStackEntry {
+                base_pointer,
+                state: CallState::VM,
+                ..
+            } => {
+                let arg = self.mem(ARG).ok()? as usize;
+                let bp = *base_pointer as usize;
+                let n_args = bp - arg - 5;
+                Some(&self.memory[arg..(arg + n_args)])
+            }
+            _ => None,
+        }
+    }
+
+    pub fn stack(&self) -> Option<&[Word]> {
+        if let Some(CallStackEntry {
+            function: Some(f),
+            base_pointer,
+            state: CallState::VM,
+            ..
+        }) = self.call_stack.last()
+        {
+            let n_locals = self.meta.function_meta.get(f).map(|f| f.n_locals)? as usize;
+            let bp = *base_pointer as usize;
+            let sp = self.mem(SP).ok()? as usize;
+            let start = bp + n_locals;
+            if start < sp {
+                Some(&self.memory[(bp + n_locals)..sp])
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn set_input_key(&mut self, key: i16) -> VMResult {
+        self.set_mem(KBD, key)
     }
 }
 

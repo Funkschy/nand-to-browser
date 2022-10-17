@@ -4,6 +4,7 @@ import { Button } from './Button.jsx';
 import { FilePicker } from './FilePicker.jsx';
 import { SpeedSlider } from './SpeedSlider.jsx';
 import { CodeView } from './CodeView.jsx'
+import { MemoryWatchBlock } from './MemoryWatchBlock.jsx'
 
 const handleFileUploads = (app, fileNames, setRunning, setFiles) => {
   setRunning(false);
@@ -129,6 +130,10 @@ export function VMEmulatorStepper({app}) {
     jumpToCurrentInstr();
   };
 
+  const locals = Array.from(app.locals());
+  const stack = Array.from(app.stack());
+  const args = Array.from(app.args());
+
   return (
     <>
       <div id="toolbar">
@@ -173,6 +178,21 @@ export function VMEmulatorStepper({app}) {
             width="512"
             height="256"/>
         </div>
+
+        {
+          !running &&
+            <div id="watches">
+              <MemoryWatchBlock
+                name="locals"
+                vars={locals}/>
+              <MemoryWatchBlock
+                name="args"
+                vars={args}/>
+              <MemoryWatchBlock
+                name="stack"
+                vars={stack}/>
+            </div>
+        }
       </div>
     </>);
 }

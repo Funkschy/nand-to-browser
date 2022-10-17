@@ -3,7 +3,9 @@ mod keyboard;
 mod parse;
 mod simulators;
 
-use definitions::{Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS};
+use definitions::{
+    Address, Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS,
+};
 use parse::bytecode::{ParseError, Parser, SourceFile};
 use simulators::vm::meta::FileInfo;
 use simulators::vm::stdlib::Stdlib;
@@ -96,6 +98,34 @@ impl App {
     pub fn set_input_key(&mut self, key: Word) -> VMResult {
         self.vm.set_input_key(key)?;
         Ok(())
+    }
+
+    pub fn locals(&self) -> Vec<Word> {
+        if let Some(locals) = self.vm.locals() {
+            locals.to_vec()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn args(&self) -> Vec<Word> {
+        if let Some(args) = self.vm.args() {
+            args.to_vec()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn stack(&self) -> Vec<Word> {
+        if let Some(stack) = self.vm.stack() {
+            stack.to_vec()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn memory_at(&self, address: Address) -> Option<Word> {
+        self.vm.memory_at(address)
     }
 
     pub fn current_function_name(&self) -> Option<String> {
