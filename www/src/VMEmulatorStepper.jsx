@@ -136,32 +136,32 @@ export function VMEmulatorStepper({app}) {
 
   return (
     <>
-      <div id="toolbar">
-        <FilePicker
-          onChange={pickFiles}/>
-
-        <ButtonRow
-          loadFiles={() => app.load_files()}
-          step={step}
-          running={running}
-          setRunning={(run) => {
-            if (!run) {
-              jumpToCurrentInstr();
-            }
-            setRunning(run);
-          }}
-          programLoaded={programLoaded}/>
-
-        <div id="speed">
-          <SpeedSlider
-            min={minStepsPerTick}
-            max={maxStepsPerTick}
-            stepsPerTick={stepsPerTick}
-            setStepsPerTick={setStepsPerTick}/>
-        </div>
-      </div>
-
       <div className={`wrapper ${running ? 'running': ''}`}>
+        <div id="toolbar">
+          <FilePicker
+            onChange={pickFiles}/>
+
+          <ButtonRow
+            loadFiles={() => app.load_files()}
+            step={step}
+            running={running}
+            setRunning={(run) => {
+              if (!run) {
+                jumpToCurrentInstr();
+              }
+              setRunning(run);
+            }}
+            programLoaded={programLoaded}/>
+
+          <div id="speed">
+            <SpeedSlider
+              min={minStepsPerTick}
+              max={maxStepsPerTick}
+              stepsPerTick={stepsPerTick}
+              setStepsPerTick={setStepsPerTick}/>
+          </div>
+        </div>
+
         {
           // while running, we want the canvas to take as much space as possible
           !running &&
