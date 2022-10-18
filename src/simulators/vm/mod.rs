@@ -419,8 +419,6 @@ impl VM {
     }
 
     fn call_vm_function(&mut self, function: Symbol, n_args: i16) -> VMResult {
-        // TODO: handle error if calling a non existing function
-
         trace_calls!({
             println!("call {:?} at {}", self.function_meta(function), function);
             println!("{:?}", self.call_stack_names());
