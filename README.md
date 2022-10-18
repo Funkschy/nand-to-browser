@@ -9,6 +9,8 @@ A Nand to Tetris Emulator implementation that can run in the browser
 cd www
 # compile the rust code into a wasm lib
 wasm-pack build --release
+# pull the javascript dependencies
+npm ci
 # run the javascript server
 npm run start
 ```
