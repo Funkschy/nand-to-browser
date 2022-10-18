@@ -49,6 +49,7 @@ function ButtonRow({step, loadFiles, running, setRunning, programLoaded}) {
         Step
       </Button>
       <Button className="btn"
+              disabled={!programLoaded}
               onClick={loadFiles}>
         Reset
       </Button>
