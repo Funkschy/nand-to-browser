@@ -48,7 +48,6 @@ fn run_desktop(vm: &mut VM) {
     canvas.present();
 
     let mut event_pump = sdl_context.event_pump().unwrap();
-    // TODO: remove this after moving the keyboard handling into rust
     'running: loop {
         for event in event_pump.poll_iter() {
             match event {
