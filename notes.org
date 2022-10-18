@@ -39,7 +39,7 @@
   - [X] kein unwrap/expect
   - [X] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
 - [ ] checken ob Funktionsname zu Klassennamen passt
-** TODO VM Frontend [10/22]
+** TODO VM Frontend [13/22]
 - [X] vm step aus frontend aufrufen
 - [X] display speicher in canvas rendern
 - [X] keyboard interaktion in vm speicher schreiben
@@ -51,11 +51,11 @@
 - [X] Laden von User code
 - [X] Anzeige des Bytecodes
 - [ ] Anzeige des Keyboard Inputs
-- [ ] Anzeige des Stacks
+- [X] Anzeige des Stacks
 - [ ] Anzeige des Call stacks
 - [ ] Anzeige der Statics
-- [ ] Anzeige der Locals
-- [ ] Anzeige der Arguments
+- [X] Anzeige der Locals
+- [X] Anzeige der Arguments
 - [ ] Anzeige von This
 - [ ] Anzeige von That
 - [ ] Anzeige von Temp
@@ -65,3 +65,30 @@
 ** TODO sonstiges [0/2]
 - [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger
 - [ ] Benchmark: 3fcc146df140f95a7be8290d897cc46b4dbccc59 vs Nachfolger
+* Themen für die BA
+** Erklären
+*** originale Tools / was ist nand 2 tetris
+**** folien alle creative commons
+*** rust
+*** wasm
+*** react
+** Reimplementierung der VM mit deutlich besserer Performance/Stabilität
+*** step weise Ausführung
+*** bytecode design
+**** enum vs union
+*** parsing
+*** keyboard handling
+**** bug für bug compatibility
+** Native stdlib
+*** Protokoll für Pausiren/Fortsetzen der builtin Funktionen
+*** kompliziert in wasm, da keine Thread.wait möglich
+*** state machine ähnlich zu async-await
+** Web UI (React & CSS)
+*** auch Einleitung für react geben
+*** adaptiv (für verschiedene screen größen)
+*** bytecode view & memory watches
+*** rendering in rust -> canvas.putImageData
+** Tracing für Entwickler
+*** Desktop Modus mit SDL (conditional compilation)
+** Testing
+*** Portierung der test Skripte zu rust unit tests
