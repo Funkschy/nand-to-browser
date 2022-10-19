@@ -9,7 +9,7 @@ mod parse;
 mod simulators;
 
 #[cfg(feature = "desktop")]
-fn run_desktop(vm: &mut VM) {
+fn run_desktop(vm: &mut VM, steps_per_tick: usize) {
     use definitions::{SCREEN_HEIGHT, SCREEN_WIDTH};
     use keyboard::get_key_code;
     use sdl2::event::Event;
@@ -129,7 +129,7 @@ fn run_desktop(vm: &mut VM) {
             }
         }
 
-        for _ in 0..20000 {
+        for _ in 0..steps_per_tick {
             vm.step().unwrap();
         }
 
@@ -167,7 +167,7 @@ fn run_desktop(vm: &mut VM) {
 }
 
 #[cfg(not(feature = "desktop"))]
-fn run_desktop(vm: &mut VM) {
+fn run_desktop(vm: &mut VM, _: usize) {
     loop {
         vm.step().expect("vm error");
     }
@@ -205,5 +205,5 @@ fn main() {
 
     vm.load(program);
 
-    run_desktop(&mut vm);
+    run_desktop(&mut vm, 20000);
 }

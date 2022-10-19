@@ -67,9 +67,8 @@ pub fn de_alloc(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Parser;
-    use crate::SourceFile;
-    use crate::VM;
+    use crate::parse::bytecode::{Parser, SourceFile};
+    use crate::simulators::vm::VM;
 
     // this test comes from the MemoryTest directory in project 12
     #[test]

@@ -43,9 +43,7 @@ pub fn sqrt(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Parser;
-    use crate::SourceFile;
-    use crate::VM;
+    use crate::parse::bytecode::{Parser, SourceFile};
 
     // this test comes from the MathTest directory in project 12
     #[test]

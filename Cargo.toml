@@ -6,6 +6,10 @@ authors = ["Felix Schoeller <felix.schoeller@protonmail.com>"]
 description = "A Nand to Tetris Emulator implementation that can run in the browser"
 license-file = "LICENSE"
 
+[[bin]]
+name = "n2t"
+path = "src/bin.rs"
+
 # wasm packages must be cdylib
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -16,21 +20,17 @@ trace_calls = []   # if this is enabled, calls will be traced even if trace_vm i
 desktop = ["sdl2"] # run the application as a desktop app by rendering to an SDL window
 default = ["console_error_panic_hook"]
 
-# make some javascript functions/types accessible from rust
-[dependencies.web-sys]
-version = "0.3"
-features = [
-    'ImageData' # the wasm renders into an imagedata object and the js code only puts that data onto the canvas
-]
-
 [dependencies]
-# dependencies for the web ui
-wasm-bindgen = "0.2"
+# dependencies that are always needed
 lazy_static = "1.4"
 
-# optional dependencies
+# web dependencies
+wasm-bindgen = { version = "0.2" }
+# make some javascript functions/types accessible from rust
+web-sys = { version = "0.3", features = ['ImageData'] }
 # logs panics with console.err which is nice for debugging
 console_error_panic_hook = { version = "0.1.7", optional = true }
+
 # for the desktop version
 sdl2 = { version = "0.35.2", optional = true }
 
