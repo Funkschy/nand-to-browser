@@ -691,6 +691,10 @@ impl VM {
         &self.memory[SCREEN_START..(SCREEN_START + 8192)]
     }
 
+    fn mem_range(&self, range: std::ops::Range<Address>) -> Option<&[Word]> {
+        self.memory.get(range)
+    }
+
     pub fn locals(&self) -> Option<&[Word]> {
         let entry = self.call_stack.last()?;
         let bp = entry.base_pointer as usize;
@@ -699,7 +703,7 @@ impl VM {
             .and_then(|f| self.meta.function_meta.get(&f).map(|f| f.n_locals))?
             as usize;
 
-        Some(&self.memory[bp..(bp + n_locals)])
+        self.mem_range(bp..(bp + n_locals))
     }
 
     pub fn args(&self) -> Option<&[Word]> {
@@ -718,7 +722,7 @@ impl VM {
                 let arg = self.mem(ARG).ok()? as usize;
                 let bp = *base_pointer as usize;
                 let n_args = bp - arg - 5;
-                Some(&self.memory[arg..(arg + n_args)])
+                self.mem_range(arg..(arg + n_args))
             }
             _ => None,
         }
@@ -737,7 +741,7 @@ impl VM {
             let sp = self.mem(SP).ok()? as usize;
             let start = bp + n_locals;
             if start < sp {
-                Some(&self.memory[(bp + n_locals)..sp])
+                self.mem_range((bp + n_locals)..sp)
             } else {
                 None
             }
