@@ -6,40 +6,37 @@ import { SpeedSlider } from './SpeedSlider.jsx';
 import { CodeView } from './CodeView.jsx'
 import { MemoryWatchBlock } from './MemoryWatchBlock.jsx'
 
-const handleFileUploads = (app, fileNames, setRunning, setFiles) => {
-  setRunning(false);
+const readAllFiles = (fileNames) => {
+  return new Promise((resolve, reject) => {
+    // we only want to actually compile and load the bytecode files after everything has been
+    // added to the internal file list in wasm
+    let loadedFiles = new Map();
 
-  // because we cannot easily pass a list to wasm, it's a lot easier to just make the wasm app
-  // remember the files we already added. So we need to clear that memory when loading new files
-  app.reset_files();
+    for (let file of fileNames) {
+      const reader = new FileReader();
 
-  // we only want to actually compile and load the bytecode files after everything has been
-  // added to the internal file list in wasm
-  let loadedFiles = new Map();
+      reader.onerror = reject;
+      reader.onload = () => {
+        const content = reader.result;
 
-  for (let file of fileNames) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target.result;
+        loadedFiles.set(file.name, content);
+        if (loadedFiles.size === fileNames.length) {
+          // all files have been read, so return the map
+          resolve(loadedFiles);
+        }
+      };
 
-      app.add_file(file.name, content);
-      loadedFiles.set(file.name, content);
-
-      if (loadedFiles.size === fileNames.length) {
-        // all files have been read and added to the internal buffer
-        app.load_files();
-        setFiles(loadedFiles);
-      }
+      reader.readAsText(file);
     }
-    reader.readAsText(file);
-  }
-};
+  })
+}
 
 function ButtonRow({step, loadFiles, running, setRunning, programLoaded}) {
   return (
     <div id="control-buttons">
       <Button
         className="btn"
+        disabled={!programLoaded}
         onClick={() => setRunning(!running)}>
         {running ? "Stop" : "Start"}
       </Button>
@@ -56,6 +53,8 @@ function ButtonRow({step, loadFiles, running, setRunning, programLoaded}) {
 
     </div>);
 }
+
+const showError = alert;
 
 // this needs to be separated from VmEmulator so that the app isn't recreated when this component
 // gets recreated
@@ -77,7 +76,7 @@ export function VMEmulatorStepper({app}) {
       app.step_times(stepsPerTick);
     } catch(error) {
       setRunning(false);
-      alert(error);
+      showError(error);
     }
   };
 
@@ -95,11 +94,26 @@ export function VMEmulatorStepper({app}) {
   }, [running, stepsPerTick]);
 
   useEffect(() => {
-    try {
-      handleFileUploads(app, fileNames, setRunning, setFiles)
-    }catch (error) {
-      alert(error);
-    }
+    const readFiles = async () => {
+      setRunning(false);
+
+      const files = await readAllFiles(fileNames);
+      setFiles(files);
+
+      // because we cannot easily pass a list to wasm, it's a lot easier to just make the wasm app
+      // remember the files we already added. So we need to clear that memory when loading new files
+      app.reset_files();
+      for (const [fileName, fileContent] of files) {
+        app.add_file(fileName, fileContent);
+      }
+      app.load_files()
+    };
+
+    readFiles().catch((error) => {
+      showError(error);
+      setFiles(new Map());
+      setFileNames([]);
+    });
   }, [fileNames]);
 
   // some stuff should only be enabled if a program has been loaded
