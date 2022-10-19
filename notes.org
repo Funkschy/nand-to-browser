@@ -16,7 +16,19 @@
 *** Performance wie in offiziellem Emulator, aber mit weniger jittering
 *** Performance ist sehr abhängig von nativer Screen Implementierung
 * TODOs
-** TODO VM Emulator [9/13]
+** TODO CLI [0/2]
+- [ ] Test Script runner [0/2]
+  - [ ] Korrekte ausführung der VM durch tst Skript
+  - [ ] Output Datei neben cmp Datei speichern
+- [ ] interface
+  - [ ] Skripte aus Ordner laden (cli argument)
+  - [ ] Tests ausführen wenn vorhanden (Struktur wie in projects Ordner)
+  - [ ] mit flag Desktop Modus starten
+  - [ ] steps per tick als cli argument
+  - [ ]
+** TODO CPU Emulator [0/1]
+  - [ ] CPU Emulator implementieren
+** TODO VM Emulator [9/12]
 - [X] alle commands implementieren
 - [X] command parsing
 - [X] funktionen erkennen die aufgerufen aber nicht deklariert werden
@@ -32,12 +44,11 @@
 - [X] unbekannte funktionen in stdlib suchen und adden falls nötig
 - [X] Start der Ausführung bei Sys.init falls vorhanden
 - [X] Debug Infos für Funktionen
-- [ ] Debug Infos für lokale Label
-- [ ] Test Script runner
 - [X] Erfolgreiche Ausführung verschiedener Projekt 9 Abgaben
 - [X] Ordentliches error handling
   - [X] kein unwrap/expect
   - [X] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
+- [ ] Debug Infos für lokale Label
 - [ ] checken ob Funktionsname zu Klassennamen passt
 ** TODO VM Frontend [13/22]
 - [X] vm step aus frontend aufrufen
@@ -50,21 +61,26 @@
 - [X] Revert Button
 - [X] Laden von User code
 - [X] Anzeige des Bytecodes
-- [ ] Anzeige des Keyboard Inputs
 - [X] Anzeige des Stacks
-- [ ] Anzeige des Call stacks
-- [ ] Anzeige der Statics
 - [X] Anzeige der Locals
 - [X] Anzeige der Arguments
+- [ ] Anzeige des Call stacks
+- [ ] Anzeige der Statics
+- [ ] Anzeige des globalen RAMS
 - [ ] Anzeige von This
 - [ ] Anzeige von That
 - [ ] Anzeige von Temp
 - [ ] Anzeige des globalen Stacks
-- [ ] Anzeige des globalen RAMS
 - [ ] Numberformat switcher
-** TODO sonstiges [0/2]
+- [ ] Anzeige des Keyboard Inputs
+** TODO BUGS [1/3]
+- [X] Screen in VM zu groß bei 1080p -> scrolling
+- [ ] bytecode view sollte nur body scrollen, nicth den <file>: <function> header
+- [ ] VM fehler crasht UI
+** TODO sonstiges [0/3]
 - [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger
 - [ ] Benchmark: 3fcc146df140f95a7be8290d897cc46b4dbccc59 vs Nachfolger
+- [ ] Dependency section in Readme (auch für Desktop)
 * Themen für die BA
 ** Erklären
 *** originale Tools / was ist nand 2 tetris
