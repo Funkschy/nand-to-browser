@@ -47,7 +47,11 @@ const makeBytecodeLines = (lineStrings, activeLineIndex) => {
   });
 };
 
-export function CodeView({fileName, functionName, lines, activeLine}) {
+export function CodeView({files, activeFileName, functionName, activeLine}) {
+  // find the source code position to highlight
+  const activeCode = files.get(activeFileName);
+  const lines = activeCode !== undefined ? activeCode.split('\n') : [];
+
   return (
     <div className="code">
       <div className="code-child">
@@ -55,7 +59,7 @@ export function CodeView({fileName, functionName, lines, activeLine}) {
           <table >
             <thead>
               <tr>
-                <th>{fileName} {functionName ? ': ' + functionName : ''}</th>
+                <th>{activeFileName} {functionName ? ': ' + functionName : ''}</th>
               </tr>
             </thead>
             <tbody>

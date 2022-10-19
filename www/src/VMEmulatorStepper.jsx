@@ -102,10 +102,6 @@ export function VMEmulatorStepper({app}) {
     }
   }, [fileNames]);
 
-  // find the source code position to highlight
-  const activeCode = files.get(activeFile);
-  const activeLines = activeCode !== undefined ? activeCode.split('\n') : [];
-
   // some stuff should only be enabled if a program has been loaded
   const programLoaded = files.size !== 0;
 
@@ -167,8 +163,8 @@ export function VMEmulatorStepper({app}) {
           // while running, we want the canvas to take as much space as possible
           !running &&
             <CodeView
-              fileName={activeFile}
-              lines={activeLines}
+              files={files}
+              activeFileName={activeFile}
               functionName={activeFunction}
               activeLine={offset}/>
         }
