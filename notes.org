@@ -20,12 +20,11 @@
 - [ ] Test Script runner [0/2]
   - [ ] Korrekte ausführung der VM durch tst Skript
   - [ ] Output Datei neben cmp Datei speichern
-- [ ] interface
-  - [ ] Skripte aus Ordner laden (cli argument)
+- [-] interface
+  - [X] Skripte aus Ordner laden (cli argument)
   - [ ] Tests ausführen wenn vorhanden (Struktur wie in projects Ordner)
-  - [ ] mit flag Desktop Modus starten
-  - [ ] steps per tick als cli argument
-  - [ ]
+  - [X] mit flag Desktop Modus starten
+  - [X] steps per tick als cli argument
 ** TODO CPU Emulator [0/1]
   - [ ] CPU Emulator implementieren
 ** TODO VM Emulator [9/12]
