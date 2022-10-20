@@ -658,7 +658,11 @@ impl VM {
             }
         }
 
-        None
+        // there is no VM function, so this is almost certainly a single file program
+        Some(FileInfo::VM {
+            module_index: 0,
+            line_in_bytecode: 0,
+        })
     }
 
     pub fn current_file_offset(&self) -> Option<usize> {
@@ -739,12 +743,18 @@ impl VM {
             let sp = self.mem(SP).ok()? as usize;
             let start = bp + n_locals;
             if start < sp {
-                self.mem_range((bp + n_locals)..sp)
+                self.mem_range(start..sp)
             } else {
                 None
             }
         } else {
-            None
+            let bp = INIT_SP as usize;
+            let sp = self.mem(SP).ok()? as usize;
+            if bp < sp {
+                self.mem_range(bp..sp)
+            } else {
+                None
+            }
         }
     }
 

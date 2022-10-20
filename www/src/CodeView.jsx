@@ -27,9 +27,9 @@ const makeBytecodeLines = (lineStrings, activeLineIndex) => {
     let highlightLine = indexWithoutLabels === activeLineIndex;
     let key_index = indexWithoutLabels;
 
-    if (line.startsWith('label')) {
+    if (line.startsWith('label') || line.startsWith('//')) {
       // just some index that cannot possibly be the activeLineIndex
-      key_index = -index;
+      key_index = -index - 1;
       highlightLine = false;
     }else {
       indexWithoutLabels += 1;
