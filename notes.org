@@ -73,14 +73,14 @@
 - [ ] Anzeige des globalen Stacks
 - [ ] Numberformat switcher
 - [ ] Anzeige des Keyboard Inputs
-** TODO BUGS [1/3]
+** TODO BUGS [2/3]
 - [X] Screen in VM zu groß bei 1080p -> scrolling
 - [ ] bytecode view sollte nur body scrollen, nicth den <file>: <function> header
-- [ ] VM fehler crasht UI
-** TODO sonstiges [0/3]
+- [X] VM fehler crasht UI
+** TODO sonstiges [1/3]
 - [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger
 - [ ] Benchmark: 3fcc146df140f95a7be8290d897cc46b4dbccc59 vs Nachfolger
-- [ ] Dependency section in Readme (auch für Desktop)
+- [X] Dependency section in Readme (auch für Desktop)
 * Themen für die BA
 ** Erklären
 *** originale Tools / was ist nand 2 tetris

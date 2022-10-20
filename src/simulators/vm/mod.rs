@@ -242,7 +242,6 @@ impl VM {
 
         match sys_init {
             Some(sys_init_address) if sys_init_address != 0 => {
-                println!("Sys.init at {}", sys_init_address);
                 self.sys_init = Some(sys_init_address);
                 self.push_call(CallStackEntry::top_level());
             }
@@ -477,7 +476,6 @@ impl VM {
         };
 
         if let Some(sys_init_address) = self.sys_init {
-            println!("jumping to Sys.init at {}", sys_init_address);
             self.sys_init = None;
             self.call_function(sys_init_address, 0)?;
             return Ok(());
