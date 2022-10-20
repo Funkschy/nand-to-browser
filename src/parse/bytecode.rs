@@ -361,6 +361,8 @@ impl<'src> Parser<'src> {
 
         let mut function_addresses = HashMap::new();
         let mut file_start = 0;
+        // only add Sys.init if we also have a main function
+        let mut had_main_function = false;
 
         loop {
             let last_module_index = self.module_index;
@@ -408,6 +410,10 @@ impl<'src> Parser<'src> {
                     self.function_symbols.push(SymbolTable::default());
 
                     push_instr(&mut code, Instruction::Function { n_locals });
+
+                    if label == "Main.main" {
+                        had_main_function = true;
+                    }
                 }
                 Token::Identifier("return") => {
                     push_instr(&mut code, Instruction::Return);
@@ -484,6 +490,12 @@ impl<'src> Parser<'src> {
         // can call each other
         for (&name, &addr) in self.stdlib.by_name() {
             if self.global_symbols.lookup(name).is_none() {
+                // we only want to add the Sys.init if the user supplied a Main.main
+                // otherwise the Sys.init would throw an error when trying to call that main function
+                if name == "Sys.init" && !had_main_function {
+                    continue;
+                }
+
                 let func = self.stdlib.by_address(addr).unwrap();
                 function_addresses.insert(name.to_owned(), addr);
                 debug_symbols.insert(
