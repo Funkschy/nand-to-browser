@@ -632,6 +632,36 @@ impl VM {
 
 // UI interaction
 impl VM {
+    /// Similar to step, but this will finish builtin Calls completely instead of having
+    /// steps inside of them. This behaviour is the one that the official tools use
+    pub fn step_until_vm_instr(&mut self) -> VMResult {
+        let mut last_state = None;
+        loop {
+            self.step()?;
+            match self.call_stack.last() {
+                Some(CallStackEntry {
+                    state: CallState::VM,
+                    ..
+                }) => {
+                    // stop if we're back in the VM
+                    return Ok(());
+                }
+                Some(CallStackEntry {
+                    state: CallState::Builtin(state, _),
+                    ..
+                }) => {
+                    if Some(*state) == last_state {
+                        // we entered a builtin endless loop
+                        return Ok(());
+                    }
+
+                    last_state = Some(*state);
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub fn memory_at(&self, address: Address) -> Option<Word> {
         self.mem(address).ok()
     }
@@ -699,6 +729,17 @@ impl VM {
 
     pub fn locals(&self) -> Option<&[Word]> {
         let entry = self.call_stack.last()?;
+
+        if !matches!(
+            entry,
+            CallStackEntry {
+                state: CallState::VM,
+                ..
+            }
+        ) {
+            return None;
+        }
+
         let bp = entry.base_pointer as usize;
         let n_locals = entry
             .function
@@ -731,31 +772,37 @@ impl VM {
     }
 
     pub fn stack(&self) -> Option<&[Word]> {
+        let entry = self.call_stack.last();
         if let Some(CallStackEntry {
             function: Some(f),
             base_pointer,
             state: CallState::VM,
             ..
-        }) = self.call_stack.last()
+        }) = entry
         {
             let n_locals = self.meta.function_meta.get(f).map(|f| f.n_locals)? as usize;
             let bp = *base_pointer as usize;
             let sp = self.mem(SP).ok()? as usize;
             let start = bp + n_locals;
             if start < sp {
-                self.mem_range(start..sp)
-            } else {
-                None
+                return self.mem_range(start..sp);
             }
-        } else {
+            return Some(&[]);
+        } else if let Some(CallStackEntry {
+            state: CallState::TopLevel,
+            ..
+        }) = entry
+        {
             let bp = INIT_SP as usize;
             let sp = self.mem(SP).ok()? as usize;
             if bp < sp {
-                self.mem_range(bp..sp)
-            } else {
-                None
+                return self.mem_range(bp..sp);
             }
+            return Some(&[]);
         }
+
+        // only return None if there actually is no stack
+        None
     }
 
     pub fn set_input_key(&mut self, key: i16) -> VMResult {
@@ -772,6 +819,7 @@ impl Default for VM {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::definitions::HEAP_START;
     use crate::definitions::KBD;
     use crate::definitions::SCREEN_START;
     use crate::parse::bytecode::{ParsedProgram, Parser, SourceFile};
@@ -2015,5 +2063,117 @@ mod tests {
         }
 
         assert_eq!(vm.pop(), Ok(22));
+    }
+
+    #[test]
+    fn test_code_position_methods() {
+        let mut vm = VM::new(Stdlib::new());
+
+        let src = r#"
+            function Main.main 0
+            push constant 5
+            push constant 3
+            sub
+            call String.new 1
+            call Main.doStuff 1
+            call Output.printString 1
+            return
+
+            function Main.doStuff 1
+            push argument 0
+            pop local 0
+            push local 0
+            push constant 65
+            call String.appendChar 2
+            push constant 65
+            call String.appendChar 2
+            return
+            "#;
+
+        let programs = vec![SourceFile::new("Main.vm", src)];
+        let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        // skip Sys.init
+        for _ in 0..7 {
+            vm.step().unwrap();
+        }
+
+        assert_eq!(vm.pc, 1);
+
+        // push constants
+        vm.step().unwrap();
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Main.main"));
+        assert_eq!(vm.locals(), Some(&[][..]));
+        assert_eq!(vm.args(), Some(&[][..]));
+        assert_eq!(vm.stack(), Some(&[5, 3][..]));
+
+        // sub
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Main.main"));
+        assert_eq!(vm.locals(), Some(&[][..]));
+        assert_eq!(vm.args(), Some(&[][..]));
+        assert_eq!(vm.stack(), Some(&[2][..]));
+
+        // call String.new
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("String.new"));
+        assert_eq!(vm.locals(), None);
+        assert_eq!(vm.args(), Some(&[2][..]));
+        assert_eq!(vm.stack(), None);
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Main.main"));
+        assert_eq!(vm.locals(), Some(&[][..]));
+        assert_eq!(vm.args(), Some(&[][..]));
+        assert_eq!(vm.stack().map(|s| s.len()), Some(1));
+        let s = vm.stack().unwrap()[0];
+        assert_eq!(s > HEAP_START as Word, true);
+
+        // call Main.doStuff
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Main.doStuff"));
+        assert_eq!(vm.locals(), Some(&[0][..]));
+        assert_eq!(vm.args(), Some(&[s][..]));
+        assert_eq!(vm.stack(), Some(&[][..]));
+
+        vm.step().unwrap();
+        vm.step().unwrap();
+        vm.step().unwrap();
+        vm.step().unwrap();
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Main.doStuff"));
+        assert_eq!(vm.locals(), Some(&[s][..]));
+        assert_eq!(vm.args(), Some(&[s][..]));
+        assert_eq!(vm.stack(), Some(&[s, 65][..]));
+
+        vm.step().unwrap();
+        vm.step().unwrap();
+        vm.step().unwrap();
+        vm.step().unwrap();
+
+        // call Output.printString
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Output.printString"));
+        assert_eq!(vm.locals(), None);
+        assert_eq!(vm.args(), Some(&[s][..]));
+        assert_eq!(vm.stack(), None);
+
+        vm.step().unwrap();
+        vm.step().unwrap();
+        vm.step().unwrap();
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Output.printString"));
+        assert_eq!(vm.locals(), None);
+        assert_eq!(vm.args(), Some(&[s][..]));
+        assert_eq!(vm.stack(), None);
+
+        vm.step().unwrap();
+        assert_eq!(vm.current_function_name(), Some("Main.main"));
+        assert_eq!(vm.locals(), Some(&[][..]));
+        assert_eq!(vm.args(), Some(&[][..]));
+        assert_eq!(vm.stack(), Some(&[0][..]));
     }
 }

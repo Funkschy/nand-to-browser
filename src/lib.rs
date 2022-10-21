@@ -91,7 +91,7 @@ impl App {
     }
 
     pub fn step(&mut self) -> VMResult {
-        self.vm.step()?;
+        self.vm.step_until_vm_instr()?;
         Ok(())
     }
 

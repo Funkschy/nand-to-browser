@@ -137,7 +137,11 @@ export function VMEmulatorStepper({app}) {
   };
 
   const step = () => {
-    app.step();
+    try {
+      app.step();
+    }catch(error) {
+      showError(error);
+    }
     jumpToCurrentInstr();
   };
 

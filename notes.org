@@ -72,9 +72,10 @@
 - [ ] Anzeige des globalen Stacks
 - [ ] Numberformat switcher
 - [ ] Anzeige des Keyboard Inputs
-** TODO BUGS [2/3]
+** TODO BUGS/Fragen [2/3]
 - [X] Screen in VM zu groß bei 1080p -> scrolling
 - [ ] bytecode view sollte nur body scrollen, nicth den <file>: <function> header
+- [ ] Sollte die Anzeige des Stacks von unten nach oben verlaufen?
 - [X] VM fehler crasht UI
 ** TODO sonstiges [1/3]
 - [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger

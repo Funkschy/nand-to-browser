@@ -34,9 +34,8 @@ pub fn init(vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
     }
 }
 
-pub fn halt(_vm: &mut VM, state: State, _params: &[Word]) -> StdResult {
-    // endless loop
-    Ok(StdlibOk::ContinueInNextStep(state))
+pub fn halt(_vm: &mut VM, _: State, _params: &[Word]) -> StdResult {
+    Err(StdlibError::Halt)
 }
 
 pub fn error(_vm: &mut VM, _: State, params: &[Word]) -> StdResult {

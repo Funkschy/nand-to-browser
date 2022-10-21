@@ -4,6 +4,9 @@ use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StdlibError {
+    // not really an error, but it makes sense to treat it as such
+    Halt,
+
     // general/internal errors
     IncorrectNumberOfArgs,
     CallingNonExistendFunction,
@@ -76,6 +79,7 @@ const VM_ERRORS: [&str; 18] = [
 impl fmt::Display for StdlibError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::Halt => write!(f, "Execution complete"),
             Self::IncorrectNumberOfArgs => write!(f, "Incorrect number of arguments"),
             Self::CallingNonExistendFunction => {
                 write!(f, "Trying to call non existing stdlib function")
