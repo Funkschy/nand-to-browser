@@ -243,7 +243,6 @@ impl VM {
         match sys_init {
             Some(sys_init_address) if sys_init_address != 0 => {
                 self.sys_init = Some(sys_init_address);
-                self.push_call(CallStackEntry::top_level());
             }
             _ => {
                 // the vm must behave slightly differently if there is no Sys.init function
@@ -477,7 +476,12 @@ impl VM {
 
         if let Some(sys_init_address) = self.sys_init {
             self.sys_init = None;
-            self.call_function(sys_init_address, 0)?;
+            if self.stdlib.by_address(sys_init_address).is_some() {
+                self.call_function(sys_init_address, 0)?;
+            } else {
+                self.push_call(CallStackEntry::top_level_vm());
+                self.pc = sys_init_address as usize;
+            }
             return Ok(());
         }
 
@@ -1571,6 +1575,85 @@ mod tests {
         assert_eq!(Ok(3010), vm.mem(3));
         assert_eq!(Ok(4010), vm.mem(4));
         assert_eq!(Ok(1196), vm.mem(310));
+    }
+
+    #[test]
+    fn statics_test_with_stdlib() {
+        let mut vm = VM::new(Stdlib::new());
+
+        let sys = r#"
+            // Tests that different functions, stored in two different
+            // class files, manipulate the static segment correctly.
+            function Sys.init 0
+            push constant 6
+            push constant 8
+            call Class1.set 2
+            pop temp 0 // Dumps the return value
+            push constant 23
+            push constant 15
+            call Class2.set 2
+            pop temp 0 // Dumps the return value
+            call Class1.get 0
+            call Class2.get 0
+            label WHILE
+            goto WHILE
+            "#;
+
+        let class1 = r#"
+            // Stores two supplied arguments in static[0] and static[1].
+            function Class1.set 0
+            push argument 0
+            pop static 0
+            push argument 1
+            pop static 1
+            push constant 0
+            return
+
+            // Returns static[0] - static[1].
+            function Class1.get 0
+            push static 0
+            push static 1
+            sub
+            return
+            "#;
+
+        let class2 = r#"
+            // Stores two supplied arguments in static[0] and static[1].
+            function Class2.set 0
+            push argument 0
+            pop static 0
+            push argument 1
+            pop static 1
+            push constant 0
+            return
+
+            // Returns static[0] - static[1].
+            function Class2.get 0
+            push static 0
+            push static 1
+            sub
+            return
+            "#;
+
+        let programs = vec![
+            SourceFile::new("Class1.vm", class1),
+            SourceFile::new("Sys.vm", sys),
+            SourceFile::new("Class2.vm", class2),
+        ];
+        let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
+        let program = bytecode_parser.parse().unwrap();
+
+        vm.load(program);
+
+        vm.set_mem(SP, 261).unwrap();
+
+        for _ in 0..36 {
+            vm.step().unwrap();
+        }
+
+        assert_eq!(Ok(263), vm.mem(0));
+        assert_eq!(Ok(-2), vm.mem(261));
+        assert_eq!(Ok(8), vm.mem(262));
     }
 
     #[test]
