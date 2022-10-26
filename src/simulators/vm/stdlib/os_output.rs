@@ -313,7 +313,7 @@ pub fn print_int(vm: &mut VM, _: State, params: &[Word]) -> StdResult {
     let i = params[0];
     let s = i.to_string();
 
-    for c in s.chars().take_while(|&c| c == '-' || c.is_digit(10)) {
+    for c in s.chars().take_while(|&c| c == '-' || c.is_ascii_digit()) {
         print_char_impl(vm, c as Word)?;
     }
 

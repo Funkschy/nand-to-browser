@@ -6,11 +6,12 @@ use crate::simulators::vm::ProgramInfo;
 use std::num::ParseIntError;
 
 use std::collections::{HashMap, HashSet};
+use std::error;
 use std::fmt;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ParseError<'src> {
+pub enum ParseError {
     UnexpectedCharacter(char),
     // technically not a real error, but it's easier to handle it like one
     EndOfFile,
@@ -27,22 +28,22 @@ pub enum ParseError<'src> {
         label: String,
         function_name: String,
     },
-    UnresolvedSymbols(HashSet<&'src str>),
+    UnresolvedSymbols(HashSet<String>),
 }
 
-impl<'src> From<ByteCodeParseError> for ParseError<'src> {
+impl From<ByteCodeParseError> for ParseError {
     fn from(err: ByteCodeParseError) -> Self {
         Self::Bytecode(err)
     }
 }
 
-impl<'src> From<ParseIntError> for ParseError<'src> {
+impl From<ParseIntError> for ParseError {
     fn from(err: ParseIntError) -> Self {
         Self::InvalidIntLiteral(err)
     }
 }
 
-impl fmt::Display for ParseError<'_> {
+impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::UnexpectedCharacter(c) => write!(f, "Unexpected character: {}", c),
@@ -63,13 +64,19 @@ impl fmt::Display for ParseError<'_> {
             Self::UnresolvedSymbols(symbols) => write!(
                 f,
                 "Could not resolve the following symbols: {}",
-                symbols.iter().copied().collect::<Vec<_>>().join("\n")
+                symbols
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join("\n")
             ),
         }
     }
 }
 
-type ParseResult<'src, T> = Result<T, ParseError<'src>>;
+impl error::Error for ParseError {}
+
+type ParseResult<T> = Result<T, ParseError>;
 
 #[derive(Eq, PartialEq, Debug)]
 enum Token<'src> {
@@ -88,13 +95,13 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    fn consume_ident(&mut self) -> ParseResult<'src, Spanned<&'src str>> {
+    fn consume_ident(&mut self) -> ParseResult<Spanned<&'src str>> {
         self.walker
             .take_chars_while(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '-')
             .ok_or(ParseError::UnexpectedEndOfFile)
     }
 
-    fn scan_token(&mut self) -> ParseResult<'src, Spanned<Token<'src>>> {
+    fn scan_token(&mut self) -> ParseResult<Spanned<Token<'src>>> {
         // skip whitespace
         self.walker.take_chars_while(char::is_whitespace);
 
@@ -216,27 +223,27 @@ impl<'src> Parser<'src> {
     }
 
     // TODO: refactor those 3 functions
-    fn function_symbols(&mut self) -> ParseResult<'src, &mut SymbolTable> {
+    fn function_symbols(&mut self) -> ParseResult<&mut SymbolTable> {
         self.function_symbols
             .last_mut()
             .ok_or(ParseError::InvalidFunctionIndex)
     }
 
-    fn lexer(&mut self) -> ParseResult<'src, &mut Lexer<'src>> {
+    fn lexer(&mut self) -> ParseResult<&mut Lexer<'src>> {
         self.sources
             .get_mut(self.module_index)
             .ok_or(ParseError::InvalidFileIndex)
             .map(|f| &mut f.lexer)
     }
 
-    fn filename(&self) -> ParseResult<'src, &str> {
+    fn filename(&self) -> ParseResult<&str> {
         self.sources
             .get(self.module_index)
             .ok_or(ParseError::InvalidFileIndex)
             .map(|s| s.name.as_str())
     }
 
-    fn next_token(&mut self) -> ParseResult<'src, Token<'src>> {
+    fn next_token(&mut self) -> ParseResult<Token<'src>> {
         let current_lexer = self.lexer()?;
         match current_lexer.scan_token() {
             Err(ParseError::EndOfFile) => {
@@ -254,7 +261,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn consume_segment(&mut self) -> ParseResult<'src, Segment> {
+    fn consume_segment(&mut self) -> ParseResult<Segment> {
         if let Token::Identifier(ident) = self.next_token()? {
             let s = Segment::from_str(ident)?;
             Ok(s)
@@ -263,7 +270,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn consume_int(&mut self) -> ParseResult<'src, i16> {
+    fn consume_int(&mut self) -> ParseResult<i16> {
         if let Token::IntLiteral(literal) = self.next_token()? {
             Ok(literal)
         } else {
@@ -271,7 +278,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn consume_segment_with_index(&mut self) -> ParseResult<'src, (Segment, i16)> {
+    fn consume_segment_with_index(&mut self) -> ParseResult<(Segment, i16)> {
         let segment = self.consume_segment()?;
         let mut index = self.consume_int()?;
 
@@ -285,7 +292,7 @@ impl<'src> Parser<'src> {
         Ok((segment, index))
     }
 
-    fn consume_ident(&mut self) -> ParseResult<'src, &'src str> {
+    fn consume_ident(&mut self) -> ParseResult<&'src str> {
         if let Token::Identifier(ident) = self.next_token()? {
             Ok(ident)
         } else {
@@ -293,7 +300,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn consume_symbol(&mut self) -> ParseResult<'src, Result<Symbol, &'src str>> {
+    fn consume_symbol(&mut self) -> ParseResult<Result<Symbol, &'src str>> {
         let ident = self.consume_ident()?;
 
         if let Some(symbol) = self.function_symbols()?.lookup(ident) {
@@ -309,11 +316,7 @@ impl<'src> Parser<'src> {
         Ok(Err(ident))
     }
 
-    fn consume_label(
-        &mut self,
-        symbol: Symbol,
-        function_internal: bool,
-    ) -> ParseResult<'src, &'src str> {
+    fn consume_label(&mut self, symbol: Symbol, function_internal: bool) -> ParseResult<&'src str> {
         let ident = self.consume_ident()?;
         // labels for ifs and such
         if function_internal {
@@ -324,7 +327,7 @@ impl<'src> Parser<'src> {
         Ok(ident)
     }
 
-    pub fn parse(&mut self) -> ParseResult<'src, ParsedProgram> {
+    pub fn parse(&mut self) -> ParseResult<ParsedProgram> {
         enum CodeEntry<'src> {
             Instruction(Instruction),
             WaitingForLabel(&'src str, Instruction),
@@ -512,7 +515,9 @@ impl<'src> Parser<'src> {
                 function_addresses,
             ))
         } else {
-            Err(ParseError::UnresolvedSymbols(unresolved))
+            Err(ParseError::UnresolvedSymbols(HashSet::from_iter(
+                unresolved.iter().copied().map(str::to_owned),
+            )))
         }
     }
 }
@@ -602,10 +607,10 @@ mod tests {
         if let Err(ParseError::UnresolvedSymbols(symbols)) = result {
             assert_eq!(
                 HashSet::from_iter([
-                    "String.new",
-                    "String.appendChar",
-                    "Output.printString",
-                    "Output.println"
+                    "String.new".to_owned(),
+                    "String.appendChar".to_owned(),
+                    "Output.printString".to_owned(),
+                    "Output.println".to_owned()
                 ]),
                 symbols
             );

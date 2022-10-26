@@ -1,6 +1,8 @@
 mod definitions;
 mod keyboard;
+#[allow(dead_code)]
 mod parse;
+#[allow(dead_code)]
 mod simulators;
 
 use definitions::{
@@ -38,8 +40,8 @@ impl From<VMError> for JsValue {
     }
 }
 
-impl From<ParseError<'_>> for JsValue {
-    fn from(error: ParseError<'_>) -> Self {
+impl From<ParseError> for JsValue {
+    fn from(error: ParseError) -> Self {
         JsValue::from(error.to_string())
     }
 }

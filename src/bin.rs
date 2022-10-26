@@ -1,5 +1,7 @@
-use crate::simulators::vm::stdlib::Stdlib;
 use parse::bytecode::{Parser, SourceFile};
+use simulators::execute_script;
+use simulators::vm::script::VMEmulatorCommandParser;
+use simulators::vm::stdlib::Stdlib;
 use simulators::vm::VM;
 
 mod definitions;
@@ -10,6 +12,7 @@ mod simulators;
 use clap::{arg, command, value_parser, ArgAction};
 use std::collections::HashMap;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::process::exit;
 use walkdir::WalkDir;
@@ -165,9 +168,9 @@ fn run(vm: &mut VM, _: usize) {
     }
 }
 
-type FileMap = HashMap<String, String>;
+type FileMap<T = String> = HashMap<T, String>;
 
-fn find_files(dir: &PathBuf) -> (FileMap, FileMap, FileMap) {
+fn find_files(dir: &PathBuf) -> (FileMap, FileMap<PathBuf>, FileMap) {
     let mut vm_files = HashMap::new();
     let mut tst_files = HashMap::new();
     let mut cmp_files = HashMap::new();
@@ -193,10 +196,17 @@ fn find_files(dir: &PathBuf) -> (FileMap, FileMap, FileMap) {
                     $map.insert(name, content);
                 }};
             }
+            macro_rules! add_path {
+                ($map:ident) => {{
+                    let content =
+                        fs::read_to_string(&path).expect(&format!("Could not read '{}'", name));
+                    $map.insert(path, content);
+                }};
+            }
 
             match ext {
                 "vm" => add!(vm_files),
-                "tst" => add!(tst_files),
+                "tst" => add_path!(tst_files),
                 "cmp" => add!(cmp_files),
                 _ => {}
             };
@@ -206,45 +216,21 @@ fn find_files(dir: &PathBuf) -> (FileMap, FileMap, FileMap) {
     (vm_files, tst_files, cmp_files)
 }
 
-fn main() {
-    let dir_arg = arg!([dir] "The directory which contains the code and tests")
-        .required(true)
-        .value_parser(value_parser!(PathBuf));
+pub fn execute(
+    use_vm_stdlib: bool,
+    steps_per_tick: usize,
+    vm_files: FileMap,
+    tst_files: FileMap<PathBuf>,
+    _cmp_files: FileMap,
+    writer: &mut impl io::Write,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let stdlib = if use_vm_stdlib {
+        Stdlib::default()
+    } else {
+        Stdlib::new()
+    };
 
-    let step_arg = arg!(-s --steps <STEPS> "How many steps per tick should be executed")
-        .value_parser(value_parser!(usize))
-        .default_value("30000");
-
-    let use_vm_arg = arg!(--vm "Use the VM stdlib implementations").action(ArgAction::SetTrue);
-
-    let matches = command!()
-        .arg(dir_arg)
-        .arg(step_arg)
-        .arg(use_vm_arg)
-        .get_matches();
-
-    let dir = matches.get_one::<PathBuf>("dir").unwrap();
-    let steps_per_tick = *matches.get_one::<usize>("steps").unwrap();
-    let use_vm_stdlib = *matches.get_one::<bool>("vm").unwrap();
-
-    // load the files .vm, .tst, and .cmp files in the given directory
-    let (vm_files, tst_files, cmp_files) = find_files(dir);
-
-    if tst_files.len() > 1 {
-        println!("Expected 0 or 1 test scripts");
-        exit(1);
-    }
-
-    if cmp_files.len() > 1 {
-        println!("Expected 0 or 1 compare files");
-        exit(2);
-    }
-
-    // let (tst_path, tst_content) = tst_files.into_iter().next().unwrap();
-    // let (cmp_path, cmp_content) = cmp_files.into_iter().next().unwrap();
-
-    let mut vm = VM::new(Stdlib::new());
-
+    let mut vm = VM::new(stdlib.clone());
     let mut programs = vm_files
         .iter()
         .map(|(name, content)| SourceFile::new(name, content))
@@ -271,11 +257,131 @@ fn main() {
         programs.push(SourceFile::new("String.vm", string));
     }
 
-    let program = Parser::with_stdlib(programs, Stdlib::new())
-        .parse()
-        .unwrap();
+    let program = Parser::with_stdlib(programs, stdlib).parse()?;
 
     vm.load(program);
 
-    run(&mut vm, steps_per_tick);
+    if !tst_files.is_empty() {
+        let (tst_name, tst_content) = tst_files.into_iter().next().unwrap();
+        let parser = VMEmulatorCommandParser::create(&tst_name, tst_content.as_str());
+        execute_script(parser, vm, writer)?;
+
+        // let (cmp_path, cmp_content) = cmp_files.into_iter().next().unwrap();
+    } else {
+        run(&mut vm, steps_per_tick);
+    }
+
+    Ok(())
+}
+
+fn main() {
+    let dir_arg = arg!([dir] "The directory which contains the code and tests")
+        .required(true)
+        .value_parser(value_parser!(PathBuf));
+
+    let step_arg = arg!(-s --steps <STEPS> "How many steps per tick should be executed")
+        .value_parser(value_parser!(usize))
+        .default_value("30000");
+
+    let use_vm_arg = arg!(--vm "Use the VM stdlib implementations").action(ArgAction::SetTrue);
+
+    let matches = command!()
+        .arg(dir_arg)
+        .arg(step_arg)
+        .arg(use_vm_arg)
+        .get_matches();
+
+    let dir = matches.get_one::<PathBuf>("dir").unwrap();
+    let steps_per_tick = *matches.get_one::<usize>("steps").unwrap();
+    let use_vm_stdlib = *matches.get_one::<bool>("vm").unwrap();
+
+    // load the files .vm, .tst, and .cmp files in the given directory
+    let (vm_files, mut tst_files, cmp_files) = find_files(dir);
+
+    if cmp_files.len() > 1 {
+        println!("Expected 0 or 1 compare files");
+        exit(2);
+    }
+
+    if tst_files.len() > 2 {
+        println!("Expected no more than 2 test scripts");
+        exit(1);
+    }
+
+    if tst_files.len() == 2 {
+        tst_files.retain(|k, _| {
+            k.file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| n.ends_with("VME.tst"))
+                .unwrap_or(false)
+        });
+    }
+
+    execute(
+        use_vm_stdlib,
+        steps_per_tick,
+        vm_files,
+        tst_files,
+        cmp_files,
+        &mut io::stdout(),
+    )
+    .unwrap();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! vm_test {
+        ($name:expr) => {
+            concat!(concat!(env!("CARGO_MANIFEST_DIR"), "/res/tests/vm/"), $name)
+        };
+    }
+
+    macro_rules! vm_filename_map {
+        ($name:expr) => {{
+            let path = PathBuf::from(vm_test!($name));
+            let content = include_str!(vm_test!($name));
+            let mut m = HashMap::new();
+            m.insert(
+                path.file_name().unwrap().to_str().unwrap().to_string(),
+                content.to_owned(),
+            );
+            m
+        }};
+    }
+
+    macro_rules! vm_filepath_map {
+        ($name:expr) => {{
+            let path = PathBuf::from(vm_test!($name));
+            let content = include_str!(vm_test!($name));
+            let mut m = HashMap::new();
+            m.insert(path, content.to_owned());
+            m
+        }};
+    }
+
+    #[test]
+    fn test_07_memory_access_basic_test() {
+        let vm = vm_filename_map!("BasicTest/BasicTest.vm");
+        let tst = vm_filepath_map!("BasicTest/BasicTestVME.tst");
+        let cmp = vm_filename_map!("BasicTest/BasicTest.cmp");
+
+        let mut w = Vec::new();
+        execute(false, 1, vm, tst, cmp, &mut w).unwrap();
+
+        // TODO: this should not happen here, but instead inside of execute
+        // TODO: how should we handle output-file?
+        //   in theory we shouldn't pass a writer to execute at all and instead let the
+        //   script set the output file
+        //   that would however make everything a bit more inconvenient, especially testing
+        //   and the web UI (if the test scripts will ever be included in there)
+        //
+        //   setting the output-file could just change the writer field in BaseScriptExecutor to
+        //   a filewriter for that file, a behaviour which we could overwrite in tests/web
+        let cmp = include_str!(vm_test!("BasicTest/BasicTest.cmp")).replace("\r\n", "\n");
+        let res = String::from_utf8(w).unwrap();
+
+        assert_eq!(cmp, res);
+    }
 }

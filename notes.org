@@ -1,24 +1,40 @@
 #+title: Notes
 * Tests mit Abgaben
 ** Tetris (Felix Schoeller)
-*** Absturz bei manchen Tetrominos wenn diese gedreht und an den rechten Bildschirmrand bewegt werden
-*** Absturz auch in offiziellem Emulator (bei VM stdlib) -> kein Bug
-*** Wird wahrscheinlich nicht mehr crashen, wenn alle stdlib Funktionen nativ sind
+- Absturz bei manchen Tetrominos wenn diese gedreht und an den rechten Bildschirmrand bewegt werden
+- Absturz auch in offiziellem Emulator (bei VM stdlib) -> kein Bug
+- Wird wahrscheinlich nicht mehr crashen, wenn alle stdlib Funktionen nativ sind
 ** Minesweeper (Patrick Müller)
-*** Absturz nach zu vielen Moves
-*** Absturz auch in offiziellem Emulator -> kein Bug
-*** Fehler war Memory leak, ist im offiziellen Emulator nicht so schnell aufgefallen, da dieser langsamer ist
+- Absturz nach zu vielen Moves
+- Absturz auch in offiziellem Emulator -> kein Bug
+- Fehler war Memory leak, ist im offiziellen Emulator nicht so schnell aufgefallen, da dieser langsamer ist
 ** Doom (Jona Leon Heywinkel)
-*** Absturz wenn man ein bisschen nach Rechts geht, dann nach vorne (in den Dämon)
-*** Absturz auch in offiziellem Emulator -> kein Bug
+- Absturz wenn man ein bisschen nach Rechts geht, dann nach vorne (in den Dämon)
+- Absturz auch in offiziellem Emulator -> kein Bug
 ** Raycaster (Julius Armbrüster)
-*** läuft ohne Probleme
-*** Performance wie in offiziellem Emulator, aber mit weniger jittering
-*** Performance ist sehr abhängig von nativer Screen Implementierung
+- läuft ohne Probleme
+- Performance wie in offiziellem Emulator, aber mit weniger jittering
+- Performance ist sehr abhängig von nativer Screen Implementierung
 * TODOs
 ** TODO CLI [0/2]
 - [ ] Test Script runner [0/2]
-  - [ ] Korrekte ausführung der VM durch tst Skript
+  - [ ] Korrekte ausführung der VM durch tst Skript [0/15]
+    - [ ] 08/FunctionCalls/StaticsTest/StaticsTestVME.tst
+    - [ ] 08/FunctionCalls/SimpleFunction/SimpleFunctionVME.tst
+    - [ ] 08/FunctionCalls/FibonacciElement/FibonacciElementVME.tst
+    - [ ] 08/FunctionCalls/NestedCall/NestedCallVME.tst
+    - [ ] 08/ProgramFlow/FibonacciSeries/FibonacciSeriesVME.tst
+    - [ ] 08/ProgramFlow/BasicLoop/BasicLoopVME.tst
+    - [ ] 12/ArrayTest/ArrayTest.tst
+    - [ ] 12/MemoryTest/MemoryTest.tst
+    - [ ] 12/MemoryTest/MemoryDiag/MemoryDiag.tst
+    - [ ] 12/MathTest/MathTest.tst
+    - [ ] 07/MemoryAccess/StaticTest/StaticTestVME.tst
+    - [ ] 07/MemoryAccess/PointerTest/PointerTestVME.tst
+    - [ ] 07/MemoryAccess/BasicTest/BasicTestVME.tst
+    - [ ] 07/StackArithmetic/SimpleAdd/SimpleAddVME.tst
+    - [ ] 07/StackArithmetic/StackTest/StackTestVME.tst
+  - [ ] Ausgabe mit cmp Datei verlgleichen und ggfs Fehler anzeigen
   - [ ] Output Datei neben cmp Datei speichern
 - [-] interface
   - [X] Skripte aus Ordner laden (cli argument)
@@ -26,7 +42,7 @@
   - [X] mit flag Desktop Modus starten
   - [X] steps per tick als cli argument
 ** TODO CPU Emulator [0/1]
-  - [ ] CPU Emulator implementieren
+- [ ] CPU Emulator implementieren
 ** TODO VM Emulator [9/12]
 - [X] alle commands implementieren
 - [X] command parsing

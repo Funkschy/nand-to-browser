@@ -1,6 +1,7 @@
 pub mod command;
 pub mod error;
 pub mod meta;
+pub mod script;
 pub mod stdlib;
 
 mod calls;
@@ -635,6 +636,7 @@ impl VM {
 }
 
 // UI interaction
+#[allow(dead_code)]
 impl VM {
     /// Similar to step, but this will finish builtin Calls completely instead of having
     /// steps inside of them. This behaviour is the one that the official tools use

@@ -1,6 +1,6 @@
 use super::stdlib::StdlibError;
 use crate::definitions::Address;
-use std::fmt;
+use std::{error, fmt};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VMError {
@@ -40,3 +40,5 @@ impl fmt::Display for VMError {
         }
     }
 }
+
+impl error::Error for VMError {}

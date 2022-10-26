@@ -23,6 +23,8 @@ default = ["console_error_panic_hook"]
 [dependencies]
 # dependencies that are always needed
 lazy_static = "1.4"
+# needed to parse the output format of the test scripts
+regex = "1"
 
 # web dependencies
 wasm-bindgen = { version = "0.2" }

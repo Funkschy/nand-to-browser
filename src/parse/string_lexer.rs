@@ -95,6 +95,25 @@ impl<'src> StringLexer<'src> {
             .get(start_idx..end_idx)
             .map(|s| Spanned::new(start_idx, end_idx, start_line, s))
     }
+
+    pub fn take_until_substr(&mut self, substr: &str) -> Option<Spanned<&'src str>> {
+        let start_line = self.line_nr;
+        let len = substr.len();
+
+        let original_start: usize = *self.chars.peek().map(|(i, _)| i)?;
+        let mut start = original_start;
+        while let Some(s) = self.source.get(start..start + len) {
+            if s == substr {
+                return self
+                    .source
+                    .get(original_start..start)
+                    .map(|s| Spanned::new(original_start, start, start_line, s));
+            }
+            start += 1;
+            self.advance()?;
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -125,5 +144,34 @@ mod test {
             Some(Spanned::new(6, 11, 1, "world")),
             iter.take_chars_while(|c| !c.is_whitespace())
         );
+    }
+
+    #[test]
+    fn test_lexer_take_until_substr_should_return_text_until_substr_if_found() {
+        let mut iter = StringLexer::new("hello world");
+        assert_eq!(
+            Some(Spanned::new(0, 6, 1, "hello ")),
+            iter.take_until_substr("world")
+        );
+
+        assert_eq!(
+            Some(Spanned::new(6, 11, 1, "world")),
+            iter.take_chars_while(|_| true)
+        );
+    }
+
+    #[test]
+    fn test_lexer_take_until_substr_should_return_empty_str_if_substr_is_at_beginning() {
+        let mut iter = StringLexer::new("hello world");
+        assert_eq!(
+            Some(Spanned::new(0, 0, 1, "")),
+            iter.take_until_substr("hello")
+        );
+    }
+
+    #[test]
+    fn test_lexer_take_until_substr_should_return_none_if_not_found() {
+        let mut iter = StringLexer::new("hello world");
+        assert_eq!(None, iter.take_until_substr("test"));
     }
 }

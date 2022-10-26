@@ -60,7 +60,7 @@ const showError = alert;
 // gets recreated
 export function VMEmulatorStepper({app}) {
   const minStepsPerTick = 500;
-  const maxStepsPerTick = 30000;
+  const maxStepsPerTick = 100000;
 
   const [running, setRunning] = useState(false);
   const [stepsPerTick, setStepsPerTick] = useState((maxStepsPerTick - minStepsPerTick) / 2);
