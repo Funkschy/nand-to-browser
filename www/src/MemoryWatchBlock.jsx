@@ -16,9 +16,15 @@ export function MemoryWatchBlock({name, vars}) {
         {
           vars.map((value, index) => {
             return (
-              <div className="watch" key={index}>
-                <span className="watch-label">{index}</span>
-                <span className="watch-content">{value}</span>
+              <div key={index}>
+                <div className="watch with-tooltip">
+                  <span className="watch-label">{index}</span>
+                  <span className="watch-content">{value}</span>
+                </div>
+                {
+                  value.length > 12 &&
+                    <span className="tooltip">{value}</span>
+                }
               </div>
             );
           })

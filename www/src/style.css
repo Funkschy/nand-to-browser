@@ -164,148 +164,161 @@ html, body {
     grid-area: screen;
 }
 
-/* look and feel */
+/* tooltips */
 
-body {
-    font-family: sans-serif;
+.with-tooltip:hover + .tooltip {
+    display: block;
 }
 
-.screen {
-    width: 95%;
-    image-rendering: -moz-crisp-edges;
-    image-rendering: -webkit-crisp-edges;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-
-    outline: black 3px solid;
-}
-
-.code-child {
-    outline: black 3px solid;
-    width: 95%;
-}
-
-.watch-block {
-    width: fit-content;
-}
-
-.watch {
-    width: 15em;
-    outline: black 3px solid;
-    margin: 0.5em;
-    font-family: sans-serif;
-    font-weight: 800;
-    font-size: 1em;
-}
-
-.watch-block > .block-label {
-    font-family: sans-serif;
-    font-weight: 800;
-    font-size: 1em;
-    margin-left: 0.5em;
-}
-
-.watch > .watch-label {
-    width: 46%;
-    display: inline-block;
-    box-sizing: border-box;
-    border-right: black 3px solid;
-    padding: 0.3em;
-}
-
-.watch > .watch-content {
-    width: 54%;
-    display: inline-block;
-    text-align: center;
-}
-
-.btn {
-    display: inline-block;
-    cursor: pointer;
-
-    padding: 0.3em 1.2em;
-    margin: 0.5em;
-
-    border: none;
-    outline: black 3px solid;
-    background: white;
-
+.tooltip {
+    display: none;
     color: black;
-    text-decoration: none;
-    text-align: center;
-    font-family: sans-serif;
-    font-weight: 800;
-    font-size: 1em;
+    z-index: 1000;
 }
 
-.btn:disabled, .btn[disabled] {
-    cursor: not-allowed;
-    color: white;
-    outline: white 3px solid;
-    background: lightgrey;
-}
+  /* look and feel */
 
-td.highlight {
-    color: red;
-}
+  body {
+      font-family: sans-serif;
+  }
 
-input[type=range] {
-    -webkit-appearance: none; /* Hides the builtin slider */
-    width: 100%; /* required for Firefox. */
-    background: transparent;
-}
+  .screen {
+      width: 95%;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-crisp-edges;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
 
-/* for chrome/safari */
+      outline: black 3px solid;
+  }
 
-input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    margin-top: -6px; /* this is needed in webkit for some reason */
-    border-radius: 0;
-    border: none;
-    outline: black 3px solid;
-    background-color: white;
-    width: 10px;
-    height: 20px;
-}
+  .code-child {
+      outline: black 3px solid;
+      width: 95%;
+  }
 
-input[type=range]::-webkit-slider-runnable-track {
-    width: 100%;
-    height: 14.4px;
-    cursor: pointer;
-    border: black 3px solid;
-    background-color: white;
-}
+  .watch-block {
+      width: fit-content;
+  }
 
-/* for firefox */
+  .watch {
+      min-width: 15em;
+      outline: black 3px solid;
+      margin: 0.5em;
+      font-family: sans-serif;
+      font-weight: 800;
+      font-size: 1em;
+  }
 
-input[type=range]::-moz-range-thumb {
-    border-radius: 0;
-    border: none;
-    outline: black 3px solid;
-    background-color: white;
-    width: 10px;
-    height: 20px;
-}
+  .watch-block > .block-label {
+      font-family: sans-serif;
+      font-weight: 800;
+      font-size: 1em;
+      margin-left: 0.5em;
+  }
 
-input[type=range]::-moz-range-track {
-    width: 100%;
-    height: 8.4px;
-    cursor: pointer;
-    border: none;
-    outline: black 3px solid;
-    background-color: white;
-}
+  .watch > .watch-label {
+      width: 46%;
+      display: inline-block;
+      box-sizing: border-box;
+      border-right: black 3px solid;
+      padding: 0.3em;
+  }
 
-input[type=range]:focus {
-    outline: none;
-}
+  .watch > .watch-content {
+      width: 54%;
+      display: inline-block;
+      text-align: center;
+      overflow: clip;
+  }
 
-input[type=range]::-ms-track {
-    width: 100%;
-    cursor: pointer;
+  .btn {
+      display: inline-block;
+      cursor: pointer;
 
-    /* Hides the slider so custom styles can be added */
-    background: transparent;
-    border-color: transparent;
-    color: transparent;
-}
+      padding: 0.3em 1.2em;
+      margin: 0.5em;
+
+      border: none;
+      outline: black 3px solid;
+      background: white;
+
+      color: black;
+      text-decoration: none;
+      text-align: center;
+      font-family: sans-serif;
+      font-weight: 800;
+      font-size: 1em;
+  }
+
+  .btn:disabled, .btn[disabled] {
+      cursor: not-allowed;
+      color: white;
+      outline: white 3px solid;
+      background: lightgrey;
+  }
+
+  td.highlight {
+      color: red;
+  }
+
+  input[type=range] {
+      -webkit-appearance: none; /* Hides the builtin slider */
+      width: 100%; /* required for Firefox. */
+      background: transparent;
+  }
+
+  /* for chrome/safari */
+
+  input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      margin-top: -6px; /* this is needed in webkit for some reason */
+      border-radius: 0;
+      border: none;
+      outline: black 3px solid;
+      background-color: white;
+      width: 10px;
+      height: 20px;
+  }
+
+  input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 14.4px;
+      cursor: pointer;
+      border: black 3px solid;
+      background-color: white;
+  }
+
+  /* for firefox */
+
+  input[type=range]::-moz-range-thumb {
+      border-radius: 0;
+      border: none;
+      outline: black 3px solid;
+      background-color: white;
+      width: 10px;
+      height: 20px;
+  }
+
+  input[type=range]::-moz-range-track {
+      width: 100%;
+      height: 8.4px;
+      cursor: pointer;
+      border: none;
+      outline: black 3px solid;
+      background-color: white;
+  }
+
+  input[type=range]:focus {
+      outline: none;
+  }
+
+  input[type=range]::-ms-track {
+      width: 100%;
+      cursor: pointer;
+
+      /* Hides the slider so custom styles can be added */
+      background: transparent;
+      border-color: transparent;
+      color: transparent;
+  }

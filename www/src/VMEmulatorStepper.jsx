@@ -148,6 +148,7 @@ export function VMEmulatorStepper({app}) {
   const locals = Array.from(app.locals());
   const stack = Array.from(app.stack());
   const args = Array.from(app.args());
+  const calls = Array.from(app.calls());
 
   return (
     <>
@@ -197,6 +198,9 @@ export function VMEmulatorStepper({app}) {
         {
           !running &&
             <div id="watches">
+              <MemoryWatchBlock
+                name="calls"
+                vars={calls}/>
               <MemoryWatchBlock
                 name="locals"
                 vars={locals}/>

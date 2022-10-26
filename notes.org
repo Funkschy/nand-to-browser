@@ -65,7 +65,7 @@
   - [X] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
 - [ ] Debug Infos für lokale Label
 - [ ] checken ob Funktionsname zu Klassennamen passt
-** TODO VM Frontend [13/22]
+** TODO VM Frontend [14/22]
 - [X] vm step aus frontend aufrufen
 - [X] display speicher in canvas rendern
 - [X] keyboard interaktion in vm speicher schreiben
@@ -79,7 +79,7 @@
 - [X] Anzeige des Stacks
 - [X] Anzeige der Locals
 - [X] Anzeige der Arguments
-- [ ] Anzeige des Call stacks
+- [X] Anzeige des Call stacks
 - [ ] Anzeige der Statics
 - [ ] Anzeige des globalen RAMS
 - [ ] Anzeige von This

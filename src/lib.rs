@@ -102,6 +102,14 @@ impl App {
         Ok(())
     }
 
+    pub fn calls(&self) -> Vec<JsValue> {
+        self.vm
+            .call_stack_names()
+            .into_iter()
+            .map(JsValue::from_str)
+            .collect()
+    }
+
     pub fn locals(&self) -> Vec<Word> {
         if let Some(locals) = self.vm.locals() {
             locals.to_vec()
