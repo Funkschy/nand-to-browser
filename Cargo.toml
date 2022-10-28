@@ -36,7 +36,6 @@ console_error_panic_hook = { version = "0.1.7", optional = true }
 # for the desktop version
 sdl2 = { version = "0.35.2", optional = true }
 clap = { version = "4.0.17", features = ["cargo"] }
-walkdir = { version = "2" }
 
 [profile.release]
 # optimize for small code size to reduce the download time on first page load

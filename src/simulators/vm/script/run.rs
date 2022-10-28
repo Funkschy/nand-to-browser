@@ -1,9 +1,9 @@
 use crate::definitions::{ARG, LCL, SP, THAT, THIS};
 use crate::parse::bytecode::{Parser, SourceFile};
 use crate::parse::script::tst::{VMEmulatorCommand, VMSetTarget};
-use crate::simulators::vm::stdlib::Stdlib;
-use crate::simulators::vm::VM;
-use crate::simulators::{ExecResult, SimulatorExecutor};
+use crate::simulators::vm::stdlib::{Stdlib, StdlibError};
+use crate::simulators::vm::{VMError, VM};
+use crate::simulators::{ExecResult, Halt, SimulatorExecutor};
 
 use super::parse_set_target;
 
@@ -70,7 +70,13 @@ impl SimulatorExecutor<VMEmulatorCommand> for VM {
 
                 self.load(program);
             }
-            VMEmulatorCommand::Step => self.step()?,
+            VMEmulatorCommand::Step => {
+                let result = self.step();
+                if let Err(VMError::StdlibError(StdlibError::Halt)) = &result {
+                    return Err(Halt.into());
+                }
+                result?;
+            }
             VMEmulatorCommand::Set(target, value) => match target {
                 VMSetTarget::Local(Some(index)) => self.set_mem_indirect(LCL, index, value)?,
                 VMSetTarget::Local(None) => self.set_mem(LCL, value)?,

@@ -16,6 +16,7 @@ pub enum ParseError {
     Expected(Token),
     CommandStartingWithSymbol,
     CommandStartingWithInt,
+    CommandStartingWithString,
     UnterminatedCommand,
     NotASimulatorCommand(String),
     CouldNotParseOutputListEntry,

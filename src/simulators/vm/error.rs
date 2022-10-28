@@ -19,6 +19,10 @@ pub enum VMError {
 
 impl From<StdlibError> for VMError {
     fn from(e: StdlibError) -> Self {
+        // dont't create error linked lists
+        if let StdlibError::VMError(vm_error) = e {
+            return *vm_error;
+        }
         VMError::StdlibError(e)
     }
 }

@@ -12,10 +12,9 @@ mod simulators;
 use clap::{arg, command, value_parser, ArgAction};
 use std::collections::HashMap;
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::exit;
-use walkdir::WalkDir;
 
 #[cfg(feature = "desktop")]
 fn run(vm: &mut VM, steps_per_tick: usize) {
@@ -170,17 +169,13 @@ fn run(vm: &mut VM, _: usize) {
 
 type FileMap<T = String> = HashMap<T, String>;
 
-fn find_files(dir: &PathBuf) -> (FileMap, FileMap<PathBuf>, FileMap) {
+fn find_files(dir: &PathBuf) -> Result<(FileMap, FileMap<PathBuf>), Box<dyn std::error::Error>> {
     let mut vm_files = HashMap::new();
     let mut tst_files = HashMap::new();
-    let mut cmp_files = HashMap::new();
 
-    for entry in WalkDir::new(dir)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| !e.file_type().is_dir())
-    {
-        let path = entry.into_path();
+    // TODO: only execute test when a flag is set, but in that case ensure that there is a tst script
+    for entry in fs::read_dir(dir)? {
+        let path = entry?.path();
         let filename = path.file_name();
         let extension = path.extension();
 
@@ -188,41 +183,31 @@ fn find_files(dir: &PathBuf) -> (FileMap, FileMap<PathBuf>, FileMap) {
             filename.and_then(|x| x.to_str()),
             extension.and_then(|x| x.to_str()),
         ) {
-            macro_rules! add {
-                ($map:ident) => {{
-                    let name = name.to_owned();
-                    let content =
-                        fs::read_to_string(&path).expect(&format!("Could not read '{}'", name));
-                    $map.insert(name, content);
-                }};
-            }
-            macro_rules! add_path {
-                ($map:ident) => {{
-                    let content =
-                        fs::read_to_string(&path).expect(&format!("Could not read '{}'", name));
-                    $map.insert(path, content);
-                }};
-            }
-
+            let read = || fs::read_to_string(&path).expect(&format!("Could not read '{}'", name));
             match ext {
-                "vm" => add!(vm_files),
-                "tst" => add_path!(tst_files),
-                "cmp" => add!(cmp_files),
+                "vm" => {
+                    let name = name.to_owned();
+                    let content = read();
+                    vm_files.insert(name, content);
+                }
+                "tst" => {
+                    let content = read();
+                    tst_files.insert(path, content);
+                }
                 _ => {}
             };
         }
     }
 
-    (vm_files, tst_files, cmp_files)
+    Ok((vm_files, tst_files))
 }
 
-pub fn execute(
+pub fn execute<'w>(
     use_vm_stdlib: bool,
     steps_per_tick: usize,
     vm_files: FileMap,
     tst_files: FileMap<PathBuf>,
-    _cmp_files: FileMap,
-    writer: &mut impl io::Write,
+    writer: impl Into<Option<&'w mut dyn Write>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let stdlib = if use_vm_stdlib {
         Stdlib::default()
@@ -265,8 +250,6 @@ pub fn execute(
         let (tst_name, tst_content) = tst_files.into_iter().next().unwrap();
         let parser = VMEmulatorCommandParser::create(&tst_name, tst_content.as_str());
         execute_script(parser, vm, writer)?;
-
-        // let (cmp_path, cmp_content) = cmp_files.into_iter().next().unwrap();
     } else {
         run(&mut vm, steps_per_tick);
     }
@@ -284,24 +267,24 @@ fn main() {
         .default_value("30000");
 
     let use_vm_arg = arg!(--vm "Use the VM stdlib implementations").action(ArgAction::SetTrue);
+    let use_stdout_arg =
+        arg!(--"print-outfile" "Use stdout instead of the output-file in the script runner")
+            .action(ArgAction::SetTrue);
 
     let matches = command!()
         .arg(dir_arg)
         .arg(step_arg)
         .arg(use_vm_arg)
+        .arg(use_stdout_arg)
         .get_matches();
 
     let dir = matches.get_one::<PathBuf>("dir").unwrap();
     let steps_per_tick = *matches.get_one::<usize>("steps").unwrap();
     let use_vm_stdlib = *matches.get_one::<bool>("vm").unwrap();
+    let use_stdout = *matches.get_one::<bool>("print-outfile").unwrap();
 
-    // load the files .vm, .tst, and .cmp files in the given directory
-    let (vm_files, mut tst_files, cmp_files) = find_files(dir);
-
-    if cmp_files.len() > 1 {
-        println!("Expected 0 or 1 compare files");
-        exit(2);
-    }
+    // load the files .vm and .tst, files in the given directory
+    let (vm_files, mut tst_files) = find_files(dir).unwrap();
 
     if tst_files.len() > 2 {
         println!("Expected no more than 2 test scripts");
@@ -317,15 +300,15 @@ fn main() {
         });
     }
 
-    execute(
-        use_vm_stdlib,
-        steps_per_tick,
-        vm_files,
-        tst_files,
-        cmp_files,
-        &mut io::stdout(),
-    )
-    .unwrap();
+    let mut out = io::stdout();
+    let writer = if use_stdout {
+        let out: &mut (dyn Write) = &mut out;
+        Some(out)
+    } else {
+        None
+    };
+
+    execute(use_vm_stdlib, steps_per_tick, vm_files, tst_files, writer).unwrap();
 }
 
 #[cfg(test)]
@@ -365,22 +348,14 @@ mod tests {
     fn test_07_memory_access_basic_test() {
         let vm = vm_filename_map!("BasicTest/BasicTest.vm");
         let tst = vm_filepath_map!("BasicTest/BasicTestVME.tst");
-        let cmp = vm_filename_map!("BasicTest/BasicTest.cmp");
 
-        let mut w = Vec::new();
-        execute(false, 1, vm, tst, cmp, &mut w).unwrap();
+        let mut v = Vec::new();
+        let w: &mut (dyn Write) = &mut v;
+        execute(false, 1, vm, tst, w).unwrap();
 
-        // TODO: this should not happen here, but instead inside of execute
-        // TODO: how should we handle output-file?
-        //   in theory we shouldn't pass a writer to execute at all and instead let the
-        //   script set the output file
-        //   that would however make everything a bit more inconvenient, especially testing
-        //   and the web UI (if the test scripts will ever be included in there)
-        //
-        //   setting the output-file could just change the writer field in BaseScriptExecutor to
-        //   a filewriter for that file, a behaviour which we could overwrite in tests/web
+        // this would usually not happen here, but instead inside of execute
         let cmp = include_str!(vm_test!("BasicTest/BasicTest.cmp")).replace("\r\n", "\n");
-        let res = String::from_utf8(w).unwrap();
+        let res = String::from_utf8(v).unwrap();
 
         assert_eq!(cmp, res);
     }

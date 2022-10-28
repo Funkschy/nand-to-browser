@@ -34,6 +34,11 @@ pub enum Token {
     Symbol(Symbol),
     Identifier(String),
     IntLiteral(i32),
+    StringLiteral(String),
+}
+
+pub fn string_kind() -> Discriminant<Token> {
+    discriminant(&Token::StringLiteral(String::new()))
 }
 
 pub fn int_kind() -> Discriminant<Token> {
@@ -164,6 +169,16 @@ impl<'tst> Lexer<'tst> {
                     }
                     _ => None,
                 }
+            }
+            '"' => {
+                self.walker.advance()?;
+                let spanned = self.walker.take_chars_while(|c| c != '"')?;
+                let closing = self.walker.advance()?;
+                if closing.content != '"' {
+                    return None;
+                }
+
+                Some(spanned.with_new_content(Token::StringLiteral(spanned.content.to_owned())))
             }
             _ => {
                 let spanned = self.walker.advance()?;

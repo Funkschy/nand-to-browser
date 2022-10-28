@@ -16,29 +16,29 @@
 - Performance wie in offiziellem Emulator, aber mit weniger jittering
 - Performance ist sehr abhängig von nativer Screen Implementierung
 * TODOs
-** TODO CLI [0/2]
-- [ ] Test Script runner [0/2]
-  - [ ] Korrekte ausführung der VM durch tst Skript [0/15]
-    - [ ] 08/FunctionCalls/StaticsTest/StaticsTestVME.tst
-    - [ ] 08/FunctionCalls/SimpleFunction/SimpleFunctionVME.tst
-    - [ ] 08/FunctionCalls/FibonacciElement/FibonacciElementVME.tst
-    - [ ] 08/FunctionCalls/NestedCall/NestedCallVME.tst
-    - [ ] 08/ProgramFlow/FibonacciSeries/FibonacciSeriesVME.tst
-    - [ ] 08/ProgramFlow/BasicLoop/BasicLoopVME.tst
-    - [ ] 12/ArrayTest/ArrayTest.tst
-    - [ ] 12/MemoryTest/MemoryTest.tst
-    - [ ] 12/MemoryTest/MemoryDiag/MemoryDiag.tst
-    - [ ] 12/MathTest/MathTest.tst
-    - [ ] 07/MemoryAccess/StaticTest/StaticTestVME.tst
-    - [ ] 07/MemoryAccess/PointerTest/PointerTestVME.tst
-    - [ ] 07/MemoryAccess/BasicTest/BasicTestVME.tst
-    - [ ] 07/StackArithmetic/SimpleAdd/SimpleAddVME.tst
-    - [ ] 07/StackArithmetic/StackTest/StackTestVME.tst
-  - [ ] Ausgabe mit cmp Datei verlgleichen und ggfs Fehler anzeigen
-  - [ ] Output Datei neben cmp Datei speichern
-- [-] interface
+** TODO CLI [2/2]
+- [X] Test Script runner [3/3]
+  - [X] Korrekte ausführung der VM durch tst Skript [15/15]
+    - [X] 07/MemoryAccess/StaticTest/StaticTestVME.tst
+    - [X] 07/MemoryAccess/PointerTest/PointerTestVME.tst
+    - [X] 07/MemoryAccess/BasicTest/BasicTestVME.tst
+    - [X] 07/StackArithmetic/SimpleAdd/SimpleAddVME.tst
+    - [X] 07/StackArithmetic/StackTest/StackTestVME.tst
+    - [X] 08/FunctionCalls/StaticsTest/StaticsTestVME.tst
+    - [X] 08/FunctionCalls/SimpleFunction/SimpleFunctionVME.tst
+    - [X] 08/FunctionCalls/FibonacciElement/FibonacciElementVME.tst
+    - [X] 08/FunctionCalls/NestedCall/NestedCallVME.tst
+    - [X] 08/ProgramFlow/FibonacciSeries/FibonacciSeriesVME.tst
+    - [X] 08/ProgramFlow/BasicLoop/BasicLoopVME.tst
+    - [X] 12/ArrayTest/ArrayTest.tst
+    - [X] 12/MemoryTest/MemoryTest.tst
+    - [X] 12/MemoryTest/MemoryDiag/MemoryDiag.tst
+    - [X] 12/MathTest/MathTest.tst
+  - [X] Ausgabe mit cmp Datei verlgleichen und ggfs Fehler anzeigen
+  - [X] Output Datei neben cmp Datei speichern
+- [X] interface
   - [X] Skripte aus Ordner laden (cli argument)
-  - [ ] Tests ausführen wenn vorhanden (Struktur wie in projects Ordner)
+  - [X] Tests ausführen wenn vorhanden (Struktur wie in projects Ordner)
   - [X] mit flag Desktop Modus starten
   - [X] steps per tick als cli argument
 ** TODO CPU Emulator [0/1]

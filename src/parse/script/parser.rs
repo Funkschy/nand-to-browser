@@ -1,4 +1,4 @@
-use super::lexer::{ident_kind, int_kind, Keyword, Lexer, Symbol, Token};
+use super::lexer::{ident_kind, int_kind, string_kind, Keyword, Lexer, Symbol, Token};
 use super::tst::{Command, CommandKind, OutputListEntry, SimulatorCommand, Terminator};
 use super::{CmdResult, ParseError, ParseResult, SimulatorCommandParser, Spanned, TokResult};
 use lazy_static::lazy_static;
@@ -37,7 +37,7 @@ where
     }
 
     fn controller_command(&mut self, kw: Spanned<Keyword>) -> CmdResult<SimCmd> {
-        use CommandKind::{CompareTo, Output, OutputFile, OutputList, Repeat};
+        use CommandKind::{CompareTo, Echo, Output, OutputFile, OutputList, Repeat};
 
         match kw.content {
             Keyword::Repeat => {
@@ -129,6 +129,18 @@ where
 
                 self.consume_terminator(Spanned::new(start_idx, end_idx, line_nr, cmd))
             }
+            Keyword::Echo => {
+                let token = self.consume_token_kind(string_kind())?;
+                let mut spanned = token.with_new_content(());
+                let cmd = if let Token::StringLiteral(literal) = token.content {
+                    Command::new(Echo(literal))
+                } else {
+                    unreachable!()
+                };
+
+                spanned.start_idx = kw.start_idx;
+                self.consume_terminator(spanned.with_new_content(cmd))
+            }
             _ => unimplemented!("Keyword {:?} not handled", kw),
         }
     }
@@ -209,6 +221,7 @@ where
             }
             Token::Symbol(_) => Err(ParseError::CommandStartingWithSymbol),
             Token::IntLiteral(_) => Err(ParseError::CommandStartingWithInt),
+            Token::StringLiteral(_) => Err(ParseError::CommandStartingWithString),
         }
     }
 

@@ -112,10 +112,10 @@ pub enum CommandKind<SimCmd: SimulatorCommand> {
         times: usize,
         block: Vec<Command<SimCmd>>,
     },
+    Echo(String),
     // Breakpoint,
     // ClearBreakpoints,
     // EndScript,
-    // Echo,
     // ClearEcho,
 }
 
