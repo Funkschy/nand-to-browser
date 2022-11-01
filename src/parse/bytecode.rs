@@ -1,4 +1,6 @@
+use super::symbols::SymbolTable;
 use super::{Spanned, StringLexer};
+use crate::definitions::Symbol;
 use crate::simulators::vm::command::{ByteCodeParseError, Instruction, Segment};
 use crate::simulators::vm::meta::{FunctionInfo, MetaInfo};
 use crate::simulators::vm::stdlib::Stdlib;
@@ -134,50 +136,6 @@ impl<'src> Lexer<'src> {
                 Ok(spanned.with_new_content(Token::IntLiteral(parsed_int)))
             }
             _ => Err(ParseError::UnexpectedCharacter(current_char)),
-        }
-    }
-}
-
-type Symbol = u16;
-
-struct SymbolTable {
-    counter: Symbol,
-    symbols: HashMap<String, Symbol>,
-}
-
-impl SymbolTable {
-    /// Lookup a value in the symbol table
-    ///
-    /// if the value does not exist we create a new symbol for it
-    /// and assume that this is the definition or that it will be defined later
-    fn lookup<'s>(&mut self, ident: impl Into<&'s str>) -> Option<Symbol> {
-        self.symbols.get(ident.into()).copied()
-    }
-
-    fn lookup_or_insert(&mut self, ident: impl Into<String>) -> Symbol {
-        *self.symbols.entry(ident.into()).or_insert_with(|| {
-            let value = self.counter;
-            self.counter += 1;
-            value
-        })
-    }
-
-    /// Set a value in the Symbol Table explicitly
-    ///
-    /// this is only makes sense for Label instructions, because the Symbol in that case should
-    /// be the position inside the bytecode
-    fn set(&mut self, ident: impl Into<String>, value: Symbol) {
-        self.symbols.insert(ident.into(), value);
-    }
-}
-
-impl Default for SymbolTable {
-    fn default() -> Self {
-        let symbols = HashMap::with_capacity(64);
-
-        Self {
-            counter: 16, // don't overwrite SP/LCL/...
-            symbols,
         }
     }
 }

@@ -11,6 +11,7 @@ use std::io::Write;
 use std::marker::PhantomData;
 use std::path::PathBuf;
 
+pub mod cpu;
 pub mod vm;
 
 #[derive(Debug, PartialEq, Eq)]

@@ -114,6 +114,7 @@ impl VM {
         }
     }
 
+    #[inline]
     fn mem(&self, address: Address) -> VMResult<Word> {
         self.memory
             .get(address)
