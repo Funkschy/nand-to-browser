@@ -1,3 +1,5 @@
+use crate::definitions::{ARG, KBD, LCL, SCREEN_START, SP, THAT, THIS};
+
 use super::symbols::SymbolTable;
 use super::{Spanned, StringLexer};
 use crate::definitions::Symbol;
@@ -80,10 +82,10 @@ enum Token<'src> {
 
 impl<'src> Token<'src> {
     pub fn is_binary_operator(&self) -> bool {
-        match self {
-            Self::Plus | Self::Minus | Self::Ampersand | Self::Pipe => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            Self::Plus | Self::Minus | Self::Ampersand | Self::Pipe
+        )
     }
 }
 
@@ -218,12 +220,14 @@ impl<'src> Iterator for Lexer<'src> {
 }
 
 pub struct SourceFile<'src> {
+    name: String,
     lexer: Peekable<Lexer<'src>>,
 }
 
 impl<'src> SourceFile<'src> {
-    pub fn new(source: &'src str) -> Self {
+    pub fn new(name: impl Into<String>, source: &'src str) -> Self {
         Self {
+            name: name.into(),
             lexer: Lexer::new(source).peekable(),
         }
     }
@@ -236,10 +240,33 @@ pub struct Parser<'src> {
 
 impl<'src> Parser<'src> {
     pub fn new(source: SourceFile<'src>) -> Self {
-        Self {
-            source,
-            symbols: SymbolTable::default(),
-        }
+        let mut symbols = SymbolTable::default();
+
+        symbols.set("R0", 0);
+        symbols.set("R1", 1);
+        symbols.set("R2", 2);
+        symbols.set("R3", 3);
+        symbols.set("R4", 4);
+        symbols.set("R5", 5);
+        symbols.set("R6", 6);
+        symbols.set("R7", 7);
+        symbols.set("R8", 8);
+        symbols.set("R9", 9);
+        symbols.set("R10", 10);
+        symbols.set("R11", 11);
+        symbols.set("R12", 12);
+        symbols.set("R13", 13);
+        symbols.set("R14", 14);
+        symbols.set("R15", 15);
+        symbols.set("SP", SP as Symbol);
+        symbols.set("LCL", LCL as Symbol);
+        symbols.set("ARG", ARG as Symbol);
+        symbols.set("THIS", THIS as Symbol);
+        symbols.set("THAT", THAT as Symbol);
+        symbols.set("SCREEN", SCREEN_START as Symbol);
+        symbols.set("KBD", KBD as Symbol);
+
+        Self { source, symbols }
     }
 
     fn next_token(&mut self) -> ParseResult<Token<'src>> {
@@ -490,7 +517,7 @@ mod tests {
 
     #[test]
     fn test_minus_one_edge_case() {
-        let mut parser = Parser::new(SourceFile::new("D=A-1"));
+        let mut parser = Parser::new(SourceFile::new("Test.asm", "D=A-1"));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -502,7 +529,7 @@ mod tests {
             )])
         );
 
-        let mut parser = Parser::new(SourceFile::new("D = A - 1 "));
+        let mut parser = Parser::new(SourceFile::new("Test.asm", "D = A - 1 "));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -517,7 +544,7 @@ mod tests {
 
     #[test]
     fn test_minus_one_edge_case_with_jump() {
-        let mut parser = Parser::new(SourceFile::new("D=A-1;JEQ"));
+        let mut parser = Parser::new(SourceFile::new("Test.asm", "D=A-1;JEQ"));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -529,7 +556,7 @@ mod tests {
             )])
         );
 
-        let mut parser = Parser::new(SourceFile::new("D = A - 1 ; JEQ "));
+        let mut parser = Parser::new(SourceFile::new("Test.asm", "D = A - 1 ; JEQ "));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -544,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_parse_multiple() {
-        let mut parser = Parser::new(SourceFile::new("D=A-1;JEQ\nA=-1"));
+        let mut parser = Parser::new(SourceFile::new("Test.asm", "D=A-1;JEQ\nA=-1"));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -595,7 +622,7 @@ mod tests {
             @END
             0;JMP // infinite loop"#;
 
-        let mut parser = Parser::new(SourceFile::new(src));
+        let mut parser = Parser::new(SourceFile::new("Test.asm", src));
         let instructions = parser.parse();
 
         assert_eq!(

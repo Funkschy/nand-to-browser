@@ -183,7 +183,9 @@ fn find_files(dir: &PathBuf) -> Result<(FileMap, FileMap<PathBuf>), Box<dyn std:
             filename.and_then(|x| x.to_str()),
             extension.and_then(|x| x.to_str()),
         ) {
-            let read = || fs::read_to_string(&path).expect(&format!("Could not read '{}'", name));
+            let read = || {
+                fs::read_to_string(&path).unwrap_or_else(|_| panic!("Could not read '{}'", name))
+            };
             match ext {
                 "vm" => {
                     let name = name.to_owned();

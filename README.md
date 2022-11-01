@@ -41,11 +41,17 @@ cargo build --release
 
 ## Usage
 
+### VM
 ``` shell
-target/release/n2t <DIR> # dir should contain the VM files, and at most one Test and one Compare script
+target/release/vm <DIR> # dir should contain the VM files, and at most one Test and one Compare script
 ```
 
-To get a list of all available options just run `target/release/n2t --help`
+### CPU
+``` shell
+target/release/cpu <DIR> # dir should contain the asm file, and at most one Test and one Compare script
+```
+
+To get a list of all available options just run `target/release/[cpu|vm] --help`
 
 # Progress
 

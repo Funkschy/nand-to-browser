@@ -85,6 +85,14 @@ pub enum VMSetTarget {
     Ram(usize),
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum CpuSetTarget {
+    A,
+    D,
+    PC,
+    Ram(usize),
+    Rom(usize),
+}
 pub trait SimulatorCommand: Debug + PartialEq + Eq + Clone {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -94,12 +102,15 @@ pub enum VMEmulatorCommand {
     Set(VMSetTarget, Word),
 }
 
-impl SimulatorCommand for VMEmulatorCommand {}
-
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub enum CPUEmulatorCommand {}
+pub enum CpuEmulatorCommand {
+    Load(PathBuf),
+    TickTock,
+    Set(CpuSetTarget, Word),
+}
 
-impl SimulatorCommand for CPUEmulatorCommand {}
+impl SimulatorCommand for VMEmulatorCommand {}
+impl SimulatorCommand for CpuEmulatorCommand {}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum CommandKind<SimCmd: SimulatorCommand> {

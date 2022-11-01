@@ -1,13 +1,14 @@
 use crate::definitions::{Address, Word, MEM_SIZE};
 use command::{Computation, Instruction, Jump, Register};
-pub use error::CPUError;
+pub use error::CpuError;
 
 pub mod command;
 pub mod error;
+pub mod script;
 
-pub type CPUResult<T = ()> = Result<T, CPUError>;
+pub type CpuResult<T = ()> = Result<T, CpuError>;
 
-pub struct CPU {
+pub struct Cpu {
     pc: usize,
     program: Vec<Instruction>,
 
@@ -16,7 +17,7 @@ pub struct CPU {
     memory: Box<[Word; MEM_SIZE]>,
 }
 
-impl Default for CPU {
+impl Default for Cpu {
     fn default() -> Self {
         Self {
             pc: 0,
@@ -28,25 +29,25 @@ impl Default for CPU {
     }
 }
 
-impl CPU {
+impl Cpu {
     #[inline]
-    fn mem(&self, address: Address) -> CPUResult<Word> {
+    fn mem(&self, address: Address) -> CpuResult<Word> {
         self.memory
             .get(address)
             .copied()
-            .ok_or(CPUError::IllegalMemoryAddress(address))
+            .ok_or(CpuError::IllegalMemoryAddress(address))
     }
 
     #[inline]
-    fn set_mem(&mut self, address: Address, value: Word) -> CPUResult {
+    fn set_mem(&mut self, address: Address, value: Word) -> CpuResult {
         *self
             .memory
             .get_mut(address)
-            .ok_or(CPUError::IllegalMemoryAddress(address))? = value;
+            .ok_or(CpuError::IllegalMemoryAddress(address))? = value;
         Ok(())
     }
 
-    fn reg(&self, reg: Register) -> CPUResult<Word> {
+    fn reg(&self, reg: Register) -> CpuResult<Word> {
         match reg {
             Register::A => Ok(self.a),
             Register::D => Ok(self.d),
@@ -64,7 +65,7 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self) -> CPUResult {
+    pub fn step(&mut self) -> CpuResult {
         macro_rules! binary {
             ( $r1:expr, $op:tt, $r2:expr) => {{
                 // cast up to i32 so that no overflow checks get triggered in debug mode
@@ -87,7 +88,7 @@ impl CPU {
         let instr = *self
             .program
             .get(self.pc)
-            .ok_or(CPUError::IllegalProgramCounter(self.pc))?;
+            .ok_or(CpuError::IllegalProgramCounter(self.pc))?;
 
         match instr {
             Instruction::A(value) => {
@@ -171,10 +172,10 @@ mod tests {
             @END
             0;JMP // Infinite loop"#;
 
-        let mut parser = Parser::new(SourceFile::new(src));
+        let mut parser = Parser::new(SourceFile::new("Test.asm", src));
         let program = parser.parse().unwrap();
 
-        let mut cpu = CPU::default();
+        let mut cpu = Cpu::default();
         cpu.load(program);
 
         for _ in 0..10000 {

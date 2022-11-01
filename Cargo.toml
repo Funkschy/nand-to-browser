@@ -7,8 +7,12 @@ description = "A Nand to Tetris Emulator implementation that can run in the brow
 license-file = "LICENSE"
 
 [[bin]]
-name = "n2t"
-path = "src/bin.rs"
+name = "vm"
+path = "src/vm.rs"
+
+[[bin]]
+name = "cpu"
+path = "src/cpu.rs"
 
 # wasm packages must be cdylib
 [lib]

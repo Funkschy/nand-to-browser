@@ -65,6 +65,7 @@
   - [X] keine [] Zugriffe in Listen (außer absolut sicher, wie z.B. in stdlib)
 - [ ] Debug Infos für lokale Label
 - [ ] checken ob Funktionsname zu Klassennamen passt
+- [ ] bei unknown token ParseError dateinamen anzeigen (oft nicht-vm datei)
 ** TODO VM Frontend [14/22]
 - [X] vm step aus frontend aufrufen
 - [X] display speicher in canvas rendern

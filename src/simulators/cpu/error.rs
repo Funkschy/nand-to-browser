@@ -3,12 +3,12 @@ use std::error;
 use std::fmt;
 
 #[derive(Debug, Eq, PartialEq)]
-pub enum CPUError {
+pub enum CpuError {
     IllegalProgramCounter(usize),
     IllegalMemoryAddress(Address),
 }
 
-impl fmt::Display for CPUError {
+impl fmt::Display for CpuError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::IllegalProgramCounter(pc) => write!(f, "Program counter out of bounds: {}", pc),
@@ -17,4 +17,4 @@ impl fmt::Display for CPUError {
     }
 }
 
-impl error::Error for CPUError {}
+impl error::Error for CpuError {}
