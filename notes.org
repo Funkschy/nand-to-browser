@@ -98,30 +98,106 @@
 - [ ] Benchmark: da0ce4500f653afe7892395c63414eb1d05ff730 vs Nachfolger
 - [ ] Benchmark: 3fcc146df140f95a7be8290d897cc46b4dbccc59 vs Nachfolger
 - [X] Dependency section in Readme (auch für Desktop)
-* Themen für die BA
-** Erklären
-*** originale Tools / was ist nand 2 tetris
-**** folien alle creative commons
-*** rust
-*** wasm
-*** react
-** Reimplementierung der VM mit deutlich besserer Performance/Stabilität
-*** step weise Ausführung
-*** bytecode design
-**** enum vs union
-*** parsing
-*** keyboard handling
-**** bug für bug compatibility
-** Native stdlib
-*** Protokoll für Pausiren/Fortsetzen der builtin Funktionen
-*** kompliziert in wasm, da keine Thread.wait möglich
-*** state machine ähnlich zu async-await
-** Web UI (React & CSS)
-*** auch Einleitung für react geben
-*** adaptiv (für verschiedene screen größen)
-*** bytecode view & memory watches
-*** rendering in rust -> canvas.putImageData
-** Tracing für Entwickler
-*** Desktop Modus mit SDL (conditional compilation)
-** Testing
-*** Portierung der test Skripte zu rust unit tests
+* BA Inhaltsverzeichnis
+** Generelles und Technologien
+- Was ist Nand to Tetris
+- Warum macht es Sinn, die Nand to Tetris tools (im Browser) neu zu schreiben
+  - UI auf großen Bildschirmen
+  - Performance
+  - kein Drang mehr die Tools zu installieren (zumindest nicht um VM Spiele zu spielen)
+- Was ist Wasm und wie unterscheidet es sich von JS
+- Was ist Rust
+- Welche Vorteile hat eine Implementierung in Rust gegenüber JS
+  - Performance
+  - Robuster durch starke statische Typisierung
+- Welche Vorteile hat Rust gegenüber anderen Sprachen die zu Wasm compilen können
+  - kleine runtime & kein GC
+  - sehr schnell
+- Was ist React und welche Vorteile bietet es gegenüber rohem JS
+** Virtuelle Machinen, Parser und ihr Design
+- Wie funktionieren VMs und Bytecode
+  - simples beispiel schrittweise erklären: schleife die [1, 3] addiert
+- Wie kann man eine VM in Rust implementieren
+  - design entscheidung: enum vs union
+  - stepweise ausführung mit pattern matching über enum
+- Wie kann man Parser in Rust implementieren
+  - Lexer & Parser
+  - Peekable
+** Abgrenzung zu Fremdleistungen
+- VM/CPU & TST Design aus Nand to Tetris
+  - Spezifikationen aus "The Elements of Computing Systems"
+- Dependencies
+  - Rust
+    - lazy_static (hack um rust weniger nervig zu machen)
+    - regex
+    - wasm-bindgen (rust code für JS zugänglich machen)
+    - web-sys (js stdlib in Rust nutzen)
+    - console_error_panic_hook (rust panics zu JS exeptions)
+    - sdl2 (native UI (eigentlich nur zum Testen))
+    - clap (CLI parsing)
+  - wasm-pack (rust -> wasm Kompilierung einfacher machen)
+  - react & npm (UI)
+- Implementierung komplett eigen
+  - Ansatz auch an einigen Stellen sehr anders als die offiziellen Tools (z.B. native stdlib, parsing, UI)
+** Vorgehen
+- Wie war mein generelles Vorgehen
+  - zuerst VM basics test driven auf dem Desktop (ohne wasm) implementieren
+    - dafür zuerst bytecode parser -> Benutzung in VM tests
+    - native Rust stdlib erst als alle basics funktioniert haben (vorher offizielle VM Implementierung)
+  - testing durch unit tests
+  - testing mittels tst scripts aus dem Kurs (erst als rust unit tests, später auch via tst executor)
+  - dann frontend unabhängig entwickeln, mit dünnem compatibility layer (lib.rs)
+- Architektur
+  - verschiedene Programme für CPU, VM
+  - Emulatoren komplett unabhängig von Frontend
+    - erlaubt verschiedene Frontends (SDL)
+    - oder auch headless mode, z.B. für die tst Scripts
+    - rendering und keyboard handling aber in rust für performance und DRY
+  - Beispiel für Rust Architektur anhand von tst file parser/executor
+    - traits als Alternative für Vererbung
+    - wenig code Duplikation
+    - Kombination aus Parser und Executor muss zusammen passen (compile time check)
+  - Implementierung der Stdlib
+    - step-weise Ausführung -> komplikationen bei stdlib Implementierung
+    - Funktionen müssen pausierbar sein (ohne aber den Thread zu blockieren)
+    - Rust Funktionen müssen VM Funktionen rufen können
+    - VM Funktionen müssen Rust Funktionen rufen können
+    - Beispiel des Ablaufs anhand einer simplen Funktion wie Sys.wait
+    - Beispiel des Ablaufs anhand einer komplexen Funktion wie Output.printString oder Keyboard.readLine
+    - Lösung: state machine ähnlich zu async await
+  - Rust compile time flags
+    - verschiedene tracing modes
+    - Desktop mode mit optionalen dependencies
+- Verhalten immer wie im offiziellen Emulator
+  - Beispiel keyboard handling: bug für bug compatibility
+** Ergebnisse
+- Show case: Web UI
+  - adaptiv für verschiedene screen größen
+  - Fullscreen canvas
+  - bytecode view und memory watches
+  - rendering in rust
+- Performance Vergleich mit offiziellem Emulator
+** Fazit
+- War das Projekt erfolgreich
+  - wurden alle Ziele umgesetzt
+    - ja: VM und CPU Emulator komplett benutzbar + tst scripts
+  - welche Vorteile hat meine Implementierung gegenüber dem offiziellem Emulator
+    - deutlich bessere Performance
+    - bessere UI
+    - vom Browser aus benutzbar
+    - simples und einheitliches CLI für Korrektoren
+    - besonders nützlich für die Implementierung und Korrektur von Projekt 9 wegen besserer Performance und größerem Screen
+- War Rust eine gute Wahl für dieses Projekt
+  - hat es die erwarteten Vorteile gegenüber JS erbracht
+    - Performance und Stabilität war gut
+    - statische starke Typisierung ist hilfreich um stabilen Code zu schreiben
+    - allerings auch oft unflexibel
+    - refactoring oft umständlich wegen lifetimes
+    - alles in allem war Rust aber eine gute Wahl
+  - hat es Vorteile gegenüber anderen Sprachen die zu Wasm compilen erbracht
+    - gutes WASM ökosystem mit vielen libraries
+** Anhang
+- Benutzerdokumentation
+  - WebUI
+  - Compilation
+  - Benutzung in Skripten für Korrektoren
