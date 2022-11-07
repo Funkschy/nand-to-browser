@@ -287,6 +287,9 @@ where
         "".to_owned()
     };
 
+    let cmp_content = cmp_content.trim();
+    let out_content = out_content.trim();
+
     if use_outfile {
         let mut line = 1;
         let mut col = 0;

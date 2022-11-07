@@ -126,12 +126,12 @@ pub fn parse_set_target(ident: &str) -> ParseResult<CpuSetTarget> {
         }};
     }
 
-    match name {
+    match name.to_lowercase().as_str() {
         "a" => no_index!(CpuSetTarget::A),
         "d" => no_index!(CpuSetTarget::D),
         "pc" => no_index!(CpuSetTarget::PC),
-        "RAM" => req_index!(CpuSetTarget::Ram),
-        "ROM" => req_index!(CpuSetTarget::Rom),
+        "ram" => req_index!(CpuSetTarget::Ram),
+        "rom" => req_index!(CpuSetTarget::Rom),
         _ => todo!(),
     }
 }

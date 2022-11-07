@@ -123,3 +123,46 @@ fn main() {
 
     execute(SourceFile::new(&asm_content), tst_file, writer).unwrap();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! cpu_path {
+        ($name:expr) => {
+            concat!(
+                concat!(env!("CARGO_MANIFEST_DIR"), "/res/tests/cpu/"),
+                $name
+            )
+        };
+    }
+
+    macro_rules! cpu_source {
+        ($name:expr) => {{
+            let content = include_str!(cpu_path!($name));
+            SourceFile::new(content)
+        }};
+    }
+
+    macro_rules! cpu_include {
+        ($name:expr) => {{
+            include_str!(cpu_path!($name))
+        }};
+    }
+
+    macro_rules! cpu_test {
+        ($name:expr) => {{
+            let path = PathBuf::from(cpu_path!($name));
+            let content = cpu_include!($name).to_owned();
+            (path, content)
+        }};
+    }
+
+    #[test]
+    fn test_07_memory_access_basic_test() {
+        let asm = cpu_source!("mult/Mult.asm");
+        let tst = cpu_test!("mult/Mult.tst");
+
+        execute(asm, Some(tst), None).unwrap();
+    }
+}
