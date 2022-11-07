@@ -48,6 +48,7 @@ pub enum Computation {
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum Destination {
     None,
     A,

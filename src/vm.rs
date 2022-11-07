@@ -1,6 +1,6 @@
 use parse::bytecode::{BytecodeParser, SourceFile};
+use parse::script::parser::ScriptParser;
 use simulators::execute_script;
-use simulators::vm::script::VMEmulatorCommandParser;
 use simulators::vm::stdlib::Stdlib;
 use simulators::vm::VM;
 
@@ -250,7 +250,7 @@ pub fn execute<'w>(
 
     if !tst_files.is_empty() {
         let (tst_name, tst_content) = tst_files.into_iter().next().unwrap();
-        let parser = VMEmulatorCommandParser::create(&tst_name, tst_content.as_str());
+        let parser = ScriptParser::new(&tst_name, tst_content.as_str());
         execute_script(parser, vm, writer)?;
     } else {
         run(&mut vm, steps_per_tick);

@@ -5,21 +5,10 @@ use crate::parse::script::tst::{Command, CommandKind, VMEmulatorCommand, VMSetTa
 use crate::parse::script::{CmdResult, ParseError, ParseResult, SimulatorCommandParser};
 use crate::parse::Spanned;
 
-use std::path::Path;
-
 mod run;
 
 #[derive(Default)]
 pub struct VMEmulatorCommandParser {}
-
-impl<'src> VMEmulatorCommandParser {
-    pub fn create(
-        path: &'src Path,
-        code: &'src str,
-    ) -> ScriptParser<'src, Self, VMEmulatorCommand> {
-        ScriptParser::new(path, code)
-    }
-}
 
 impl<'tst> ScriptParser<'tst, VMEmulatorCommandParser, VMEmulatorCommand> {
     fn parse_set_target(&self, ident: &str) -> ParseResult<VMSetTarget> {
@@ -157,7 +146,7 @@ mod tests {
     use crate::parse::script::lexer::int_kind;
     use crate::parse::script::tst::*;
 
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_parser_consume_repeat_vmstep() {

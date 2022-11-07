@@ -45,15 +45,23 @@ where
                     start_idx, line_nr, ..
                 } = kw;
 
-                let count_tok = self.consume_token_kind(int_kind())?;
-                let count = if let Spanned {
-                    content: Token::IntLiteral(count),
+                let count = if let Ok(Spanned {
+                    content: Token::IntLiteral(_),
                     ..
-                } = count_tok
+                }) = self.peek_token()
                 {
-                    count
+                    if let Spanned {
+                        content: Token::IntLiteral(count),
+                        ..
+                    } = self.consume_token_kind(int_kind())?
+                    {
+                        count as usize
+                    } else {
+                        unreachable!()
+                    }
                 } else {
-                    unreachable!()
+                    // HACK: technically this should be infinite
+                    usize::MAX
                 };
 
                 self.consume_token_exact(Token::Symbol(Symbol::OpenBrace))?;
@@ -70,7 +78,7 @@ where
                 let end_idx = closing.end_idx;
 
                 let cmd = Command::new(Repeat {
-                    times: count as usize,
+                    times: count,
                     block,
                 });
 
@@ -329,7 +337,15 @@ mod test {
             "repeat {}",
         );
         assert_eq!(
-            Err(ParseError::ExpectedKind(int_kind())),
+            Ok(Spanned::new(
+                0,
+                9,
+                1,
+                Command::new(CommandKind::Repeat {
+                    times: usize::MAX,
+                    block: vec![]
+                },)
+            )),
             parser.next_command()
         );
     }

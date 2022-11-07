@@ -55,22 +55,6 @@ impl Cpu {
         }
     }
 
-    pub fn set_input_key(&mut self, key: i16) -> CpuResult {
-        self.set_mem(KBD, key)
-    }
-
-    pub fn display(&self) -> &[Word] {
-        &self.memory[SCREEN_START..=SCREEN_END]
-    }
-
-    pub fn memory_at(&self, address: Address) -> Option<Word> {
-        self.mem(address).ok()
-    }
-
-    pub fn current_file_offset(&self) -> usize {
-        self.pc
-    }
-
     pub fn load(&mut self, program: Vec<Instruction>) {
         self.pc = 0;
         self.program = program;
@@ -152,6 +136,26 @@ impl Cpu {
         }
 
         Ok(())
+    }
+}
+
+// UI interaction
+#[allow(dead_code)]
+impl Cpu {
+    pub fn set_input_key(&mut self, key: i16) -> CpuResult {
+        self.set_mem(KBD, key)
+    }
+
+    pub fn display(&self) -> &[Word] {
+        &self.memory[SCREEN_START..=SCREEN_END]
+    }
+
+    pub fn memory_at(&self, address: Address) -> Option<Word> {
+        self.mem(address).ok()
+    }
+
+    pub fn current_file_offset(&self) -> usize {
+        self.pc
     }
 }
 

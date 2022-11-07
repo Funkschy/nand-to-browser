@@ -5,21 +5,10 @@ use crate::parse::script::tst::{Command, CommandKind, CpuEmulatorCommand, CpuSet
 use crate::parse::script::{CmdResult, ParseError, ParseResult, SimulatorCommandParser};
 use crate::parse::Spanned;
 
-use std::path::Path;
-
 mod run;
 
 #[derive(Default)]
 pub struct CpuEmulatorCommandParser {}
-
-impl<'src> CpuEmulatorCommandParser {
-    pub fn create(
-        path: &'src Path,
-        code: &'src str,
-    ) -> ScriptParser<'src, Self, CpuEmulatorCommand> {
-        ScriptParser::new(path, code)
-    }
-}
 
 impl<'tst> ScriptParser<'tst, CpuEmulatorCommandParser, CpuEmulatorCommand> {
     fn parse_set_target(&self, ident: &str) -> ParseResult<CpuSetTarget> {

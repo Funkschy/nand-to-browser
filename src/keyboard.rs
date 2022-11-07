@@ -61,6 +61,9 @@ lazy_static! {
     };
 }
 
+// this function is only needed when we actually have a UI,
+// so the other compilations report it as unused
+#[allow(dead_code)]
 pub fn get_key_code(letter: &str) -> Option<Word> {
     if letter.len() == 1 {
         letter
