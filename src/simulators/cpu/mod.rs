@@ -1,4 +1,4 @@
-use crate::definitions::{Address, Word, MEM_SIZE};
+use crate::definitions::{Address, Word, KBD, MEM_SIZE, SCREEN_END, SCREEN_START};
 use command::{Computation, Instruction, Jump, Register};
 pub use error::CpuError;
 
@@ -53,6 +53,22 @@ impl Cpu {
             Register::D => Ok(self.d),
             Register::M => self.mem(self.a as Address),
         }
+    }
+
+    pub fn set_input_key(&mut self, key: i16) -> CpuResult {
+        self.set_mem(KBD, key)
+    }
+
+    pub fn display(&self) -> &[Word] {
+        &self.memory[SCREEN_START..=SCREEN_END]
+    }
+
+    pub fn memory_at(&self, address: Address) -> Option<Word> {
+        self.mem(address).ok()
+    }
+
+    pub fn current_file_offset(&self) -> usize {
+        self.pc
     }
 
     pub fn load(&mut self, program: Vec<Instruction>) {
@@ -143,7 +159,7 @@ impl Cpu {
 mod tests {
     use super::*;
 
-    use crate::parse::assembly::{Parser, SourceFile};
+    use crate::parse::assembly::{AssemblyParser, SourceFile};
 
     #[test]
     fn test_sum_1_to_100() {
@@ -172,7 +188,7 @@ mod tests {
             @END
             0;JMP // Infinite loop"#;
 
-        let mut parser = Parser::new(SourceFile::new("Test.asm", src));
+        let mut parser = AssemblyParser::new(SourceFile::new(src));
         let program = parser.parse().unwrap();
 
         let mut cpu = Cpu::default();

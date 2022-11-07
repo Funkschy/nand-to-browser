@@ -13,7 +13,7 @@ use std::fmt;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ParseError {
+pub enum BytecodeParseError {
     UnexpectedCharacter(char),
     // technically not a real error, but it's easier to handle it like one
     EndOfFile,
@@ -33,19 +33,19 @@ pub enum ParseError {
     UnresolvedSymbols(HashSet<String>),
 }
 
-impl From<ByteCodeParseError> for ParseError {
+impl From<ByteCodeParseError> for BytecodeParseError {
     fn from(err: ByteCodeParseError) -> Self {
         Self::Bytecode(err)
     }
 }
 
-impl From<ParseIntError> for ParseError {
+impl From<ParseIntError> for BytecodeParseError {
     fn from(err: ParseIntError) -> Self {
         Self::InvalidIntLiteral(err)
     }
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for BytecodeParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::UnexpectedCharacter(c) => write!(f, "Unexpected character: {}", c),
@@ -76,9 +76,9 @@ impl fmt::Display for ParseError {
     }
 }
 
-impl error::Error for ParseError {}
+impl error::Error for BytecodeParseError {}
 
-type ParseResult<T> = Result<T, ParseError>;
+type ParseResult<T> = Result<T, BytecodeParseError>;
 
 #[derive(Eq, PartialEq, Debug)]
 enum Token<'src> {
@@ -100,7 +100,7 @@ impl<'src> Lexer<'src> {
     fn consume_ident(&mut self) -> ParseResult<Spanned<&'src str>> {
         self.walker
             .take_chars_while(|c| c.is_alphanumeric() || c == '_' || c == '.' || c == '-')
-            .ok_or(ParseError::UnexpectedEndOfFile)
+            .ok_or(BytecodeParseError::UnexpectedEndOfFile)
     }
 
     fn scan_token(&mut self) -> ParseResult<Spanned<Token<'src>>> {
@@ -110,7 +110,10 @@ impl<'src> Lexer<'src> {
         let Spanned {
             content: current_char,
             ..
-        } = self.walker.current_char().ok_or(ParseError::EndOfFile)?;
+        } = self
+            .walker
+            .current_char()
+            .ok_or(BytecodeParseError::EndOfFile)?;
 
         match current_char {
             '/' => {
@@ -119,7 +122,7 @@ impl<'src> Lexer<'src> {
                     self.walker.take_chars_while(|c| c != '\n');
                     self.scan_token()
                 } else {
-                    Err(ParseError::UnexpectedCharacter(current_char))
+                    Err(BytecodeParseError::UnexpectedCharacter(current_char))
                 }
             }
             c if c.is_alphabetic() => {
@@ -131,11 +134,11 @@ impl<'src> Lexer<'src> {
                 let spanned = self
                     .walker
                     .take_chars_while(char::is_numeric)
-                    .ok_or(ParseError::UnexpectedEndOfFile)?;
+                    .ok_or(BytecodeParseError::UnexpectedEndOfFile)?;
                 let parsed_int = spanned.content.parse::<i16>()?;
                 Ok(spanned.with_new_content(Token::IntLiteral(parsed_int)))
             }
-            _ => Err(ParseError::UnexpectedCharacter(current_char)),
+            _ => Err(BytecodeParseError::UnexpectedCharacter(current_char)),
         }
     }
 }
@@ -154,7 +157,7 @@ impl<'src> SourceFile<'src> {
     }
 }
 
-pub struct Parser<'src> {
+pub struct BytecodeParser<'src> {
     // the current sourcefile
     // source files are iterated in the order they're passed into new
     module_index: usize,
@@ -169,7 +172,7 @@ pub struct Parser<'src> {
     stdlib: Stdlib,
 }
 
-impl<'src> Parser<'src> {
+impl<'src> BytecodeParser<'src> {
     pub fn with_stdlib(sources: Vec<SourceFile<'src>>, stdlib: Stdlib) -> Self {
         Self {
             module_index: 0,
@@ -184,32 +187,32 @@ impl<'src> Parser<'src> {
     fn function_symbols(&mut self) -> ParseResult<&mut SymbolTable> {
         self.function_symbols
             .last_mut()
-            .ok_or(ParseError::InvalidFunctionIndex)
+            .ok_or(BytecodeParseError::InvalidFunctionIndex)
     }
 
     fn lexer(&mut self) -> ParseResult<&mut Lexer<'src>> {
         self.sources
             .get_mut(self.module_index)
-            .ok_or(ParseError::InvalidFileIndex)
+            .ok_or(BytecodeParseError::InvalidFileIndex)
             .map(|f| &mut f.lexer)
     }
 
     fn filename(&self) -> ParseResult<&str> {
         self.sources
             .get(self.module_index)
-            .ok_or(ParseError::InvalidFileIndex)
+            .ok_or(BytecodeParseError::InvalidFileIndex)
             .map(|s| s.name.as_str())
     }
 
     fn next_token(&mut self) -> ParseResult<Token<'src>> {
         let current_lexer = self.lexer()?;
         match current_lexer.scan_token() {
-            Err(ParseError::EndOfFile) => {
+            Err(BytecodeParseError::EndOfFile) => {
                 // try to continue with the next file
                 self.module_index += 1;
                 if self.module_index >= self.sources.len() {
                     // no more files, so just return the error
-                    Err(ParseError::EndOfFile)
+                    Err(BytecodeParseError::EndOfFile)
                 } else {
                     self.next_token()
                 }
@@ -224,7 +227,7 @@ impl<'src> Parser<'src> {
             let s = Segment::from_str(ident)?;
             Ok(s)
         } else {
-            Err(ParseError::ExpectedSegment)
+            Err(BytecodeParseError::ExpectedSegment)
         }
     }
 
@@ -232,7 +235,7 @@ impl<'src> Parser<'src> {
         if let Token::IntLiteral(literal) = self.next_token()? {
             Ok(literal)
         } else {
-            Err(ParseError::ExpectedInt)
+            Err(BytecodeParseError::ExpectedInt)
         }
     }
 
@@ -254,7 +257,7 @@ impl<'src> Parser<'src> {
         if let Token::Identifier(ident) = self.next_token()? {
             Ok(ident)
         } else {
-            Err(ParseError::ExpectedIdent)
+            Err(BytecodeParseError::ExpectedIdent)
         }
     }
 
@@ -328,7 +331,7 @@ impl<'src> Parser<'src> {
         loop {
             let last_module_index = self.module_index;
             let token = self.next_token();
-            if let Err(ParseError::EndOfFile) = token {
+            if let Err(BytecodeParseError::EndOfFile) = token {
                 break;
             }
 
@@ -396,7 +399,7 @@ impl<'src> Parser<'src> {
                 Token::Identifier("or") => push_instr(&mut code, Instruction::Or),
                 Token::Identifier("not") => push_instr(&mut code, Instruction::Not),
                 Token::Identifier("neg") => push_instr(&mut code, Instruction::Neg),
-                _ => return Err(ParseError::InvalidToken),
+                _ => return Err(BytecodeParseError::InvalidToken),
             };
         }
 
@@ -433,7 +436,7 @@ impl<'src> Parser<'src> {
                             instructions.push(Instruction::IfGoto { instruction })
                         }
                     } else {
-                        return Err(ParseError::UnresolvedLocalLabel {
+                        return Err(BytecodeParseError::UnresolvedLocalLabel {
                             label: label.to_string(),
                             function_name: debug_symbols
                                 .get(&(function_offset as u16))
@@ -473,7 +476,7 @@ impl<'src> Parser<'src> {
                 function_addresses,
             ))
         } else {
-            Err(ParseError::UnresolvedSymbols(HashSet::from_iter(
+            Err(BytecodeParseError::UnresolvedSymbols(HashSet::from_iter(
                 unresolved.iter().copied().map(str::to_owned),
             )))
         }
@@ -514,7 +517,7 @@ mod tests {
     use super::*;
     use crate::simulators::vm::stdlib::{BuiltinFunction, StdlibOk};
 
-    impl<'src> Parser<'src> {
+    impl<'src> BytecodeParser<'src> {
         pub fn new(sources: Vec<SourceFile<'src>>) -> Self {
             Self::with_stdlib(sources, Stdlib::default())
         }
@@ -559,10 +562,10 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Main.vm", main)];
-        let mut parser = Parser::new(programs);
+        let mut parser = BytecodeParser::new(programs);
         let result = parser.parse();
 
-        if let Err(ParseError::UnresolvedSymbols(symbols)) = result {
+        if let Err(BytecodeParseError::UnresolvedSymbols(symbols)) = result {
             assert_eq!(
                 HashSet::from_iter([
                     "String.new".to_owned(),
@@ -575,7 +578,7 @@ mod tests {
         } else {
             assert_eq!(
                 true,
-                matches!(result, Err(ParseError::UnresolvedSymbols(_)))
+                matches!(result, Err(BytecodeParseError::UnresolvedSymbols(_)))
             );
         }
     }
@@ -614,7 +617,7 @@ mod tests {
             SourceFile::new("String.vm", string),
             SourceFile::new("Simple.vm", source),
         ];
-        let mut parser = Parser::new(programs);
+        let mut parser = BytecodeParser::new(programs);
         let code = parser.parse().unwrap();
 
         assert_eq!(
@@ -710,7 +713,7 @@ mod tests {
         label END
         goto END"#;
 
-        let mut parser = Parser::new(vec![SourceFile::new("Main.vm", program)]);
+        let mut parser = BytecodeParser::new(vec![SourceFile::new("Main.vm", program)]);
         let parsed_bytecode = parser.parse().unwrap();
 
         let expected_bytecode = vec![
@@ -787,7 +790,7 @@ mod tests {
             push local 0"#;
 
         let programs = vec![SourceFile::new("BasicLoop.vm", bytecode)];
-        let mut parser = Parser::new(programs);
+        let mut parser = BytecodeParser::new(programs);
         let code = parser.parse().unwrap();
 
         assert_eq!(
@@ -885,7 +888,7 @@ mod tests {
             SourceFile::new("Sys.vm", sys),
             SourceFile::new("Main.vm", main),
         ];
-        let mut parser = Parser::new(programs);
+        let mut parser = BytecodeParser::new(programs);
         let code = parser.parse().unwrap();
 
         assert_eq!(
@@ -981,7 +984,7 @@ mod tests {
             SourceFile::new("Class2.vm", class2),
             SourceFile::new("Class3.vm", class3),
         ];
-        let mut parser = Parser::new(programs);
+        let mut parser = BytecodeParser::new(programs);
         let result = parser.parse().unwrap();
 
         assert_eq!(
@@ -1073,7 +1076,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Main.vm", src)];
-        let mut parser = Parser::new(programs);
+        let mut parser = BytecodeParser::new(programs);
         let result = parser.parse().unwrap();
 
         assert_eq!(
@@ -1128,7 +1131,7 @@ mod tests {
         assert_eq!(true, stdlib_address_space.contains(&append_address));
 
         let programs = vec![SourceFile::new("Simple.vm", source)];
-        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let mut parser = BytecodeParser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(
@@ -1218,7 +1221,7 @@ mod tests {
         assert_eq!(u16::MAX, wait_address);
 
         let programs = vec![SourceFile::new("Simple.vm", source)];
-        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let mut parser = BytecodeParser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(
@@ -1262,7 +1265,7 @@ mod tests {
         assert_eq!(u16::MAX, init_address);
 
         let programs = vec![SourceFile::new("Simple.vm", source)];
-        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let mut parser = BytecodeParser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(
@@ -1306,7 +1309,7 @@ mod tests {
         assert_eq!(u16::MAX, init_address);
 
         let programs = vec![SourceFile::new("Simple.vm", source)];
-        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let mut parser = BytecodeParser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(
@@ -1352,7 +1355,7 @@ mod tests {
         assert_eq!(u16::MAX, init_address);
 
         let programs = vec![SourceFile::new("Simple.vm", source)];
-        let mut parser = Parser::with_stdlib(programs, stdlib);
+        let mut parser = BytecodeParser::with_stdlib(programs, stdlib);
         let code = parser.parse().unwrap();
 
         assert_eq!(

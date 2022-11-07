@@ -34,7 +34,7 @@ pub fn dispose(vm: &mut VM, state: State, params: &[Word]) -> StdResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::bytecode::{Parser, SourceFile};
+    use crate::parse::bytecode::{BytecodeParser, SourceFile};
 
     // this test comes from the ArrayTest directory in project 12
     #[test]
@@ -203,7 +203,7 @@ mod tests {
             SourceFile::new("Main.vm", test),
         ];
 
-        let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, Stdlib::new());
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);

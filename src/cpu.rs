@@ -1,4 +1,4 @@
-use parse::assembly::{Parser, SourceFile};
+use parse::assembly::{AssemblyParser, SourceFile};
 use simulators::cpu::script::CpuEmulatorCommandParser;
 use simulators::cpu::Cpu;
 use simulators::execute_script;
@@ -65,7 +65,7 @@ pub fn execute<'w>(
     writer: impl Into<Option<&'w mut dyn Write>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut cpu = Cpu::default();
-    let program = Parser::new(asm_file).parse()?;
+    let program = AssemblyParser::new(asm_file).parse()?;
 
     cpu.load(program);
 
@@ -118,8 +118,8 @@ fn main() {
         None
     };
 
-    let (asm_name, asm_content) = asm_files.into_iter().next().expect("No asm file in folder");
+    let (_, asm_content) = asm_files.into_iter().next().expect("No asm file in folder");
     let tst_file = tst_files.into_iter().next();
 
-    execute(SourceFile::new(asm_name, &asm_content), tst_file, writer).unwrap();
+    execute(SourceFile::new(&asm_content), tst_file, writer).unwrap();
 }

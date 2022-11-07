@@ -1,5 +1,5 @@
 use crate::definitions::{ARG, LCL, SP, THAT, THIS};
-use crate::parse::bytecode::{Parser, SourceFile};
+use crate::parse::bytecode::{BytecodeParser, SourceFile};
 use crate::parse::script::tst::{VMEmulatorCommand, VMSetTarget};
 use crate::simulators::vm::stdlib::{Stdlib, StdlibError};
 use crate::simulators::vm::{VMError, VM};
@@ -57,7 +57,7 @@ impl SimulatorExecutor<VMEmulatorCommand> for VM {
                         .map(|(name, content)| SourceFile::new(name, content))
                         .collect();
 
-                    Parser::with_stdlib(sources, Stdlib::new()).parse()?
+                    BytecodeParser::with_stdlib(sources, Stdlib::new()).parse()?
                 } else {
                     let content = read_to_string(path.clone())?;
                     let filename = path
@@ -65,7 +65,7 @@ impl SimulatorExecutor<VMEmulatorCommand> for VM {
                         .and_then(|s| s.to_str())
                         .ok_or("Could not get filename of path")?;
                     let file = SourceFile::new(filename, &content);
-                    Parser::with_stdlib(vec![file], Stdlib::new()).parse()?
+                    BytecodeParser::with_stdlib(vec![file], Stdlib::new()).parse()?
                 };
 
                 self.load(program);

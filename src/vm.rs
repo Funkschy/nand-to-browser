@@ -1,4 +1,4 @@
-use parse::bytecode::{Parser, SourceFile};
+use parse::bytecode::{BytecodeParser, SourceFile};
 use simulators::execute_script;
 use simulators::vm::script::VMEmulatorCommandParser;
 use simulators::vm::stdlib::Stdlib;
@@ -244,7 +244,7 @@ pub fn execute<'w>(
         programs.push(SourceFile::new("String.vm", string));
     }
 
-    let program = Parser::with_stdlib(programs, stdlib).parse()?;
+    let program = BytecodeParser::with_stdlib(programs, stdlib).parse()?;
 
     vm.load(program);
 

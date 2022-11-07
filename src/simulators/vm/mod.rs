@@ -9,7 +9,8 @@ mod calls;
 pub use error::VMError;
 
 use crate::definitions::{
-    Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SCREEN_START, SP, THAT, THIS,
+    Address, Symbol, Word, ARG, INIT_SP, KBD, LCL, MEM_SIZE, SCREEN_END, SCREEN_START, SP, THAT,
+    THIS,
 };
 use calls::*;
 use command::{Instruction, Segment};
@@ -206,7 +207,7 @@ impl VM {
             Segment::That => self.mem(THAT)?,
             Segment::Temp => 5,
             Segment::Pointer => 3,
-            // Static memory segments are actually resolved in the ByteCode Parser
+            // Static memory segments are actually resolved in the ByteCode BytecodeParser
             // The parser will simply set the index to an offset unique for the source file
             // it is currently parsing.
             Segment::Static => 0,
@@ -727,7 +728,7 @@ impl VM {
     }
 
     pub fn display(&self) -> &[Word] {
-        &self.memory[SCREEN_START..(SCREEN_START + 8192)]
+        &self.memory[SCREEN_START..=SCREEN_END]
     }
 
     fn mem_range(&self, range: std::ops::Range<Address>) -> Option<&[Word]> {
@@ -829,7 +830,7 @@ mod tests {
     use crate::definitions::HEAP_START;
     use crate::definitions::KBD;
     use crate::definitions::SCREEN_START;
-    use crate::parse::bytecode::{ParsedProgram, Parser, SourceFile};
+    use crate::parse::bytecode::{BytecodeParser, ParsedProgram, SourceFile};
     use crate::simulators::vm::stdlib::{BuiltinFunction, StdResult};
     use std::collections::HashMap;
 
@@ -979,7 +980,7 @@ mod tests {
             add"#;
 
         let programs = vec![SourceFile::new("BasicTest.vm", bytecode)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1026,7 +1027,7 @@ mod tests {
             add"#;
 
         let programs = vec![SourceFile::new("PointerTest.vm", bytecode)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1062,7 +1063,7 @@ mod tests {
             add"#;
 
         let programs = vec![SourceFile::new("StaticTest.vm", bytecode)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1086,7 +1087,7 @@ mod tests {
             add"#;
 
         let programs = vec![SourceFile::new("SimpleAdd.vm", bytecode)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1146,7 +1147,7 @@ mod tests {
             not"#;
 
         let programs = vec![SourceFile::new("StackTest.vm", bytecode)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1194,7 +1195,7 @@ mod tests {
             push local 0"#;
 
         let programs = vec![SourceFile::new("BasicLoop.vm", bytecode)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1263,7 +1264,7 @@ mod tests {
             label END_PROGRAM"#;
 
         let programs = vec![SourceFile::new("FibonacciSeries.vm", bytecode)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, Stdlib::new());
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1337,7 +1338,7 @@ mod tests {
             label END_PROGRAM"#;
 
         let programs = vec![SourceFile::new("FibonacciSeries.vm", bytecode)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1407,7 +1408,7 @@ mod tests {
             SourceFile::new("Sys.vm", sys),
             SourceFile::new("Main.vm", main),
         ];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1502,7 +1503,7 @@ mod tests {
             return"#;
 
         let programs = vec![SourceFile::new("Sys.vm", sys)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1550,7 +1551,7 @@ mod tests {
             return"#;
 
         let programs = vec![SourceFile::new("Sys.vm", sys)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1643,7 +1644,7 @@ mod tests {
             SourceFile::new("Sys.vm", sys),
             SourceFile::new("Class2.vm", class2),
         ];
-        let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, Stdlib::new());
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1722,7 +1723,7 @@ mod tests {
             SourceFile::new("Class1.vm", class1),
             SourceFile::new("Class2.vm", class2),
         ];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1780,7 +1781,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Lines.vm", src)];
-        let mut bytecode_parser = Parser::new(programs);
+        let mut bytecode_parser = BytecodeParser::new(programs);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1822,7 +1823,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("MathsTest.vm", src)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, stdlib);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1855,7 +1856,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("MathsTest.vm", src)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, stdlib);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1924,7 +1925,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Main.vm", src)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, stdlib);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -1996,7 +1997,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Main.vm", src)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, stdlib);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -2055,7 +2056,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Main.vm", src)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, stdlib);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -2139,7 +2140,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Main.vm", src)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, stdlib);
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);
@@ -2177,7 +2178,7 @@ mod tests {
             "#;
 
         let programs = vec![SourceFile::new("Main.vm", src)];
-        let mut bytecode_parser = Parser::with_stdlib(programs, Stdlib::new());
+        let mut bytecode_parser = BytecodeParser::with_stdlib(programs, Stdlib::new());
         let program = bytecode_parser.parse().unwrap();
 
         vm.load(program);

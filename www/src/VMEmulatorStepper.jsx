@@ -125,7 +125,7 @@ export function VMEmulatorStepper({app}) {
   };
 
   const jumpToCurrentInstr = () => {
-    const file = app.current_file_name();
+    const file = app.current_file_name() || fileNames[0]?.name;
     const func = app.current_function_name();
     const offset = app.current_file_offset();
 

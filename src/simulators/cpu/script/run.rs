@@ -1,4 +1,4 @@
-use crate::parse::assembly::{Parser, SourceFile};
+use crate::parse::assembly::{AssemblyParser, SourceFile};
 use crate::parse::script::tst::{CpuEmulatorCommand, CpuSetTarget};
 use crate::simulators::cpu::Cpu;
 use crate::simulators::{ExecResult, SimulatorExecutor};
@@ -23,14 +23,9 @@ impl SimulatorExecutor<CpuEmulatorCommand> for Cpu {
     fn exec_sim(&mut self, c: CpuEmulatorCommand) -> ExecResult {
         match c {
             CpuEmulatorCommand::Load(path) => {
-                let content = read_to_string(path.clone())?;
-                let filename = path
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .map(|s| s.to_owned())
-                    .ok_or("Could not get filename of path")?;
-                let file = SourceFile::new(filename, &content);
-                let program = Parser::new(file).parse()?;
+                let content = read_to_string(path)?;
+                let file = SourceFile::new(&content);
+                let program = AssemblyParser::new(file).parse()?;
 
                 self.load(program);
             }

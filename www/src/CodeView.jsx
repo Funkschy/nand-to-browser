@@ -9,6 +9,10 @@ function BytecodeLine({highlightLine, activeLine, children}) {
         behavior: 'smooth',
         block: 'center'
       });
+      // scroll page back up in case the bytecode view is below the canvas
+      window.scroll({
+        top: ref.current?.offsetParent.offsetTop,
+      });
     }
   }, [activeLine]);
 
@@ -19,15 +23,16 @@ function BytecodeLine({highlightLine, activeLine, children}) {
 }
 
 const makeBytecodeLines = (lineStrings, activeLineIndex) => {
-  // we need to ignore lines with labels because the VM will give us an offset inside the compiled
-  // bytecode, which does not contain any labels
+  // we need to ignore lines with labels/comments because the simulator will give us
+  // an offset inside the compiled bytecode, which does not contain any labels/comments
+
   let indexWithoutLabels = 0;
 
   return lineStrings.map((line, index) => {
     let highlightLine = indexWithoutLabels === activeLineIndex;
     let key_index = indexWithoutLabels;
 
-    if (line.startsWith('label') || line.startsWith('//')) {
+    if (line.startsWith("\r") ||line.startsWith("\n") || line.startsWith('label') || line.startsWith('//') || line.startsWith("(")) {
       // just some index that cannot possibly be the activeLineIndex
       key_index = -index - 1;
       highlightLine = false;

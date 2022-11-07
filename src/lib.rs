@@ -8,7 +8,9 @@ mod simulators;
 use definitions::{
     Address, Word, BITS_PER_WORD, SCREEN_HEIGHT, SCREEN_WIDTH, SCREEN_WIDTH_IN_WORDS,
 };
-use parse::bytecode::{ParseError, Parser, SourceFile};
+use parse::assembly::{self, AssemblyParseError, AssemblyParser};
+use parse::bytecode::{self, BytecodeParseError, BytecodeParser};
+use simulators::cpu::{Cpu, CpuError};
 use simulators::vm::meta::FileInfo;
 use simulators::vm::stdlib::Stdlib;
 use simulators::vm::{VMError, VM};
@@ -22,9 +24,74 @@ pub fn get_key_code(letter: &str) -> Option<Word> {
     keyboard::get_key_code(letter)
 }
 
+enum Simulator {
+    None,
+    VM(Box<VM>),
+    Cpu(Box<Cpu>),
+}
+
+impl Simulator {
+    fn step(&mut self) -> SimResult {
+        match self {
+            Self::None => Err("Cannot step without a Simulator".into()),
+            Self::VM(vm) => Ok(vm.step_until_vm_instr()?),
+            Self::Cpu(cpu) => Ok(cpu.step()?),
+        }
+    }
+
+    pub fn step_times(&mut self, times: u32) -> SimResult {
+        match self {
+            Self::None => return Err("Cannot step without a Simulator".into()),
+            Self::VM(vm) => {
+                for _ in 0..times {
+                    vm.step()?;
+                }
+            }
+            Self::Cpu(cpu) => {
+                for _ in 0..times {
+                    cpu.step()?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_input_key(&mut self, key: i16) -> SimResult {
+        match self {
+            Self::None => Ok(()),
+            Self::VM(vm) => Ok(vm.set_input_key(key)?),
+            Self::Cpu(cpu) => Ok(cpu.set_input_key(key)?),
+        }
+    }
+
+    pub fn memory_at(&self, address: Address) -> Option<Word> {
+        match self {
+            Self::None => None,
+            Self::VM(vm) => vm.memory_at(address),
+            Self::Cpu(cpu) => cpu.memory_at(address),
+        }
+    }
+
+    pub fn current_file_offset(&self) -> Option<usize> {
+        match self {
+            Self::None => None,
+            Self::VM(vm) => vm.current_file_offset(),
+            Self::Cpu(cpu) => Some(cpu.current_file_offset()),
+        }
+    }
+
+    pub fn display(&self) -> Option<&[Word]> {
+        match self {
+            Self::None => None,
+            Self::VM(vm) => Some(vm.display()),
+            Self::Cpu(cpu) => Some(cpu.display()),
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub struct App {
-    vm: VM,
+    sim: Simulator,
     programs: Vec<(String, String)>, // (filename, content)
 }
 
@@ -40,13 +107,25 @@ impl From<VMError> for JsValue {
     }
 }
 
-impl From<ParseError> for JsValue {
-    fn from(error: ParseError) -> Self {
+impl From<CpuError> for JsValue {
+    fn from(error: CpuError) -> Self {
         JsValue::from(error.to_string())
     }
 }
 
-type VMResult = Result<(), JsValue>;
+impl From<BytecodeParseError> for JsValue {
+    fn from(error: BytecodeParseError) -> Self {
+        JsValue::from(error.to_string())
+    }
+}
+
+impl From<AssemblyParseError> for JsValue {
+    fn from(error: AssemblyParseError) -> Self {
+        JsValue::from(error.to_string())
+    }
+}
+
+type SimResult = Result<(), JsValue>;
 
 #[wasm_bindgen]
 impl App {
@@ -54,10 +133,8 @@ impl App {
         #[cfg(feature = "console_error_panic_hook")]
         console_error_panic_hook::set_once();
 
-        let vm = VM::new(Stdlib::new());
-
         Self {
-            vm,
+            sim: Simulator::None,
             programs: Vec::new(),
         }
     }
@@ -70,89 +147,65 @@ impl App {
         self.programs.push((name, content));
     }
 
-    pub fn load_files(&mut self) -> VMResult {
-        let stdlib = Stdlib::new();
-        let programs = self
-            .programs
-            .iter()
-            .map(|(name, content)| SourceFile::new(name, content))
-            .collect::<Vec<_>>();
+    pub fn load_files(&mut self) -> SimResult {
+        if self.programs.len() > 1 {
+            for (name, _) in &self.programs {
+                if !name.ends_with(".vm") {
+                    return Err("Either load multiple .vm files or a single .asm file".into());
+                }
+            }
 
-        let mut bytecode_parser = Parser::with_stdlib(programs, stdlib);
-        let program = bytecode_parser.parse()?;
+            let mut vm = VM::new(Stdlib::new());
 
-        self.vm.load(program);
-        Ok(())
-    }
+            let stdlib = Stdlib::new();
+            let programs = self
+                .programs
+                .iter()
+                .map(|(name, content)| bytecode::SourceFile::new(name, content))
+                .collect::<Vec<_>>();
 
-    pub fn step_times(&mut self, times: u32) -> VMResult {
-        for _ in 0..times {
-            self.vm.step()?;
-        }
-        Ok(())
-    }
+            let mut bytecode_parser = BytecodeParser::with_stdlib(programs, stdlib);
+            let program = bytecode_parser.parse()?;
 
-    pub fn step(&mut self) -> VMResult {
-        self.vm.step_until_vm_instr()?;
-        Ok(())
-    }
-
-    pub fn set_input_key(&mut self, key: Word) -> VMResult {
-        self.vm.set_input_key(key)?;
-        Ok(())
-    }
-
-    pub fn calls(&self) -> Vec<JsValue> {
-        self.vm
-            .call_stack_names()
-            .into_iter()
-            .map(JsValue::from_str)
-            .collect()
-    }
-
-    pub fn locals(&self) -> Vec<Word> {
-        if let Some(locals) = self.vm.locals() {
-            locals.to_vec()
+            vm.load(program);
+            self.sim = Simulator::VM(vm.into());
         } else {
-            Vec::new()
+            let (_, content) = self
+                .programs
+                .get(0)
+                .ok_or_else::<JsValue, _>(|| "Trying to load empty program vector".into())?;
+
+            let mut cpu = Cpu::default();
+            let mut assembly_parser = AssemblyParser::new(assembly::SourceFile::new(content));
+            let program = assembly_parser.parse()?;
+
+            cpu.load(program);
+            self.sim = Simulator::Cpu(cpu.into());
         }
+
+        Ok(())
     }
 
-    pub fn args(&self) -> Vec<Word> {
-        if let Some(args) = self.vm.args() {
-            args.to_vec()
-        } else {
-            Vec::new()
-        }
+    // --- General Simulator features ---
+
+    pub fn step_times(&mut self, times: u32) -> SimResult {
+        self.sim.step_times(times)
     }
 
-    pub fn stack(&self) -> Vec<Word> {
-        if let Some(stack) = self.vm.stack() {
-            stack.to_vec()
-        } else {
-            Vec::new()
-        }
+    pub fn step(&mut self) -> SimResult {
+        self.sim.step()
+    }
+
+    pub fn set_input_key(&mut self, key: Word) -> SimResult {
+        self.sim.set_input_key(key)
     }
 
     pub fn memory_at(&self, address: Address) -> Option<Word> {
-        self.vm.memory_at(address)
-    }
-
-    pub fn current_function_name(&self) -> Option<String> {
-        self.vm.current_function_name().map(|n| n.to_owned())
-    }
-
-    pub fn current_file_name(&self) -> Option<String> {
-        match self.vm.current_file_info()? {
-            FileInfo::VM { module_index, .. } => {
-                self.programs.get(module_index).map(|p| p.0.to_owned())
-            }
-            FileInfo::Builtin(name) => Some(name.to_owned()),
-        }
+        self.sim.memory_at(address)
     }
 
     pub fn current_file_offset(&self) -> Option<usize> {
-        self.vm.current_file_offset()
+        self.sim.current_file_offset()
     }
 
     pub fn data_buffer_size() -> usize {
@@ -160,8 +213,8 @@ impl App {
         BYTES_PER_PIXEL * SCREEN_WIDTH * SCREEN_HEIGHT
     }
 
-    pub fn display_data(&self) -> ImageData {
-        let display = self.vm.display();
+    pub fn display_data(&self) -> Option<ImageData> {
+        let display = self.sim.display()?;
         let mut data = Vec::with_capacity(Self::data_buffer_size());
         for row_idx in 0..SCREEN_HEIGHT {
             for word_idx in 0..SCREEN_WIDTH_IN_WORDS {
@@ -184,6 +237,71 @@ impl App {
             SCREEN_WIDTH as u32,
             SCREEN_HEIGHT as u32,
         )
-        .unwrap()
+        .ok()
+    }
+}
+
+// VM Emulator specific stuff
+#[wasm_bindgen]
+impl App {
+    pub fn calls(&self) -> Vec<JsValue> {
+        if let Simulator::VM(vm) = &self.sim {
+            vm.call_stack_names()
+                .into_iter()
+                .map(JsValue::from_str)
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn locals(&self) -> Vec<Word> {
+        if let Simulator::VM(vm) = &self.sim {
+            if let Some(locals) = vm.locals() {
+                return locals.to_vec();
+            }
+        }
+
+        Vec::new()
+    }
+
+    pub fn args(&self) -> Vec<Word> {
+        if let Simulator::VM(vm) = &self.sim {
+            if let Some(args) = vm.args() {
+                return args.to_vec();
+            }
+        }
+
+        Vec::new()
+    }
+
+    pub fn stack(&self) -> Vec<Word> {
+        if let Simulator::VM(vm) = &self.sim {
+            if let Some(stack) = vm.stack() {
+                return stack.to_vec();
+            }
+        }
+
+        Vec::new()
+    }
+
+    pub fn current_function_name(&self) -> Option<String> {
+        if let Simulator::VM(vm) = &self.sim {
+            return vm.current_function_name().map(|n| n.to_owned());
+        }
+        None
+    }
+
+    pub fn current_file_name(&self) -> Option<String> {
+        if let Simulator::VM(vm) = &self.sim {
+            match vm.current_file_info()? {
+                FileInfo::VM { module_index, .. } => {
+                    self.programs.get(module_index).map(|p| p.0.to_owned())
+                }
+                FileInfo::Builtin(name) => Some(name.to_owned()),
+            }
+        } else {
+            None
+        }
     }
 }

@@ -13,7 +13,7 @@ use std::error;
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ParseError {
+pub enum AssemblyParseError {
     UnexpectedCharacter(char),
     // technically not a real error, but it's easier to handle it like one
     EndOfFile,
@@ -30,13 +30,13 @@ pub enum ParseError {
     InvalidToken,
 }
 
-impl From<ParseIntError> for ParseError {
+impl From<ParseIntError> for AssemblyParseError {
     fn from(err: ParseIntError) -> Self {
         Self::InvalidIntLiteral(err)
     }
 }
 
-impl fmt::Display for ParseError {
+impl fmt::Display for AssemblyParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::UnexpectedCharacter(c) => write!(f, "Unexpected character: {}", c),
@@ -60,9 +60,9 @@ impl fmt::Display for ParseError {
     }
 }
 
-impl error::Error for ParseError {}
+impl error::Error for AssemblyParseError {}
 
-type ParseResult<T> = Result<T, ParseError>;
+type ParseResult<T> = Result<T, AssemblyParseError>;
 
 #[derive(Eq, PartialEq, Debug)]
 enum Token<'src> {
@@ -103,22 +103,24 @@ impl<'src> Lexer<'src> {
     fn consume_ident(&mut self) -> ParseResult<Spanned<&'src str>> {
         self.walker
             .take_chars_while(|c| c.is_alphanumeric() || c == '_' || c == '.')
-            .ok_or(ParseError::UnexpectedEndOfFile)
+            .ok_or(AssemblyParseError::UnexpectedEndOfFile)
     }
 
     fn consume_single(&mut self, tok: Token<'src>) -> ParseResult<Spanned<Token<'src>>> {
         self.walker
             .advance()
             .map(|spanned| spanned.with_new_content(tok))
-            .ok_or(ParseError::UnexpectedEndOfFile)
+            .ok_or(AssemblyParseError::UnexpectedEndOfFile)
     }
 
     fn current_char(&mut self) -> ParseResult<Spanned<char>> {
-        self.walker.current_char().ok_or(ParseError::EndOfFile)
+        self.walker
+            .current_char()
+            .ok_or(AssemblyParseError::EndOfFile)
     }
 
     fn advance(&mut self) -> ParseResult<Spanned<char>> {
-        self.walker.advance().ok_or(ParseError::EndOfFile)
+        self.walker.advance().ok_or(AssemblyParseError::EndOfFile)
     }
 
     fn scan_token(&mut self) -> ParseResult<Spanned<Token<'src>>> {
@@ -137,7 +139,7 @@ impl<'src> Lexer<'src> {
                     self.walker.take_chars_while(|c| c != '\n');
                     self.scan_token()
                 } else {
-                    Err(ParseError::UnexpectedCharacter(current_char))
+                    Err(AssemblyParseError::UnexpectedCharacter(current_char))
                 }
             }
             ';' => self.consume_single(Token::Semi),
@@ -162,7 +164,7 @@ impl<'src> Lexer<'src> {
                 let spanned = self
                     .walker
                     .take_chars_while(char::is_numeric)
-                    .ok_or(ParseError::UnexpectedEndOfFile)?;
+                    .ok_or(AssemblyParseError::UnexpectedEndOfFile)?;
                 let parsed_int = spanned.content.parse::<i16>()?;
                 Ok(spanned.with_new_content(Token::IntLiteral(parsed_int)))
             }
@@ -180,7 +182,7 @@ impl<'src> Lexer<'src> {
                         next.start_idx = at.start_idx;
                         Ok(next.with_new_content(Token::AConst(constant as u16)))
                     }
-                    _ => Err(ParseError::ExpectedLabelOrConstant),
+                    _ => Err(AssemblyParseError::ExpectedLabelOrConstant),
                 }
             }
             '(' => {
@@ -190,7 +192,7 @@ impl<'src> Lexer<'src> {
                 let label = self
                     .walker
                     .take_chars_while(|c| c != ')')
-                    .ok_or(ParseError::ExpectedIdent)?;
+                    .ok_or(AssemblyParseError::ExpectedIdent)?;
 
                 // skip )
                 // the next char has to be either ) or eof
@@ -203,7 +205,7 @@ impl<'src> Lexer<'src> {
                 let wrapped_content = Token::Identifier(ident.content);
                 Ok(ident.with_new_content(wrapped_content))
             }
-            _ => Err(ParseError::UnexpectedCharacter(current_char)),
+            _ => Err(AssemblyParseError::UnexpectedCharacter(current_char)),
         }
     }
 }
@@ -212,7 +214,7 @@ impl<'src> Iterator for Lexer<'src> {
     type Item = ParseResult<Spanned<Token<'src>>>;
     fn next(&mut self) -> Option<Self::Item> {
         let next_token = self.scan_token();
-        if let Err(ParseError::EndOfFile) = next_token {
+        if let Err(AssemblyParseError::EndOfFile) = next_token {
             return None;
         }
         Some(next_token)
@@ -220,25 +222,23 @@ impl<'src> Iterator for Lexer<'src> {
 }
 
 pub struct SourceFile<'src> {
-    name: String,
     lexer: Peekable<Lexer<'src>>,
 }
 
 impl<'src> SourceFile<'src> {
-    pub fn new(name: impl Into<String>, source: &'src str) -> Self {
+    pub fn new(source: &'src str) -> Self {
         Self {
-            name: name.into(),
             lexer: Lexer::new(source).peekable(),
         }
     }
 }
 
-pub struct Parser<'src> {
+pub struct AssemblyParser<'src> {
     source: SourceFile<'src>,
     symbols: SymbolTable,
 }
 
-impl<'src> Parser<'src> {
+impl<'src> AssemblyParser<'src> {
     pub fn new(source: SourceFile<'src>) -> Self {
         let mut symbols = SymbolTable::default();
 
@@ -273,7 +273,7 @@ impl<'src> Parser<'src> {
         self.source
             .lexer
             .next()
-            .ok_or(ParseError::EndOfFile)?
+            .ok_or(AssemblyParseError::EndOfFile)?
             .map(|s| s.content)
     }
 
@@ -281,7 +281,7 @@ impl<'src> Parser<'src> {
         if token == self.next_token()? {
             Ok(token)
         } else {
-            Err(ParseError::InvalidToken)
+            Err(AssemblyParseError::InvalidToken)
         }
     }
 
@@ -298,16 +298,18 @@ impl<'src> Parser<'src> {
             0 => Computation::ConstZero,
             1 => Computation::ConstOne,
             -1 => Computation::ConstNegOne,
-            _ => return Err(ParseError::InvalidIntComp(value)),
+            _ => return Err(AssemblyParseError::InvalidIntComp(value)),
         })
     }
 
     fn consume_reg(&mut self) -> ParseResult<Register> {
         let token = self.next_token()?;
         if let Token::Identifier(ident) = token {
-            ident.try_into().map_err(|_| ParseError::ExpectedRegister)
+            ident
+                .try_into()
+                .map_err(|_| AssemblyParseError::ExpectedRegister)
         } else {
-            Err(ParseError::ExpectedRegister)
+            Err(AssemblyParseError::ExpectedRegister)
         }
     }
 
@@ -322,7 +324,9 @@ impl<'src> Parser<'src> {
             Token::Minus => Ok(Computation::UnaryIntNeg(self.consume_reg()?)),
             // binary
             Token::Identifier(lhs) => {
-                let lhs: Register = lhs.try_into().map_err(|_| ParseError::ExpectedRegister)?;
+                let lhs: Register = lhs
+                    .try_into()
+                    .map_err(|_| AssemblyParseError::ExpectedRegister)?;
 
                 if let Some(Ok(token)) = self.source.lexer.peek() {
                     if let Token::IntLiteral(-1) = token.content {
@@ -373,10 +377,10 @@ impl<'src> Parser<'src> {
                         let rhs = self.consume_reg()?;
                         Ok(Computation::BinaryOr(lhs, rhs))
                     }
-                    _ => Err(ParseError::ExpectedOperator),
+                    _ => Err(AssemblyParseError::ExpectedOperator),
                 }
             }
-            _ => Err(ParseError::ExpectedComputation),
+            _ => Err(AssemblyParseError::ExpectedComputation),
         }
     }
 
@@ -403,7 +407,7 @@ impl<'src> Parser<'src> {
             Token::Identifier("JNE") => Ok(Jump::Ne),
             Token::Identifier("JLE") => Ok(Jump::Le),
             Token::Identifier("JMP") => Ok(Jump::Unconditional),
-            _ => Err(ParseError::ExpectedJump),
+            _ => Err(AssemblyParseError::ExpectedJump),
         }
     }
 
@@ -436,7 +440,7 @@ impl<'src> Parser<'src> {
 
         loop {
             let token = self.next_token();
-            if let Err(ParseError::EndOfFile) = token {
+            if let Err(AssemblyParseError::EndOfFile) = token {
                 break;
             }
 
@@ -467,7 +471,9 @@ impl<'src> Parser<'src> {
                     })) = self.source.lexer.peek()
                     {
                         // no dest, just Register + jump
-                        let reg = ident.try_into().map_err(|_| ParseError::ExpectedRegister)?;
+                        let reg = ident
+                            .try_into()
+                            .map_err(|_| AssemblyParseError::ExpectedRegister)?;
                         push_instr(
                             &mut code,
                             Instruction::C(
@@ -481,7 +487,7 @@ impl<'src> Parser<'src> {
 
                     let dest: Destination = ident
                         .try_into()
-                        .map_err(|_| ParseError::InvalidDestination(ident.to_owned()))?;
+                        .map_err(|_| AssemblyParseError::InvalidDestination(ident.to_owned()))?;
 
                     self.consume_token(Token::Eq)?;
 
@@ -491,7 +497,7 @@ impl<'src> Parser<'src> {
                     );
                 }
 
-                _ => return Err(ParseError::InvalidToken),
+                _ => return Err(AssemblyParseError::InvalidToken),
             };
         }
 
@@ -517,7 +523,7 @@ mod tests {
 
     #[test]
     fn test_minus_one_edge_case() {
-        let mut parser = Parser::new(SourceFile::new("Test.asm", "D=A-1"));
+        let mut parser = AssemblyParser::new(SourceFile::new("D=A-1"));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -529,7 +535,7 @@ mod tests {
             )])
         );
 
-        let mut parser = Parser::new(SourceFile::new("Test.asm", "D = A - 1 "));
+        let mut parser = AssemblyParser::new(SourceFile::new("D = A - 1 "));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -544,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_minus_one_edge_case_with_jump() {
-        let mut parser = Parser::new(SourceFile::new("Test.asm", "D=A-1;JEQ"));
+        let mut parser = AssemblyParser::new(SourceFile::new("D=A-1;JEQ"));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -556,7 +562,7 @@ mod tests {
             )])
         );
 
-        let mut parser = Parser::new(SourceFile::new("Test.asm", "D = A - 1 ; JEQ "));
+        let mut parser = AssemblyParser::new(SourceFile::new("D = A - 1 ; JEQ "));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -571,7 +577,7 @@ mod tests {
 
     #[test]
     fn test_parse_multiple() {
-        let mut parser = Parser::new(SourceFile::new("Test.asm", "D=A-1;JEQ\nA=-1"));
+        let mut parser = AssemblyParser::new(SourceFile::new("D=A-1;JEQ\nA=-1"));
         let instructions = parser.parse();
 
         assert_eq!(
@@ -622,7 +628,7 @@ mod tests {
             @END
             0;JMP // infinite loop"#;
 
-        let mut parser = Parser::new(SourceFile::new("Test.asm", src));
+        let mut parser = AssemblyParser::new(SourceFile::new(src));
         let instructions = parser.parse();
 
         assert_eq!(

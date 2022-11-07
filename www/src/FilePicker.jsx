@@ -9,7 +9,7 @@ export function FilePicker({onChange}) {
         Upload Files
         <input type="file"
                hidden
-               accept="text/plain,.vm"
+               accept=".vm,.asm"
                names="files[]" multiple
                onChange={onChange}/>
       </label>

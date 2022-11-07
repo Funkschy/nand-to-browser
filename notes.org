@@ -34,15 +34,16 @@
     - [X] 12/MemoryTest/MemoryTest.tst
     - [X] 12/MemoryTest/MemoryDiag/MemoryDiag.tst
     - [X] 12/MathTest/MathTest.tst
-  - [X] Ausgabe mit cmp Datei verlgleichen und ggfs Fehler anzeigen
+  - [X] Ausgabe mit cmp Datei vergleichen und ggfs Fehler anzeigen
   - [X] Output Datei neben cmp Datei speichern
 - [X] interface
   - [X] Skripte aus Ordner laden (cli argument)
   - [X] Tests ausführen wenn vorhanden (Struktur wie in projects Ordner)
   - [X] mit flag Desktop Modus starten
   - [X] steps per tick als cli argument
-** TODO CPU Emulator [0/1]
-- [ ] CPU Emulator implementieren
+** TODO CPU Emulator [1/2]
+- [X] CPU Emulator implementieren
+- [ ] Test scripts als integration oder unit tests auführen
 ** TODO VM Emulator [9/12]
 - [X] alle commands implementieren
 - [X] command parsing

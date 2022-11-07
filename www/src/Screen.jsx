@@ -9,7 +9,9 @@ export function Screen(props) {
     // the wasm code renders the display info into an ImageData object, which we just need to
     // pass to the canvas
     const data = app.display_data();
-    ctx.putImageData(data, 0, 0);
+    if (data) {
+      ctx.putImageData(data, 0, 0);
+    }
   };
 
   useEffect(() => {
