@@ -29,8 +29,8 @@ export function Screen(props) {
 
     // cleanup when the component is unmounted
     return () => {
-      window.cancelAnimationFrame(animationFrameId)
-    }
+      window.cancelAnimationFrame(animationFrameId);
+    };
 
     // the draw function will be redefined after the effect runs, making it an endless loop, which
     // in this case is actually what we want

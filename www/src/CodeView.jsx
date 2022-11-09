@@ -14,10 +14,11 @@ function BytecodeLine({highlightLine, activeLine, children}) {
         top: ref.current?.offsetParent.offsetTop,
       });
     }
-  }, [activeLine]);
+  }, [activeLine, highlightLine]);
 
   return (
-    <td className={highlightLine ? 'highlight' : ''} ref={ref} children={children}>
+    <td className={highlightLine ? 'highlight' : ''} ref={ref}>
+      {children}
     </td>
   );
 }
@@ -32,7 +33,7 @@ const makeBytecodeLines = (lineStrings, activeLineIndex) => {
     let highlightLine = indexWithoutLabels === activeLineIndex;
     let key_index = indexWithoutLabels;
 
-    if (line.startsWith("\r") ||line.startsWith("\n") || line.startsWith('label') || line.startsWith('//') || line.startsWith("(")) {
+    if (line.startsWith('\r') ||line.startsWith('\n') || line.startsWith('label') || line.startsWith('//') || line.startsWith('(')) {
       // just some index that cannot possibly be the activeLineIndex
       key_index = -index - 1;
       highlightLine = false;

@@ -10,7 +10,7 @@ export function FilePicker({onChange}) {
         <input type="file"
                hidden
                accept=".vm,.asm"
-               names="files[]" multiple
+               multiple
                onChange={onChange}/>
       </label>
     </form>);

@@ -1,6 +1,6 @@
-import { App, get_key_code } from "nand-to-tetris-web";
+import { App, get_key_code } from 'nand-to-tetris-web';
 
-import React, { useEffect, useRef, useState, Component } from 'react';
+import React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import './style.css';

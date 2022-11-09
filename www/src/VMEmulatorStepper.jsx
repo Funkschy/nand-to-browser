@@ -3,8 +3,8 @@ import { Screen } from './Screen.jsx';
 import { Button } from './Button.jsx';
 import { FilePicker } from './FilePicker.jsx';
 import { SpeedSlider } from './SpeedSlider.jsx';
-import { CodeView } from './CodeView.jsx'
-import { MemoryWatchBlock } from './MemoryWatchBlock.jsx'
+import { CodeView } from './CodeView.jsx';
+import { MemoryWatchBlock } from './MemoryWatchBlock.jsx';
 
 const readAllFiles = (fileNames) => {
   return new Promise((resolve, reject) => {
@@ -28,8 +28,8 @@ const readAllFiles = (fileNames) => {
 
       reader.readAsText(file);
     }
-  })
-}
+  });
+};
 
 function ButtonRow({step, loadFiles, running, setRunning, programLoaded}) {
   return (
@@ -38,7 +38,7 @@ function ButtonRow({step, loadFiles, running, setRunning, programLoaded}) {
         className="btn"
         disabled={!programLoaded}
         onClick={() => setRunning(!running)}>
-        {running ? "Stop" : "Start"}
+        {running ? 'Stop' : 'Start'}
       </Button>
       <Button className="btn"
               disabled={running || !programLoaded}
@@ -88,7 +88,7 @@ export function VMEmulatorStepper({app}) {
       // when that happens, this function will be run and clear the interval, which will be
       // re-created while creating the new component
       return () => {
-        clearInterval(interval)
+        clearInterval(interval);
       };
     }
   }, [running, stepsPerTick]);
@@ -106,7 +106,7 @@ export function VMEmulatorStepper({app}) {
       for (const [fileName, fileContent] of files) {
         app.add_file(fileName, fileContent);
       }
-      app.load_files()
+      app.load_files();
     };
 
     readFiles().catch((error) => {
