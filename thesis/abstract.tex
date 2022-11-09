@@ -1,27 +1,12 @@
-Fassen Sie die Fragestellung, Motivation und Ergebnisse Ihrer Arbeit
-hier in wenigen Worten zusammen.
+Das Feld der Informatik ist über die Jahrzehnte seit seiner Entstehung zunehmend
+komplex und unübersichtlich geworden.
+Dies hat dazu geführt, dass Studierende der Informatik heutzutage oft keinen Überblick über die generelle Funktionsweise von Computern besitzten, sondern sich zunehmend auf immer spezifischere Teilfelder der Informatik spezialisieren.
 
-Die Zusammenfassung sollte den Umfang einer Seite nicht überschreiten.
+Shimon Schocken and Noam Nisan glauben, dass dies ein Problem darstellt und, dass der beste Weg um zu verstehen, wie Computer funktionieren, darin besteht, einen von Grund auf selber zu bauen~\cite[Preface]{nisan2005}
 
-\subsection{Was}
-From Nand to Tetris ist ein Kurs, welcher an über 400 Universitäten und Schulen unterrichtet wird \cite{nand2tetris.org}, mit dem Ziel die Funktionsweise eines modernen Computers anschaulich und interaktiv zu vermitteln.
+Um Studenten diesen, für viele unvorstellbaren, Schritt zu ermöglichen, haben Schocken und Nisan den Nand to Tetris Kurs erstellt, welcher es Studierenden ermöglicht ein komplettes Computer System inklusive Assembler, Compiler und Programmbibliotheken von Grund auf selber zu entwickeln. Dieses System ist komplex genug, um die Implementierung von einer Reihe von Spielen und Programmen zu ermöglichen.\ref{fig:hackenstein-offiziell}
 
-\begin{itemize}
-\item Portierung des VM Emulators in den Browser
-\end{itemize}
+Dieser Kurs beinhaltet nicht nur das theoretische Wissen, welches Studenten benötigen werden, sondern auch drei verschiedene Emulatoren um die Entwicklung des Systems in klar separierte, übersichtliche Abschnitte zu unterteilen.
 
-\subsection{Warum}
-\begin{itemize}
-\item alte Swing Anwendung
-\item nicht skalierbar => schwer erkennbar auf hochauflösenden displays
-\item langsamer als nötig
-\end{itemize}
-
-\subsection{Wie}
-\begin{itemize}
-\item neu schreiben in Rust
-\item Rust zu Wasm kompilieren und vom Browser aus nutzen
-\end{itemize}
-
-\subsection{Ergebnis}
-tbd
+Genau diese Emulatoren sind jedoch auch ein häufiger Kritikpunkt unter Kursteilnehmern, da sie zunehmend den Ansprüchen moderner Nutzer nicht mehr gerecht werden. Es handelt sich um Java-Swing Anwendungen, welche nicht nur sehr langsam sind, sondern es wegen fehlender Skalierung auf hochauflösenden Displays schwer machen den Inhalt des Emulator-Displays zu erkennen.
+Im Zuge dieser Arbeit wurden zwei dieser drei Emulatoren mittels WebAssembly als Browser Anwendungen neu geschrieben. Dies ermöglicht nicht nur ein größeres Display und deutlich verbesserte Performance, sondern erlaubt auch eine Nutzung der Tools ohne den Zwang diese auf dem Rechner des Kursteilnehmers zu installieren.

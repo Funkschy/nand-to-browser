@@ -1,0 +1,28 @@
+\section{Abgrenzungen zu Fremdleistungen}
+
+\subsection{Nand to Tetris}
+\begin{itemize}
+  \item VM Bytecode design und high level Funktionalität
+  \item CPU Assembly design und high level Funktionalität
+  \item TST design und high level Funktionalität
+  \item Viele Tests für Emulatoren aus N2T Projekten
+\end{itemize}
+
+\subsection{Dependencies}
+\begin{itemize}
+\item lazy\_static (hack um rust weniger nervig zu machen)
+\item regex
+\item wasm-bindgen (rust code für JS zugänglich machen)
+\item web-sys (js stdlib in Rust nutzen)
+\item console\_error\_panic\_hook (rust panics zu JS exeptions)
+\item sdl2 (native UI (eigentlich nur zum Testen))
+\item clap (CLI parsing)
+\item wasm-pack (rust -> wasm Kompilierung einfacher machen)
+\item react und npm (UI)
+\end{itemize}
+
+\subsection{Related Work}
+\begin{itemize}
+  \item https://github.com/itoshkov/nand2tetris-emu
+  \item https://github.com/mossprescott/pynand
+\end{itemize}

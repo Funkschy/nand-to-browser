@@ -100,12 +100,14 @@
 - [ ] Benchmark: 3fcc146df140f95a7be8290d897cc46b4dbccc59 vs Nachfolger
 - [X] Dependency section in Readme (auch für Desktop)
 * BA Inhaltsverzeichnis
-** Generelles und Technologien
+** Einleitung
 - Was ist Nand to Tetris
 - Warum macht es Sinn, die Nand to Tetris tools (im Browser) neu zu schreiben
   - UI auf großen Bildschirmen
   - Performance
   - kein Drang mehr die Tools zu installieren (zumindest nicht um VM Spiele zu spielen)
+- Hackenstein screenshot um komplexität zu zeigen
+** Generelles und Technologien
 - Was ist Wasm und wie unterscheidet es sich von JS
 - Was ist Rust
 - Welche Vorteile hat eine Implementierung in Rust gegenüber JS
@@ -115,15 +117,6 @@
   - kleine runtime & kein GC
   - sehr schnell
 - Was ist React und welche Vorteile bietet es gegenüber rohem JS
-** Virtuelle Machinen, Parser und ihr Design
-- Wie funktionieren VMs und Bytecode
-  - simples beispiel schrittweise erklären: schleife die [1, 3] addiert
-- Wie kann man eine VM in Rust implementieren
-  - design entscheidung: enum vs union
-  - stepweise ausführung mit pattern matching über enum
-- Wie kann man Parser in Rust implementieren
-  - Lexer & Parser
-  - Peekable
 ** Abgrenzung zu Fremdleistungen
 - VM/CPU & TST Design aus Nand to Tetris
   - Spezifikationen aus "The Elements of Computing Systems"
@@ -140,7 +133,10 @@
   - react & npm (UI)
 - Implementierung komplett eigen
   - Ansatz auch an einigen Stellen sehr anders als die offiziellen Tools (z.B. native stdlib, parsing, UI)
-** Vorgehen
+- Related Work
+  - https://github.com/itoshkov/nand2tetris-emu
+  - https://github.com/mossprescott/pynand
+** Implementierung
 - Wie war mein generelles Vorgehen
   - zuerst VM basics test driven auf dem Desktop (ohne wasm) implementieren
     - dafür zuerst bytecode parser -> Benutzung in VM tests
@@ -148,16 +144,33 @@
   - testing durch unit tests
   - testing mittels tst scripts aus dem Kurs (erst als rust unit tests, später auch via tst executor)
   - dann frontend unabhängig entwickeln, mit dünnem compatibility layer (lib.rs)
+  - Verhalten immer wie im offiziellen Emulator
+    - Beispiel keyboard handling: bug für bug compatibility
+
 - Architektur
   - verschiedene Programme für CPU, VM
   - Emulatoren komplett unabhängig von Frontend
     - erlaubt verschiedene Frontends (SDL)
     - oder auch headless mode, z.B. für die tst Scripts
     - rendering und keyboard handling aber in rust für performance und DRY
+
+- Wie funktionieren VMs und Bytecode
+  - simples beispiel schrittweise erklären: schleife die [1, 3] addiert
+
+- VM Entwicklung in Rust
+  - Wie habe ich die VMs in Rust implementiert
+    - design entscheidung: enum vs union
+    - stepweise ausführung mit pattern matching über enum
+  - Wie habe ich die Parser in Rust implementiert
+    - Lexer & Parser
+    - Peekable
   - Beispiel für Rust Architektur anhand von tst file parser/executor
     - traits als Alternative für Vererbung
     - wenig code Duplikation
     - Kombination aus Parser und Executor muss zusammen passen (compile time check)
+  - Rust compile time flags
+    - verschiedene tracing modes
+    - Desktop mode mit optionalen dependencies
   - Implementierung der Stdlib
     - step-weise Ausführung -> komplikationen bei stdlib Implementierung
     - Funktionen müssen pausierbar sein (ohne aber den Thread zu blockieren)
@@ -166,18 +179,19 @@
     - Beispiel des Ablaufs anhand einer simplen Funktion wie Sys.wait
     - Beispiel des Ablaufs anhand einer komplexen Funktion wie Output.printString oder Keyboard.readLine
     - Lösung: state machine ähnlich zu async await
-  - Rust compile time flags
-    - verschiedene tracing modes
-    - Desktop mode mit optionalen dependencies
-- Verhalten immer wie im offiziellen Emulator
-  - Beispiel keyboard handling: bug für bug compatibility
 ** Ergebnisse
 - Show case: Web UI
   - adaptiv für verschiedene screen größen
   - Fullscreen canvas
   - bytecode view und memory watches
   - rendering in rust
+- Hosting auf github pages
 - Performance Vergleich mit offiziellem Emulator
+  - Ergebnisse als Graph (oft laufen lassen, verschiedene Rechner)
+  - Warum ziehe ich Schluss aus Daten
+** Future work
+- Hardware simulator
+- mehr UI
 ** Fazit
 - War das Projekt erfolgreich
   - wurden alle Ziele umgesetzt
