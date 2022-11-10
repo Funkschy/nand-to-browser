@@ -41,20 +41,16 @@ jobs:
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
           wasm-pack build --release
 
-      - name: Install JS dependencies
+      - name: Build JS release
         working-directory: ./www
-        run: npm ci
-
-      - name: merge
         run: |
-          mkdir release
-          cp -r www release
-          cp -r pkg release
+          npm ci
+          npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
-          path: './release'
+          path: './www/dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v1
