@@ -148,7 +148,13 @@ impl App {
     }
 
     pub fn load_files(&mut self) -> SimResult {
-        if self.programs.len() > 1 {
+        let is_vm = self
+            .programs
+            .first()
+            .map(|(name, _)| name.ends_with(".vm"))
+            .unwrap_or(false);
+
+        if is_vm {
             for (name, _) in &self.programs {
                 if !name.ends_with(".vm") {
                     return Err("Either load multiple .vm files or a single .asm file".into());
