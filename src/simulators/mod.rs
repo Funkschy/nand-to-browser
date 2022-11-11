@@ -254,7 +254,7 @@ where
     ScriptParser<'tst, P, C>: SimulatorCommandParser<C>,
 {
     let writer = writer.into();
-    let use_outfile = writer.is_none();
+    let mut use_outfile = writer.is_none();
 
     let mut executor = BaseScriptExecutor::new(sim_executor, writer);
     for cmd in p {
@@ -269,7 +269,12 @@ where
         }
     }
 
-    executor.writer()?.flush()?;
+    if let Ok(writer) = executor.writer() {
+        writer.flush()?;
+    } else {
+        // if there is no output writer, we definitely don't want to use an outfile
+        use_outfile = false;
+    }
 
     let (cmp_name, cmp_content) = if let Some(cmp) = &executor.compare_file {
         (
