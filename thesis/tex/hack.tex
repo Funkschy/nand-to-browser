@@ -1,5 +1,5 @@
-\section{Nand to Tetris und die Hack Architektur}
-\subsection{Die Abschnitte des Nand to Tetris Kurses}
+\section{Nand to Tetris and the Hack Architecture}
+\subsection{The sections of Nand to Tetris}
 \begin{itemize}
   \item Chips und Logic Gates (nicht Teil der Arbeit)
   \item CPU und Assembly
@@ -7,9 +7,9 @@
   \item High level Sprache und Betriebssystem (nicht Teil der Arbeit)
 \end{itemize}
 
-\subsection{Ein Überblick über VM Architektur im Allgemeinen}
-\subsubsection{Beispiel: Zahlen in Schleife addieren in simpler VM}
-\begin{lstlisting}[language=C, caption={Berechne 1 + 2 + 3 in C}, captionpos=b]
+\subsection{How does the Hack VM work}
+\subsubsection{Example: Adding numbers in a Loop}
+\begin{lstlisting}[language=C, caption={Calculate 1 + 2 + 3 in C}, captionpos=b]
   int i = 1;
   int sum = 0;
   while (i <= 3) {
@@ -17,44 +17,9 @@
     i++;
   }
 \end{lstlisting}
-\begin{lstlisting}[caption={Berechne 1 + 2 + 3 in einer Stack-basierten VM}, captionpos=b]
-  // i = 1
-  push 1
-  pop i
-
-  // sum = 0
-  push 0
-  pop sum
-
-  label LOOP_START
-  push i
-  push 3
-  // i <= 3 pusht entweder true oder false auf den stack
-  less-than-or-equal
-  // wenn der vorherige check false war, springen wir aus der Schleife
-  goto-if-false LOOP_END
-
-  // wenn i immer noch <= 3, addieren wir zuerst i und sum
-  // und schreiben das Ergebnis der Addition wieder in die Summe
-  push i
-  push sum
-  add
-  pop sum
-
-  push i
-  push 1
-  add
-  pop i  // i = i + 1
-
-  // Springe zum Anfang der Schleife
-  goto LOOP_START
-
-  label LOOP_END
-\end{lstlisting}
 
 \subsection{Hack Bytecode}
-\subsubsection{Das obige Beispiel in der Hack Architektur}
-\begin{lstlisting}[caption={Berechne 1 + 2 + 3 in der Hack VM}, captionpos=b]
+\begin{lstlisting}[caption={Calculate 1 + 2 + 3 in the Hack VM}, captionpos=b]
   // i = 1
   push constant 1
   pop local 0
@@ -65,13 +30,13 @@
 
   label LOOP_START
 
-  // die Hack Architektur besitzt keine <= Instruktion,
-  // insofern benutzen wir i < 4 anstatt i <= 3
+  // the Hack bytecode does not have an <= instruction,
+  // therefore use i < 4 instead of i <= 3
   push local 0
   push constant 4
   lt
 
-  // falls i >= 4 ist springen wir aus der Schleife
+  // if i >= 4 jump out of the loop
   not
   if-goto LOOP_END
 
@@ -87,7 +52,7 @@
   add
   pop local 0
 
-  // Springe zum Anfang der Schleife
+  // jump to the beginning of the loop again
   goto LOOP_START
   label LOOP_END
 \end{lstlisting}

@@ -1,0 +1,52 @@
+\section {Technologies}
+
+\subsection{WebAssembly}
+
+WebAssembly (abbreviated Wasm) is a binary instruction format for a stack-based virtual machine. It is designed as a portable compilation target for programming languages, enabling the usage of traditionally native languages, such as C/C++ or Rust for web development.~\cite{wasmweb}
+Wasm however is not a replacement for JavaScript (JS) in its entirety. Rather it is intended to complement JS by being used to implement the computationally intensive parts of web applications, while all parts related to DOM manipulation and event handling continue to be written in JS.~\cite{wasmmdn}
+
+\subsection{Rust}
+
+Rust is a multi-paradigm programming language that tries to combine high-level ergonomics with low-level control. \cite[Introduction]{klabnik2019rust}
+Besides the option to compile to native machine code, Rust is also capable of targeting Wasm as its platform, making it possible to use Rust for web development.~\cite{rustwasm}
+Just like C and C++, Rust does not use runtime garbage collection by default, but unlike those langauges, Rust also does not require the programmer to explicitly free memory themselves.
+Instead, it relies on its compiler to automatically insert all the necessary cleanup code. This is made possible by the ownership system, which tracks the lifetime of every reference in the program and ensures that nothing can be used after being freed.
+In order to do this, the compiler has to enforce a set of rules, which will cause a compilation error if broken.~\cite[Chapter~4]{klabnik2019rust}
+This unique approach allows achieving the same performance as C/C++, but without sacrificing memory safety.
+
+disadvantages: rules, explicit lifetimes -> time-consuming to write/refactor
+type system: inspired by ML and Haskell (https://doc.rust-lang.org/reference/influences.html)
+
+\subsection{The advantages of Rust over JavaScript}
+
+\begin{itemize}
+  \item Performance
+  \item Stability und reliability through the rich typesystem and ownership model
+  \item useful language features: Enums, Pattern Matching and Traits
+  \item https://dl.acm.org/doi/abs/10.1145/3062341.3062363
+\end{itemize}
+
+\subsection{The advantages of Rust over other WebAssembly languages}
+
+\begin{itemize}
+  \item Performance and Bundle size (no GC, small runtime)
+  \item stable ecosystem: wasm-bindgen, web-sys, console\_error\_panic\_hook
+  \item stable language (multiple major releases, backwards compatibility)
+  \item safer than C/C++ https://msrc-blog.microsoft.com/2019/07/16/a-proactive-approach-to-more-secure-code/
+  \item good tooling: Cargo, Great error messages, editor support
+\end{itemize}
+
+\subsection{React.js}
+
+\begin{itemize}
+  \item Industry standard for reactive frontend development
+  \item very stable and mature with tons of resources
+\end{itemize}
+
+\subsection{The advantages of React.js over pure JavaScript}
+
+\begin{itemize}
+  \item Component architecture simplifies code re-use
+  \item simple, declarative and efficient updates for Components
+  \item UI = f(state) instead of imperative spagetti code
+\end{itemize}
