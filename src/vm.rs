@@ -23,6 +23,8 @@ fn run(vm: &mut VM, steps_per_tick: usize) {
     use sdl2::event::Event;
     use sdl2::keyboard::Keycode;
     use sdl2::pixels::{Color, PixelFormatEnum};
+    use simulators::vm::error::VMError;
+    use simulators::vm::stdlib::StdlibError;
 
     let logical_width = SCREEN_WIDTH as u32;
     let logical_height = SCREEN_HEIGHT as u32;
@@ -122,7 +124,13 @@ fn run(vm: &mut VM, steps_per_tick: usize) {
         }
 
         for _ in 0..steps_per_tick {
-            vm.step().unwrap();
+            let result = vm.step();
+            if matches!(&result, Err(VMError::StdlibError(StdlibError::Halt))) {
+                break 'running;
+            } else {
+                // only report actual errors, not halting
+                result.expect("vm error");
+            }
         }
 
         let words_per_row = 32;
