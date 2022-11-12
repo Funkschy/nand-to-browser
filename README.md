@@ -2,6 +2,8 @@
 
 A Nand to Tetris Emulator implementation that can run in the browser or on your Desktop
 
+The application is hosted on https://funkschy.github.io/nand-to-browser/
+
 # Dependencies
 ## General
 - [Rust](https://www.rust-lang.org/)
