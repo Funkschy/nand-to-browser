@@ -5,16 +5,16 @@
 % in eigene Dateien zu schreiben und mittels \input einzubinden.
 % Eine mögliche Verzeichnisstruktur sähe entsprechend so aus:
 %
-%     thesis/
-%     +- tex/
-%     |  +- introduction.tex
-%     |  +- motivation.tex
-%     |  +- experiments.tex
-%     |  |  ...
-%     |  +- conclusion.tex
-%     +- abstract.tex
-%     +- contents.tex
-%     +- thesis.tex
+% thesis/
+% +- tex/
+% |  +- introduction.tex
+% |  +- motivation.tex
+% |  +- experiments.tex
+% |  |  ...
+% |  +- conclusion.tex
+% +- abstract.tex
+% +- contents.tex
+% +- thesis.tex
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \input{tex/intro.tex}
@@ -29,10 +29,20 @@
 \subsection{Bilder}%
 \label{sec:figures}
 
-\begin{figure}[h]
-  \includegraphics[width=14cm]{fig/hackenstein-offiziell.png}
-  \caption{A simple Wolfenstein 3D Clone running in the VM Emulator}%
-  \label{fig:hackenstein-offiziell}
-\end{figure}
+\begin{center}
+  \begin{figure}[h]
+    \includegraphics[width=14cm]{fig/hackenstein-offiziell.png}
+    \caption{A simple Wolfenstein 3D Clone running in the VM Emulator}%
+    \label{fig:hackenstein-offiziell}
+  \end{figure}
+\end{center}
+
+\begin{center}
+  \begin{figure}[h]
+    \includegraphics[width=14cm]{fig/gaschunky.png}
+    \caption{A screenshot of the GASchunky animation in progress}%
+    \label{fig:gaschunky-screenshot}
+  \end{figure}
+\end{center}
 
 \input{tex/conclusions.tex}
