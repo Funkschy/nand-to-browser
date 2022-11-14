@@ -1,6 +1,11 @@
 \section{Related work}
 
 \subsection{Nand to Tetris}
+
+This project is of course closely related to the Nand to Tetris~\cite{n2tweb} course. All of the high-level functionality was designed and specified by Nisan and Schocken.
+Since the goal of this project is to develop an alternative emulator implementation, care was taken to follow the specifications described in the companion book, specifically the sections 4.2, 7.2, 8.2 and 9.2.7  ~\cite{nisan2005}.
+In addition, many of the integration tests are direct ports of test cases included in the Nand to Tetris course.
+
 \begin{itemize}
   \item VM Bytecode design und high level Funktionalität
   \item CPU Assembly design und high level Funktionalität
@@ -9,6 +14,7 @@
 \end{itemize}
 
 \subsection{Dependencies}
+
 \begin{itemize}
 \item lazy\_static (hack um rust weniger nervig zu machen)
 \item regex
@@ -22,12 +28,19 @@
 \end{itemize}
 
 \subsection{Existing Nand to Tetris Emulator implementations}
+
+The main Nand to Tetris Emulator implementation is, of course, the official one, which can be downloaded directly on the courses website and contains all the tools necessarry for completing all the projects in the book.~\cite{n2tsoftware}
+However, there have also been other people who tried to provide an alternative emulator experience. One of those is pynand, which aims to provide a better experience, by eliminating the need to install java and making the interface less ``clunky''~\cite{pynand}. This tool however has multiple limitations, which limit its usefulness. It does little to improve the performance of the emulator and also severely limits the programs that can be run. Furthermore it offers no UI outside of the display, making it hard to debug complex Jack programs. Also, the user is still required to install software onto their computer, just Python instead of Java.
+
 \begin{itemize}
   \item https://github.com/itoshkov/nand2tetris-emu
   \item https://github.com/mossprescott/pynand
 \end{itemize}
 
 \subsection{Emulators in WebAssembly}
+
+In recent years, there have been several projects that implemented emulators in WebAssembly. Notably, an emulator for Intel's 8086 Micorprocessor~\cite{9824078} also written in Rust and using a ReactJS frontend. This already demonstrates the viability of these technologies for the creation of web-based emulators, but obviously offers no benefit to the participants of the Nand to Tetris course, which is the major goal of this thesis.
+
 \begin{itemize}
   \item https://ieeexplore.ieee.org/abstract/document/9824078
   \item https://wasm4.org/

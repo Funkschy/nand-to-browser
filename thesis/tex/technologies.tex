@@ -13,17 +13,21 @@ Just like C and C++, Rust does not use runtime garbage collection by default, bu
 Instead, it relies on its compiler to automatically insert all the necessary cleanup code. This is made possible by the ownership system, which tracks the lifetime of every reference in the program and ensures that nothing can be used after being freed.
 In order to do this, the compiler has to enforce a set of rules, which will cause a compilation error if broken.~\cite[Chapter~4]{klabnik2019rust}
 This unique approach allows achieving the same performance as C/C++, but without sacrificing memory safety.
+However, it also has its drawbacks: When more rules are imposed on the programmer, writing and especially refactoring code tends to become more tedious, since a simple change from an owned object to a reference in Rust often requires inserting explicit lifetimes into large portions of the code base.
 
-disadvantages: rules, explicit lifetimes -> time-consuming to write/refactor
-type system: inspired by ML and Haskell (https://doc.rust-lang.org/reference/influences.html)
+\subsection{The advantages of Rust and WebAssembly over JavaScript}
 
-\subsection{The advantages of Rust over JavaScript}
+WebAssembly offers significant performance improvements over JavaScript, often reaching execution times within 10\% of native code. Even the optimized subset of JavaScript known as asm.js is, on average, 33.7\% slower than Wasm~\cite[Chapter~7.3]{wasmspeed}. The advantages do not stop with performance however, if used as a compilation target, it offers the ability to use Rust's powerful and versatile type system on the web.
+This type system, inspired by ML and Haskell~\cite{rustinfluences}, provides programmers with a variety of ways to specify and limit the capabilities of certain types in their applications.
+It enables the detection and prevention of entire classes of errors at compile time, dramatically reducing the amount of end-to-end testing required.
+Some features in Rust's type system are especially valuable for writing emulators, namely Enums, Pattern Matching and Traits, whose influences on the design of the final application will be explained in further detail in \cref{implementation}.
 
 \begin{itemize}
   \item Performance
   \item Stability und reliability through the rich typesystem and ownership model
   \item useful language features: Enums, Pattern Matching and Traits
   \item https://dl.acm.org/doi/abs/10.1145/3062341.3062363
+  \item type system: inspired by ML and Haskell (https://doc.rust-lang.org/reference/influences.html)
 \end{itemize}
 
 \subsection{The advantages of Rust over other WebAssembly languages}
@@ -36,14 +40,14 @@ type system: inspired by ML and Haskell (https://doc.rust-lang.org/reference/inf
   \item good tooling: Cargo, Great error messages, editor support
 \end{itemize}
 
-\subsection{React.js}
+\subsection{ReactJS}
 
 \begin{itemize}
   \item Industry standard for reactive frontend development
   \item very stable and mature with tons of resources
 \end{itemize}
 
-\subsection{The advantages of React.js over pure JavaScript}
+\subsection{The advantages of ReactJS over pure JavaScript}
 
 \begin{itemize}
   \item Component architecture simplifies code re-use
