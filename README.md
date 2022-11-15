@@ -40,18 +40,23 @@ cargo build --release --features desktop
 # for headless mode (to only run test scripts without seeing the UI)
 cargo build --release
 ```
+This will actually produce two different binaries inside the target/release directory. One for the VM Emualtor and one for the CPU emulator.
 
 ## Usage
 
 ### VM
 ``` shell
-target/release/vm <DIR> # dir should contain the VM files, and at most one Test and one Compare script
+target/release/vm <DIR> # dir should contain the VM files, Test and Compare scripts
 ```
+In the course's projects there are some who contain multiple Test scripts. In that case the one that ends with VME.tst will be used.
+This behaviour was chosen, because the binary can be used without any test scripts. If there are no test scripts in the directory, it will either run in headless mode, or if the desktop feature was enabled during compilation, it will start the SDL UI.
 
 ### CPU
 ``` shell
-target/release/cpu <DIR> # dir should contain the asm file, and at most one Test and one Compare script
+target/release/cpu <tst file>
 ```
+The CPU emulator can only be used with a Test script, so that is the expected argument.
+This should be equivalent to the official emulator.
 
 To get a list of all available options just run `target/release/[cpu|vm] --help`
 
