@@ -12,10 +12,60 @@
 
 \subsection{Architectural overview}
 The general architecture of the application is outlined in \cref{fig:arch}.
-There are three possible entry points for the application, which are listed in the interfaces section of the figure.
+It is divided into three major sections. The actual simulators, the parsers and the interfaces that serve as entry points into the application. Even though the CPU and VM are usually refered to as emulators, the module is called simulators because that is a more general term, that would also fit the hardware simulator which was not implemented as part of this thesis~\ref{future-work}. This is the naming convention of the official tools, where the emulators are also part of the simulators package~\cite{n2tsimulators}.
 
-\subsection{VM development in Rust}
+\subsubsection{Interfaces}
+There are three possible entry points for the application, which are listed in the interfaces section of the figure. Two of those are intended for use via the command line. They provide the ability to use the test scripts included in the project within the new emulator.
+They do however work in slightly different ways because the VM emulator can be run without a test script, while the CPU emulator does not have that ability at the moment.
+For this reason, the VM Emulator expects a path to a directory containing the bytecode, test and comparison files, while the CPU emulator only accepts a single file path to a test scripts as its input.
+The VM emulator will then behave differently based on the contents of the provided directory.
+If there are no test scripts in the directory, the VM will simply try to execute the bytecode files directly instead. If the application was compiled in desktop mode~\ref{conditional-compilation}, a new window will be created, containing the VM display.
+In the case of a single test script, that script will be executed instead. However, the exercises contain multiple projects with two different test scripts, only one of which is for the VM with the other one being intended for the CPU emulator.
+Fortunately, these scripts all follow the same naming convention, with the VM script names ending in ``VME'', a property the application uses to distinguish between the two.
+
+The third entry point is the most relevant for most users. The web UI, which is a JavaScript application that calls the emulator implementations as a WebAssembly library, can be easily accessed in any major web browser.
+Unlike the other two entry points, which can each only use one of the emulators, the web UI can use both simulators, indicated in the diagram by an arrow pointing to the outer simulators box.
+
+\subsubsection{Simulators}
+The two emulators in the simulators module are structurally very similar. Both have a Command module that contains the instruction enum~\ref{rust-vm-dev}, an Error module that contains the error enum for the respective emulator and a Script module that handles the emulators execution if run via a test script.
+However, the VM is more complex and also contains the Stdlib module, which contains the Rust implementation of the Jack standard library~\ref{jack-stdlib-in-rust}.
+
+\subsubsection{Parsers}
+Unlike the simulators module, the Parsing module actually contains three different submodules, as the script parsing is mostly independent from the emulator implementation used.
+Having said that, there are some emulator specific instructions in the scripts whose parsing is actually contained in the Script module of the respective emulator. This division was done intentionally, because parsing those instructions is only a small part of the whole script parsing process and is closely linked to the way the script is interpreted by the emulator.
+All of the parsers share a lot of common code, so it makes sense to combine them into one module.
+
+\subsection{VM development in Rust} \label{rust-vm-dev}
+\subsubsection{Design decision: Enums vs Unions}
+\subsubsection{Step by step execution with pattern matching}
 \subsection{Parser development in Rust}
+\subsubsection{Lexer vs Parser}
+\subsubsection{Generic lexer}
+\subsubsection{Explaining the bytecode parser}
+\subsubsection{Peekable as an example for the usefulness of traits}
 \subsection{The test-script workflow}
-\subsection{The native standard library protocol}
-\subsection{Using conditional compilation in Rust}
+\subsubsection{Traits as an alternative to inheritance}
+\subsubsection{Compile time check for the combination of parser and executor}
+\subsection{The native standard library protocol} \label{jack-stdlib-in-rust}
+\subsubsection{The problem}
+\begin{itemize}
+  \item step by step execution -> no waiting
+  \item vm functions can call rust functions
+  \item rust functions can call vm functions
+\end{itemize}
+\subsubsection{Solution: Finite-state machine}
+\begin{itemize}
+  \item args passed as vector
+  \item vm is also passed mutably
+  \item state (integer, initially 0) is always passed to stdlib function
+  \item stdlib function returns either Done or next state
+  \item next time it's called with next state (if not finished)
+\end{itemize}
+\subsubsection{Example: Sys.wait}
+\subsubsection{Example: Output.printString}
+oder Keyboard.readLine
+\subsection{Using conditional compilation in Rust} \label{conditional-compilation}
+\begin{itemize}
+  \item different tracing modes without runtime overhead
+  \item desktop mode with optional dependencies
+\end{itemize}
