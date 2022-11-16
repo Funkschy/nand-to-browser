@@ -37,6 +37,51 @@ All of the parsers share a lot of common code, so it makes sense to combine them
 
 \subsection{VM development in Rust} \label{rust-vm-dev}
 \subsubsection{Design decision: Enums vs Unions}
+Before one can start implementing a VM, one must first decide on an internal representation for the bytecode that will run on that VM.
+The bytecode design will always involve tradeoffs between performance and usability during development.
+The authors of the original emulator implementation choose a very inefficient representation where each instruction is an object of an Instruction class. The instruction class contains a field for the opcode, the actual instruction that is executed, and several fields for possible arguments, plus to another integer that determines the number of arguments.
+In addition, it also contains a string argument that is used for call instructions, where functions are actually called by their name at runtime.
+This design has several disadvantages. From a performance perspective, it is very wasteful. Each instruction has the maximum size, even if it takes no arguments. More importantly, each instruction must be allocated on the heap and therefore requires pointer indirection during execution, which is know to have drastic impacts on performance as it reduces spatial locality~\cite{6498541}.
+Futhermore, using strings to dispatch call instructions is a lot less efficient than just jumping to the correct bytecode position directly.
+
+Two different bytecode designs were considered during the development of the new emulator.
+The first, which is more efficient but also posed serious problems from an implementation point of view, uses unions to minimize the space required for storing the instruction vector~\ref{lst:original-bytecode}.
+
+An union of instructions, segments and constants allows us to pack all these components of the bytecode into a single vector. Reading the values does, however, requires unsafe Rust code.
+Because each of the union variants can be represented by a single byte, this approach has the clear advantage that each instruction only occupies as much space as it really needs, with no padding bytes. The instruction vector is simply a vector of bytes that can be interpreted based on the context.
+However, this approach also has drawbacks. A single instruction in the textual representation of the bytecode can now correspond to multiple entries in the instruction vector. This means that the index of an instruction in the program at runtime is often significantly larger than then line number of the instruction in the input.
+This has two major consequences. The first and less important is that additional metadata is required to determine the line number in the input from the current instruction in the runtime representation. This drastically increases the complexity needed to implement the code view in the UI.
+The more important issue however is the reduction of the available address space. Jump instructions in the Hack Bytecode are absolute, not relative as for example in the JVM.
+This means that by assigning multiple indices to each instruction, we would recude the number of available jump locations significantly, prohibiting us from loading bigger projects like Hackenstein~\ref{fig:hackenstein-offiziell}.
+Alternatively, we could dispense with the one-to-one mapping of addresses and bytecode indices, but this would further complicate the VM implementation.
+
+\begin{lstlisting}[label={lst:original-bytecode}]
+  pub enum Segment {
+    Argument,
+    Local,
+    // [...]
+    Temp,
+  }
+
+  pub enum Instruction {
+    Add,
+    Sub,
+
+    // [...]
+
+    Function,
+    Call
+  }
+
+  pub union Opcode {
+    instruction: Instruction,
+    segment: Segment,
+    constant: u8,
+  }
+\end{lstlisting}
+
+For the reasons mentioned above, the new emulator actually uses a different bytecode representation. Instead of focusing purely on performance, it is more similar to the official emulators's approach, but with the pointer indirections and some overhead removed.
+
 \subsubsection{Step by step execution with pattern matching}
 \subsection{Parser development in Rust}
 \subsubsection{Lexer vs Parser}
