@@ -47,6 +47,8 @@ pub fn wait(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
         return Err(StdlibError::SysWaitNegativeDuration);
     }
 
+    // unfortunately this cannot actually be implemented correctly in wasm because wasm currently
+    // offers no way to get the current system time. Therefore we can only use ticks as an estimate
     let duration = params[0] as State * 1000;
 
     if state == 0 {
