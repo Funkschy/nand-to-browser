@@ -1,17 +1,31 @@
 \section{Implementation} \label{implementation}
+In this project, both the VM emulator and the CPU emulator were implemented. Yet, this decision was made relatively late in the implementation process because it was difficult to accurately estimate the time required to implement the VM.
+The CPU emulator is also much simpler than the VM and can reuse some of the code from the VM implementation.
+Accordingly most of this section only focusses on the VM emulator. If no emulator is explicitly specified, the text is always referring to the VM.
 
 \subsection{General approach}
-\subsubsection{Test driven development of the VM without an UI}
-\begin{itemize}
-  \item first implement bytecode parser, because it can be used in VM Tests
-  \item basic VM features (everything except for function, call, return)
-  \item testing with unit tests (Translations of VME.tst tests)
-  \item rest of the VM instructions
-  \item stdlib only as vm bytecode
-\end{itemize}
+For any project, one must first decide on a course of action. Due to the relatively unique requirements of this project, the order in which the features are to be implemented is not immediately obvious.
+Fundamentally, there are are two possible approaches. In a top-down approach, one would start by implementing the user interface (UI) first and then fill in the gaps later.
+However, since the application has different user interfaces depending on the intended use, it makes more sense to develop bottom-up.
+This allowed for a more test-driven approach, where the internal logic of the emulator is developed first and only later integrated into the UI.
+In order to be able to test the VM properly, it made sense to implement the bytecode parser first~\ref{parser-dev}, as it would significantly reduce the effort required to write unit tests for the VM.
+Once the parser was completed, the VM could be implemented in isolation and independent of the future user interface. The various instructions of the VM vary in complexity, so it made sense to postpone the implementation of the Function, Call and Return instructions until all other instructions had been implemented and sufficiently tested.
+Here, the tests in the course projects, which were intended to test the participants' compiler implementation, helped to ensure the correct functionality of the emulator.
+Although there was no way to parse the test scripts directly at this point, they were still very useful because they could easily be translated directly into rust code by hand.
+Eventually all instructions were implemented according to their specification~\cite{nisan2005}.
+At this point the emulator was full functional, the standard library was simply loaded in its bytecode form, which made it possible to execute any VM program without any modifications. The standard library would later be implemented in Rust for performance reasons~\ref{jack-stdlib-in-rust}.
+
+% \subsubsection{Test driven development of the VM without an UI}
+% \begin{itemize}
+%   \item first implement bytecode parser, because it can be used in VM Tests
+%   \item basic VM features (everything except for function, call, return)
+%   \item testing with unit tests (Translations of VME.tst tests)
+%   \item rest of the VM instructions
+%   \item stdlib only as vm bytecode
+% \end{itemize}
 
 \subsection{Architectural overview}
-The general architecture of the application is outlined in \cref{fig:arch}.
+The general architecture of the application is outlined in \cref{fig:arch}. Every box in this diagram represents a Rust module, which can either be a single file or an entire directory.
 It is divided into three major sections. The actual simulators, the parsers and the interfaces that serve as entry points into the application. Even though the CPU and VM are usually refered to as emulators, the module is called simulators because that is a more general term, that would also fit the hardware simulator which was not implemented as part of this thesis~\ref{future-work}. This is the naming convention of the official tools, where the emulators are also part of the simulators package~\cite{n2tsimulators}.
 
 \subsubsection{Interfaces}
@@ -42,7 +56,7 @@ The bytecode design will always involve tradeoffs between performance and usabil
 The authors of the original emulator implementation choose a very inefficient representation where each instruction is an object of an Instruction class. The instruction class contains a field for the opcode, the actual instruction that is executed, and several fields for possible arguments, plus to another integer that determines the number of arguments.
 In addition, it also contains a string argument that is used for call instructions, where functions are actually called by their name at runtime.
 This design has several disadvantages. From a performance perspective, it is very wasteful. Each instruction has the maximum size, even if it takes no arguments. More importantly, each instruction must be allocated on the heap and therefore requires pointer indirection during execution, which is know to have drastic impacts on performance as it reduces spatial locality~\cite{6498541}.
-Futhermore, using strings to dispatch call instructions is a lot less efficient than just jumping to the correct bytecode position directly.
+Furthermore, using strings to dispatch call instructions is a lot less efficient than just jumping to the correct bytecode position directly.
 
 Two different bytecode designs were considered during the development of the new emulator.
 The first, which is more efficient but also posed serious problems from an implementation point of view, uses unions to minimize the space required for storing the instruction vector~\ref{lst:original-bytecode}.
@@ -53,9 +67,13 @@ However, this approach also has drawbacks. A single instruction in the textual r
 This has two major consequences. The first and less important is that additional metadata is required to determine the line number in the input from the current instruction in the runtime representation. This drastically increases the complexity needed to implement the code view in the UI.
 The more important issue however is the reduction of the available address space. Jump instructions in the Hack Bytecode are absolute, not relative as for example in the JVM.
 This means that by assigning multiple indices to each instruction, we would recude the number of available jump locations significantly, prohibiting us from loading bigger projects like Hackenstein~\ref{fig:hackenstein-offiziell}.
-Alternatively, we could dispense with the one-to-one mapping of addresses and bytecode indices, but this would further complicate the VM implementation.
+Alternatively, we could dispense with the one-to-one mapping of addresses and bytecode indices, but that would further complicate the VM implementation.
 
-\begin{lstlisting}[label={lst:original-bytecode}]
+\begin{lstlisting}[
+  label={lst:original-bytecode},
+  caption={Bytecode representation based on unions},
+  captionpos=b
+  ]
   pub enum Segment {
     Argument,
     Local,
@@ -81,10 +99,95 @@ Alternatively, we could dispense with the one-to-one mapping of addresses and by
 \end{lstlisting}
 
 For the reasons mentioned above, the new emulator actually uses a different bytecode representation. Instead of focusing purely on performance, it is more similar to the official emulators's approach, but with the pointer indirections and some overhead removed.
+This approach is based around Rust's enum types. Enums allow the programmer to define a type by enumerating its possible variants~\cite[Chapter~6]{klabnik2019rust}.
+Enums are typically used in conjunction with pattern matching, a feature that allows the programmer to compare a value against a series of patterns and then execute code based on which pattern matches~\cite[Chapter~6.2]{klabnik2019rust}.
+All of the instructions are now contained in a single enum~\ref{lst:enum-bytecode}.
+This makes it very easy to not only identify the current instruction, but also extract all the necessary data from it~\ref{lst:bytecode-pattern-matching}.
+
+\begin{lstlisting}[
+  label={lst:enum-bytecode},
+  caption={Bytecode representation based on a single enum},
+  captionpos=b
+  ]
+  pub enum Instruction {
+    Add,
+    Sub,
+
+    // [...]
+
+    Push { segment: Segment, index: Word },
+    Pop { segment: Segment, index: Word },
+
+    Function { n_locals: Word },
+    Call { function: Word, n_args: Word },
+  }
+\end{lstlisting}
+
+The size of the entire enum is equal to the size of its largest variant, which may sound wasteful at first, however this is actually not a problem.
+Call instructions in the new emulator are not dispatched based on the function name. Instead, the bytecode parser already resolves the name to the index of the function within the bytecode vector, therefore enabling the VM to simply set the program counter to that value directly.
+This has the additional benefit of making the Call instruction, which would otherwise be the largest variant, the same size as the Push and Pop instructions.
+Analysis of 15 different Jack programs and the Jack standard library has revealed that Push and Pop in combination account for about 70\% of all bytecode instructions in real programs, while Call instructions account for another 10\% of all instructions.
+Based on this, the padding caused by using enums is not really relevant for the memory requirements and cache efficiency of actual programs.
+Pointer indirections, which are however still relevant, are also not an issue in this representation, as it contains no pointers at all.
+For the above reasons, this representation is a good choice, both for performance and ease of use during development.
+
+\begin{lstlisting}[
+  label={lst:bytecode-pattern-matching},
+  caption={Using pattern matching to deconstruct the instruction data},
+  captionpos=b
+  ]
+  match instruction {
+    Add => tos_binary!(self, +),
+    // [...]
+    Push { segment, index } => {
+      let value = self.get_value(segment, index)?;
+      self.push(value)?;
+    }
+    // [...]
+    Function { n_locals } => {
+      // initialize all local variables to zero
+      for _ in 0..n_locals {
+        self.push(0)?;
+      }
+    }
+  }
+\end{lstlisting}
 
 \subsubsection{Step by step execution with pattern matching}
-\subsection{Parser development in Rust}
-\subsubsection{Lexer vs Parser}
+The architecture, with its different entry points and ways to use the emulators~\ref{fig:arch}, poses unique constraints on VM implementation. In order to satisfy all those requirements, the VM runs in a way that executes one step at a time and is able to be suspended after each of those steps. This constraint will be especially important for the interaction with native rust code in the standard library~\ref{jack-stdlib-in-rust}.
+In each step, the VM first fetches the current instruction from the loaded program, then performs pattern matching to extract all the required data and finally executes the instruction.
+The matching process can be seen in \cref{lst:bytecode-pattern-matching}, where the segment and index of a push instruction are extracted and then used to first load the value with another method and then push it onto the stack.
+Rusts pattern matching handles the selection of the correct branch automatically.
+
+\subsubsection{Rust macros}
+Macros are a way of writing code that writes other code, which is known as metaprogramming~\cite[Chapter~19.5]{klabnik2019rust}.
+They allow the programmer to extend the language in certain ways that would not be possible with functions alone.
+One of those ways is the ability to pass language operators as arguments, which would require the creation of a closure when using functions.
+Another advantage of macros is that, unlike functions, they have no runtime overhead, since the code is only inserted at the position of the caller, without an actual function call at runtime.
+Those advantages can be seen in \cref{lst:binary-add-macro}, which is used in the step function for bitwise and, bitwise or, addition and subtraction. The macro gets the two values on the top of the stack, casts them to a 32 bit integer for compatibility with Java, applies the operator to them and then pushes the result onto the stack.
+The operator can be passed as a simple token, instead of wrapping it into an anonymous function.
+\cref{lst:bytecode-pattern-matching} shows how this macro would be called to implement the Add instruction.
+
+\begin{lstlisting}[
+  label={lst:binary-add-macro},
+  caption={A macro which handles binary operators in the VM emulator},
+  captionpos=b
+  ]
+  macro_rules! tos_binary {
+    ($vm:expr, $op:tt) => {{
+        let sp = $vm.mem(SP)? as Address;
+        // cast up to i32 to keep compatibility with
+        // the official emulator in case of an overflow
+        let l = $vm.mem(sp - 2)? as i32;
+        let r = $vm.mem(sp - 1)? as i32;
+        $vm.set_mem(sp - 2, (l $op r) as Word)?;
+        $vm.add_to_mem(SP, -1)?;
+      }};
+  }
+\end{lstlisting}
+
+\subsection{Parser development in Rust} \label{parser-dev}
+\subsubsection{Lexers and Parsers}
 \subsubsection{Generic lexer}
 \subsubsection{Explaining the bytecode parser}
 \subsubsection{Peekable as an example for the usefulness of traits}
@@ -92,13 +195,13 @@ For the reasons mentioned above, the new emulator actually uses a different byte
 \subsubsection{Traits as an alternative to inheritance}
 \subsubsection{Compile time check for the combination of parser and executor}
 \subsection{The native standard library protocol} \label{jack-stdlib-in-rust}
-\subsubsection{The problem}
+\subsubsection{The issues with native functions in the virtual machine}
 \begin{itemize}
   \item step by step execution -> no waiting
   \item vm functions can call rust functions
   \item rust functions can call vm functions
 \end{itemize}
-\subsubsection{Solution: Finite-state machine}
+\subsubsection{Solving those issues with a Finite-state machine}
 \begin{itemize}
   \item args passed as vector
   \item vm is also passed mutably
@@ -108,7 +211,7 @@ For the reasons mentioned above, the new emulator actually uses a different byte
 \end{itemize}
 \subsubsection{Example: Sys.wait}
 \subsubsection{Example: Output.printString}
-oder Keyboard.readLine
+or Keyboard.readLine (also shows why you can't just execute the entire native function)
 \subsection{Using conditional compilation in Rust} \label{conditional-compilation}
 \begin{itemize}
   \item different tracing modes without runtime overhead

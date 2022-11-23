@@ -1,11 +1,24 @@
 \section{Nand to Tetris and the Hack Architecture}
-\subsection{The sections of Nand to Tetris}
-\begin{itemize}
-  \item Chips und Logic Gates (nicht Teil der Arbeit)
-  \item CPU und Assembly
-  \item Virtuelle Machine
-  \item High level Sprache und Betriebssystem (nicht Teil der Arbeit)
-\end{itemize}
+
+Nand to Tetris is divided into several sections that can be worked on or skipped more or less independently of each other.
+Each section is further removed from the actual hardware than its predecessor. In the beginning, the students create the necessary chips and logic gates, starting with only a nand gate. This section is not part of this thesis at all, but it may be relevant in future additions to the application~\ref{future-work}.
+After that, the students will work with assembly language and create an assembler of their own, the generated code of which will target the CPU from the previous section.
+The application created as part of this thesis includes an emulator, that is able to run the assembly directly without any further compilation. This allows students to run their assembly code in the same application as their VM code from the later sections.
+In the next section, students will work closely with VM bytecode, first by writing a translator from bytecode to assembly, and later by writing a complete game using the high-level programming language that will be implemented in the last section.
+In the end, students will create a compiler for a high-level language called Jack, that is part of the course. They will also implement a standard library for this language, that abstracts many of the direct interactions with the platform, such as printing text to the screen.
+The last two parts are relevant to this project because students can run both the VM code and their compiled assembly inside the emulator. Furthermore, the main focus of this project is the aforementioned game that is created in Project 9.
+It may seem strange to develop a whole new emulator mainly to improve a single one of twelve projects, but that single project is the ``Tetris'' to which the title of the course refers. Even though Project 9 is not the last project, it is still the highlight of the course for many people.
+This is illustrated by the fact that nine of the twelve examples listed under the ``Cool Stuff''~\cite{n2tweb} tab on the official website are Jack programs that would qualify as Project 9 solutions.
+Therefore, if your goal is to improve the overall student experience, it makes sense to focus on this project in particular.
+Despite that, this the emulators created as part of this project may also improve the experience for other projects.~\ref{evaluation}
+
+% \subsection{The sections of Nand to Tetris}
+% \begin{itemize}
+%   \item Chips und Logic Gates (nicht Teil der Arbeit)
+%   \item CPU und Assembly
+%   \item Virtuelle Machine
+%   \item High level Sprache und Betriebssystem (nicht Teil der Arbeit)
+% \end{itemize}
 
 \subsection{How does the Hack VM work}
 \subsubsection{Example: Adding numbers in a Loop}
@@ -17,6 +30,9 @@
     i++;
   }
 \end{lstlisting}
+
+explain push/pop in detail
+explain how the stack works
 
 \subsection{Hack Bytecode}
 \begin{lstlisting}[caption={Calculate 1 + 2 + 3 in the Hack VM}, captionpos=b]
