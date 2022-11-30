@@ -18,7 +18,8 @@ In contrast, the bytecode view and the memory segments are hidden while the prog
 \subsection{Comparison with the official Emulator based on compatability} \label{compatibility}
 \begin{itemize}
   \item every program working. systematic approach because there are tons of non public programs. Example programs that use every instruction/stdlib-function
-  \item Sys.wait not the same (but also different behaviour on official emulator, based on stdlib)
+  \item Sys.wait not the same (but also different behaviour on official emulator, based on stdlib) \label{sys.wait-compatibility}
+  \item Sys.wait behaves differently in vm stdlib on official emulator
   \item keyboard bug for bug compatible
 \end{itemize}
 
@@ -150,5 +151,5 @@ The new emulator was run both from the web UI and in desktop mode. In both cases
 \end{figure}
 
 It is clearly visible that the new Emulator is several times faster than the official implementation.
-On average, the official emulator without modifications takes around 44 seconds to render the full animation once. Meanwhile the Web version of the new emulator manages to achieve the same result in just 1.7 seconds on average. The native version of the new emulator which uses SDL to render the internal display is even faster, just taking 1.35 seconds on average. While the official emulator can be sped up drastically, it still does not come close.
+On average, the official emulator without modifications takes around 36 seconds to render the full animation once. Meanwhile the Web version of the new emulator manages to achieve the same result in just one second on average. The native version of the new emulator which uses SDL to render the internal display is even slightly faster. While the official emulator can be sped up drastically, it still does not come close.
 This shows us that even though the new emulator only uses a single thread and runs in a browser, it still offers massive performance benefits over the official implementation.
