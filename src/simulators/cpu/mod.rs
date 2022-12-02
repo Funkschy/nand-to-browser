@@ -112,14 +112,14 @@ impl Cpu {
                 };
 
                 let (a, d, m) = dest.as_bools();
+                if m {
+                    self.set_mem(self.a as Address, value)?;
+                }
                 if a {
                     self.a = value;
                 }
                 if d {
                     self.d = value;
-                }
-                if m {
-                    self.set_mem(self.a as Address, value)?;
                 }
 
                 self.pc = match jump {
