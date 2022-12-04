@@ -4,45 +4,22 @@ A Nand to Tetris Emulator implementation that can run in the browser or on your 
 
 The application is hosted on https://funkschy.github.io/nand-to-browser/
 
-# Dependencies
-## General
-- [Rust](https://www.rust-lang.org/)
+# Usage
 ## Web
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
-- [npm](https://github.com/npm/cli)
-## Desktop
-- [SDL2](https://www.libsdl.org/)
+When you open [the application](https://funkschy.github.io/nand-to-browser/), initially no program is loaded.
+To use the emulator, you must click the Upload Files button and select all the .vm files for your program (or a single .asm file to use the CPU emulator).
+After you select the files and click Open, the program will automatically load into the emulator ROM, unlocking the Start, Step, and Reset buttons.
 
-# Web Mode
+When you click Start, the program will run in a loop, with the speed determined by the slider at the top right of the application. While the program is running, the Start button is changed to Stop and the Step button is disabled. Furthermore, the screen is maximized and the information about RAM and ROM is hidden.
 
-To use the web version, we need to build a WebAssembly library and then host the Javascript frontend with some file server (npm run start will start the webpack development server)
+The Step button advances the emulator by a single instruction, updating the bytecode view on the left side of the screen and the memory cells at the bottom after each step.
+This is mainly meant for debugging.
 
-``` shell
-# switch into the web ui folder
-cd www
-# compile the rust code into a wasm lib
-wasm-pack build --release
-# pull the javascript dependencies
-npm ci
-# run the javascript server
-npm run start
-```
+Reset simply resets the emulator to the state immediately after loading the program.
 
-Then just open [localhost on port 8080](http://localhost:8080) in your browser
+The speed of the running emulator can be adjusted at any time with the slider at the top right.
 
-# Desktop Mode
-## Compilation
-``` shell
-# compile the application into a desktop version
-# for desktop mode (with a graphical user interface)
-cargo build --release --features desktop
-
-# for headless mode (to only run test scripts without seeing the UI)
-cargo build --release
-```
-This will actually produce two different binaries inside the target/release directory. One for the VM Emualtor and one for the CPU emulator.
-
-## Usage
+![The user interface](thesis/fig/ui-demo-desktop.png)
 
 ### VM
 ``` shell
@@ -60,6 +37,42 @@ This should be equivalent to the official emulator.
 
 To get a list of all available options just run `target/release/[cpu|vm] --help`
 
-# Progress
+# Dependencies
+## General
+- [Rust](https://www.rust-lang.org/)
+## Web
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/)
+- [npm](https://github.com/npm/cli)
+## Desktop
+- [SDL2](https://www.libsdl.org/)
 
-See the notes.org file for a list of checkboxes
+# Building the emulator
+First install the relevant dependencies listed above.
+
+## Web Mode
+
+To use the web version, we need to build a WebAssembly library and then host the Javascript frontend with some file server (npm run start will start the webpack development server)
+
+``` shell
+# switch into the web ui folder
+cd www
+# compile the rust code into a wasm lib
+wasm-pack build --release
+# pull the javascript dependencies
+npm ci
+# run the javascript server
+npm run start
+```
+
+Then just open [localhost on port 8080](http://localhost:8080) in your browser
+
+## Desktop Mode
+``` shell
+# for headless mode (to only run test scripts without seeing the UI)
+cargo build --release
+
+# compile the application into a desktop version
+# for desktop mode (with a graphical user interface)
+cargo build --release --features desktop
+```
+This will actually produce two different binaries inside the target/release directory. One for the VM Emualtor and one for the CPU emulator.
