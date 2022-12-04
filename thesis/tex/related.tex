@@ -1,8 +1,10 @@
 \section{Related work}
 
+This project builds on much existing material, being both a modern rewrite of an existing tool and a case study of the viability of a number of technologies for porting complex desktop applications to the browser.
+
 \subsection{Nand to Tetris}
 
-This project is of course closely related to the Nand to Tetris~\cite{n2tweb} course. All of the high-level functionality was designed and specified by Nisan and Schocken.
+It is of course closely related to the Nand to Tetris~\cite{n2tweb} course. All of the high-level functionality was designed and specified by Nisan and Schocken.
 Since the goal of this project is to develop an alternative emulator implementation, care was taken to follow the specifications described in the companion book, specifically the sections 4.2, 7.2, 8.2 and 9.2.7  ~\cite{nisan2005}.
 In addition, many of the integration tests are direct ports of test cases included in the Nand to Tetris course.
 
@@ -15,31 +17,52 @@ In addition, many of the integration tests are direct ports of test cases includ
 
 \subsection{Dependencies}
 
-\begin{itemize}
-\item lazy\_static (hack um rust weniger nervig zu machen)
-\item regex
-\item wasm-bindgen (rust code für JS zugänglich machen)
-\item web-sys (js stdlib in Rust nutzen)
-\item console\_error\_panic\_hook (rust panics zu JS exeptions)
-\item sdl2 (native UI (eigentlich nur zum Testen))
-\item clap (CLI parsing)
-\item wasm-pack (rust -> wasm Kompilierung einfacher machen)
-\item react und npm (UI)
-\end{itemize}
+One of the main reasons why Rust was chosen as the language for this project is its strong ecosystem, especially in regard to WebAssembly~\ref{rust-vs-other-wasm}.
+Therefore, it is not surprising that several other Rust projects were used here to be both more efficient and to produce a more stable and reliable final program.
+However, it is also important to use as few dependencies as possible, as any dependency could become a future liability if that library is ever abandoned or compromised by malicious actors.
+For this reason, each library used in this project has a clear purpose and provides enough value to justify its inclusion.
 
-\subsection{Existing Nand to Tetris Emulator implementations}
+\subsubsection{Rust Dependencies} \label{rust-deps}
+The following sections summarize the reasons to include each dependency.
+Rust does not currently allow static constants that require runtime code for initialization. However, this is a very useful feature, for example to use hashmaps to define lookup tables.
+The lazy\_static library is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic} because it provides exactly this functionality in the form of a single macro~\ref{macros}. Among other things, it is used for the lookup table in the keyboard handler, which maps special symbols such as the escape key to the corresponding key codes in the emulator.
+Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts for the emulator.
+The two most important libraries when it comes to the value of Rust for this project are wasm-bindgen and web-sys. The former is responsible for creating bindings between Rust and JavaScript, allowing the two to call each other as if they were written in the same language. The latter provides implementations for common JavaScript APIs in Rust. It builds directly on wasm-bindgen to provide most of the functionality that users would normally have to write bindings for.
+These two libraries are further complemented by console\_error\_panic\_hook and wasm-pack.
+The former simply prints the stack trace of a Rust panic~\ref{rust-error-handling} to the JavaScript console.
+Wasm-pack, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command-line tool that simplifies building and packaging Rust applications into Wasm modules.
+The above dependencies are all that is needed for the web version of the emulator. If the native version is used instead, two different dependencies are used instead of the Wasm-focused dependencies.
+The first is SDL2, which is only included if the application is compiled with the desktop flag enables~\ref{conditional-compilation}.
+Finally, there is clap, an easy-to-use parsing library for command line arguments.
 
-The main Nand to Tetris Emulator implementation is, of course, the official one, which can be downloaded directly on the courses website and contains all the tools necessarry for completing all the projects~\cite[Software]{n2tweb}.
-However, there have also been other people who tried to provide an alternative emulator experience. One of those is pynand, which aims to provide a better experience, by eliminating the need to install java and making the interface less ``clunky''~\cite{pynand}. This tool however has multiple limitations, which limit its usefulness. It does little to improve the performance of the emulator and also severely limits the programs that can be run. Furthermore it offers no UI outside of the display, making it hard to debug complex Jack programs. Also, the user is still required to install software onto their computer, just Python instead of Java.
+% \begin{itemize}
+% \item lazy\_static (hack um rust weniger nervig zu machen)
+% \item regex
+% \item wasm-bindgen (rust code für JS zugänglich machen)
+% \item web-sys (js stdlib in Rust nutzen)
+% \item console\_error\_panic\_hook (rust panics zu JS exeptions)
+% \item sdl2 (native UI (eigentlich nur zum Testen))
+% \item clap (CLI parsing)
+% \item wasm-pack (rust -> wasm Kompilierung einfacher machen)
+% \end{itemize}
+
+\subsubsection{JavaScript Dependencies}
+ReactJS is the only dependency for the web-based user interface.
+Since most of the logic is implemented in Rust, the code needed for the UI is mainly focused on displaying the internal state of the emulator. There are no complex UI components or procedures that would warrant using separate libraries.
+The entire front-end simply uses React hooks for all state handling.
+In addition, the UI was intentionally kept minimalistic to match the emulator's black-and-white display, so no external CSS libraries were required.
+
+\subsection{Existing emulator implementations}
+The main implementation of Nand to Tetris Emulator is, of course, the official one, which can be downloaded directly from the course website and contains all the necessary tools for completing all projects~\cite[Software]{n2tweb}.
+However, there have been other people who have tried to provide an alternative emulator experience. One of these is pynand, which aims to provide a better experience by eliminating the need to install Java and making the interface less ``clunky''~\cite{pynand}. However, this tool has several limitations that limit its usefulness. It does little to improve the performance of the emulator and also severely limits the programs that can be run. It also doesn't provide a user interface outside of the display, which makes debugging complex Jack programs difficult. Besides, the user still has to install software on his computer, just Python instead of Java.
 
 % \begin{itemize}
 %   \item https://github.com/itoshkov/nand2tetris-emu
 %   \item https://github.com/mossprescott/pynand
 % \end{itemize}
 
-\subsection{Emulators in WebAssembly}
-
-In recent years, there have been several projects that implemented emulators in WebAssembly. Notably, an emulator for Intel's 8086 Micorprocessor~\cite{9824078} also written in Rust and using a ReactJS frontend. This already demonstrates the viability of these technologies for the creation of web-based emulators, but obviously offers no benefit to the participants of the Nand to Tetris course, which is the major goal of this thesis.
+% \subsection{Emulators in WebAssembly}
+In recent years, there have been several projects that implemented other emulators in WebAssembly. Notably, an emulator for Intel's 8086 microprocessor~\cite{9824078}, also written in Rust and using a ReactJS frontend. This already shows the viability of these technologies for creating web-based emulators, but obviously does not provide any benefit to the participants of the Nand to Tetris course, which is the main goal of this work.
 
 % \begin{itemize}
 %   \item https://ieeexplore.ieee.org/abstract/document/9824078
