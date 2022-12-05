@@ -23,10 +23,11 @@ The speed of the running emulator can be adjusted at any time with the slider at
 
 ### VM
 ``` shell
-target/release/vm <DIR> # dir should contain the VM files, Test and Compare scripts
+target/release/vm <DIR or tst FILE>
 ```
-In the course's projects there are some who contain multiple Test scripts. In that case the one that ends with VME.tst will be used.
-This behaviour was chosen, because the binary can be used without any test scripts. If there are no test scripts in the directory, it will either run in headless mode, or if the desktop feature was enabled during compilation, it will start the SDL UI.
+If the path to a directory is passed to the application, it will read all the vm files contained in that directory and execute them. This will either happen in headless mode, or if the desktop feature was set during compilation, a new window will open and display the screen.
+If a filepath is passed instead, the application checks if the filepath leads to a tst file and if it does, that tst file is executed. Unlike the official implementation, the stdlib will actually be loaded automatically here.
+In any other case, an error message is displayed and the application will be terminated.
 
 ### CPU
 ``` shell

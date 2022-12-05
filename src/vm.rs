@@ -14,7 +14,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process::exit;
 
 #[cfg(feature = "desktop")]
 fn run(vm: &mut VM, steps_per_tick: usize) {
@@ -175,49 +174,31 @@ fn run(vm: &mut VM, _: usize) {
     }
 }
 
-type FileMap<T = String> = HashMap<T, String>;
-
-fn find_files(dir: &PathBuf) -> Result<(FileMap, FileMap<PathBuf>), Box<dyn std::error::Error>> {
+fn find_files(dir: &PathBuf) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
     let mut vm_files = HashMap::new();
-    let mut tst_files = HashMap::new();
-
-    // TODO: only execute test when a flag is set, but in that case ensure that there is a tst script
     for entry in fs::read_dir(dir)? {
         let path = entry?.path();
         let filename = path.file_name();
         let extension = path.extension();
 
-        if let (Some(name), Some(ext)) = (
+        if let (Some(name), Some("vm")) = (
             filename.and_then(|x| x.to_str()),
             extension.and_then(|x| x.to_str()),
         ) {
-            let read = || {
-                fs::read_to_string(&path).unwrap_or_else(|_| panic!("Could not read '{}'", name))
-            };
-            match ext {
-                "vm" => {
-                    let name = name.to_owned();
-                    let content = read();
-                    vm_files.insert(name, content);
-                }
-                "tst" => {
-                    let content = read();
-                    tst_files.insert(path, content);
-                }
-                _ => {}
-            };
+            let name = name.to_owned();
+            let content =
+                fs::read_to_string(&path).unwrap_or_else(|_| panic!("Could not read '{}'", name));
+            vm_files.insert(name, content);
         }
     }
 
-    Ok((vm_files, tst_files))
+    Ok(vm_files)
 }
 
-pub fn execute<'w>(
+pub fn execute_dir<'w>(
     use_vm_stdlib: bool,
     steps_per_tick: usize,
-    vm_files: FileMap,
-    tst_files: FileMap<PathBuf>,
-    writer: impl Into<Option<&'w mut dyn Write>>,
+    vm_files: HashMap<String, String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let stdlib = if use_vm_stdlib {
         Stdlib::default()
@@ -255,22 +236,25 @@ pub fn execute<'w>(
     let program = BytecodeParser::with_stdlib(programs, stdlib).parse()?;
 
     vm.load(program);
+    run(&mut vm, steps_per_tick);
+    Ok(())
+}
 
-    if !tst_files.is_empty() {
-        let (tst_name, tst_content) = tst_files.into_iter().next().unwrap();
-        let parser = ScriptParser::new(&tst_name, tst_content.as_str());
-        execute_script(parser, vm, writer)?;
-    } else {
-        run(&mut vm, steps_per_tick);
-    }
-
+pub fn execute_test<'w>(
+    tst_file: (PathBuf, String),
+    writer: impl Into<Option<&'w mut dyn Write>>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let (tst_name, tst_content) = tst_file;
+    let parser = ScriptParser::new(&tst_name, tst_content.as_str());
+    execute_script(parser, VM::new(Stdlib::new()), writer)?;
     Ok(())
 }
 
 fn main() {
-    let dir_arg = arg!([dir] "The directory which contains the code and tests")
-        .required(true)
-        .value_parser(value_parser!(PathBuf));
+    let dir_or_test_arg =
+        arg!([dir_or_test] "The directory which contains the code or the path to a test file")
+            .required(true)
+            .value_parser(value_parser!(PathBuf));
 
     let step_arg = arg!(-s --steps <STEPS> "How many steps per tick should be executed")
         .value_parser(value_parser!(usize))
@@ -282,43 +266,33 @@ fn main() {
             .action(ArgAction::SetTrue);
 
     let matches = command!()
-        .arg(dir_arg)
+        .arg(dir_or_test_arg)
         .arg(step_arg)
         .arg(use_vm_arg)
         .arg(use_stdout_arg)
         .get_matches();
 
-    let dir = matches.get_one::<PathBuf>("dir").unwrap();
+    let dir_or_test = matches.get_one::<PathBuf>("dir_or_test").unwrap();
     let steps_per_tick = *matches.get_one::<usize>("steps").unwrap();
     let use_vm_stdlib = *matches.get_one::<bool>("vm").unwrap();
     let use_stdout = *matches.get_one::<bool>("print-outfile").unwrap();
 
-    // load the files .vm and .tst, files in the given directory
-    let (vm_files, mut tst_files) = find_files(dir).unwrap();
-
-    if tst_files.len() > 2 {
-        println!("Expected no more than 2 test scripts");
-        exit(1);
-    }
-
-    if tst_files.len() == 2 {
-        tst_files.retain(|k, _| {
-            k.file_name()
-                .and_then(|n| n.to_str())
-                .map(|n| n.ends_with("VME.tst"))
-                .unwrap_or(false)
-        });
-    }
-
-    let mut out = io::stdout();
-    let writer = if use_stdout {
-        let out: &mut (dyn Write) = &mut out;
-        Some(out)
+    if dir_or_test.is_dir() {
+        let vm_files = find_files(dir_or_test).unwrap();
+        execute_dir(use_vm_stdlib, steps_per_tick, vm_files).unwrap();
+    } else if dir_or_test.extension().and_then(|s| s.to_str()) == Some("tst") {
+        let mut out = io::stdout();
+        let writer = if use_stdout {
+            let out: &mut (dyn Write) = &mut out;
+            Some(out)
+        } else {
+            None
+        };
+        let content = fs::read_to_string(dir_or_test).unwrap();
+        execute_test((dir_or_test.clone(), content), writer).unwrap();
     } else {
-        None
-    };
-
-    execute(use_vm_stdlib, steps_per_tick, vm_files, tst_files, writer).unwrap();
+        println!("Error: dir_or_test was neither a directory, nor a test file");
+    }
 }
 
 #[cfg(test)]
@@ -331,37 +305,21 @@ mod tests {
         };
     }
 
-    macro_rules! vm_filename_map {
+    macro_rules! vm_filepath_tuple {
         ($name:expr) => {{
             let path = PathBuf::from(vm_test!($name));
             let content = include_str!(vm_test!($name));
-            let mut m = HashMap::new();
-            m.insert(
-                path.file_name().unwrap().to_str().unwrap().to_string(),
-                content.to_owned(),
-            );
-            m
-        }};
-    }
-
-    macro_rules! vm_filepath_map {
-        ($name:expr) => {{
-            let path = PathBuf::from(vm_test!($name));
-            let content = include_str!(vm_test!($name));
-            let mut m = HashMap::new();
-            m.insert(path, content.to_owned());
-            m
+            (path, content.to_owned())
         }};
     }
 
     #[test]
     fn test_07_memory_access_basic_test() {
-        let vm = vm_filename_map!("BasicTest/BasicTest.vm");
-        let tst = vm_filepath_map!("BasicTest/BasicTestVME.tst");
+        let tst = vm_filepath_tuple!("BasicTest/BasicTestVME.tst");
 
         let mut v = Vec::new();
         let w: &mut (dyn Write) = &mut v;
-        execute(false, 1, vm, tst, w).unwrap();
+        execute_test(tst, w).unwrap();
 
         // this would usually not happen here, but instead inside of execute
         let cmp = include_str!(vm_test!("BasicTest/BasicTest.cmp")).replace("\r\n", "\n");
