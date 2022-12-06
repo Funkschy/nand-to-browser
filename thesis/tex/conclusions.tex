@@ -1,4 +1,4 @@
-\section{Conclusions}
+\section{Conclusions and future work}
 All things considered, the project was a success. The original goal of providing an alternative VM emulator implementation in the browser that is faster and better suited for modern displays was achieved.
 Additionally, the CPU emulator was also rewritten and integrated into the same user interface, and the test script workflow was also ported to Rust.
 Not everything is an improvement over the original emulator, however; there are still some opportunities for future improvements, as described in~\cref{future-work}.
@@ -7,8 +7,8 @@ Further acceleration of the already existing trend of developing more and more a
 
 % \subsection{Summary}
 % summary with emphasis on results/comparisons
-
-\subsection{Future work} \label{future-work}
+% \subsection{Future work}
+\label{future-work}
 While the project resulted in a working application that fullfills the original goals, there are still multiple things that could be improved in the future.
 First and foremost is the inclusion of the last of the three simulators, the hardware simulator. Since this simulator is not affected by performance issues, as only simple tests of the created logic gates are performed, it would benefit least from a rewrite in Rust. Having all of the simulators for the course inside of one single application would, however, be a great benefit for the students participating in the course as they would not have to install anything locally anymore.
 This would require not just a new emulator to be written, but also a completely new user interface, while the VM and CPU can share a single interface due to their many similarities.
