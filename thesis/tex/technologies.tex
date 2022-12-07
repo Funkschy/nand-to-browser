@@ -1,24 +1,27 @@
 \section {Technologies}
 The following sections provide an overview of all the technologies used in the creation of the new emulators.
-In addition, a rationale is given for the choice of these technologies over alternatives.
+Furthermore, a rationale is given for the choice of these technologies over alternatives.
 
 \subsection{WebAssembly}
-WebAssembly (abbreviated Wasm) is a binary instruction format for a stack-based virtual machine. It is designed as a portable compilation target for programming languages, enabling the usage of traditionally native languages, such as C/C++ or Rust for web development.~\cite{wasmweb}
-Wasm however is not a replacement for JavaScript (JS) in its entirety. Rather it is intended to complement JS by being used to implement the computationally intensive parts of web applications, while all parts related to DOM manipulation and event handling continue to be written in JS. It is developed as a web standard via the W3C WebAssembly Working Group with active participation from all major browser vendors~\cite{wasmmdn}.
+WebAssembly (Wasm) is a binary instruction format for a stack-based virtual machine. It is designed as a portable compilation target for programming languages, enabling the use of traditionally native languages such as C/C++ or Rust for web development.~\cite{wasmweb}
+Wasm, however, is not a replacement for JavaScript in its entirety.
+Rather, it is intended to complement JavaScript by being used to implement the computationally intensive parts of web applications, while all parts related to DOM manipulation and event handling continue to be written in JavaScript.
+It is being developed as a Web standard by the W3C WebAssembly Working Group, in which all major browser vendors are active participants~\cite{wasmmdn}.
 This makes Wasm code very portable between different browsers.
 
 \subsection{Rust}
 Rust is a multi-paradigm programming language that tries to combine high-level ergonomics with low-level control. \cite[Introduction]{klabnik2019rust}
-Besides the option to compile to native machine code, Rust is also capable of targeting Wasm as its platform, making it possible to use Rust for web development.~\cite{rustwasm}
-Just like C and C++, Rust does not use runtime garbage collection by default, but unlike those langauges, Rust also does not require the programmer to explicitly free memory themselves.
-Instead, it relies on its compiler to automatically insert all the necessary cleanup code. This is made possible by the ownership system, which tracks the lifetime of every reference in the program and ensures that nothing can be used after being freed.
-In order to do this, the compiler has to enforce a set of rules, which will cause a compilation error if broken.~\cite[Chapter~4]{klabnik2019rust}
-This unique approach allows achieving the same performance as C/C++, but without sacrificing memory safety.
-However, it also has its drawbacks: When more rules are imposed on the programmer, writing and especially refactoring code tends to become more tedious, since a simple change from an owned object to a reference in Rust often requires inserting explicit lifetimes into large portions of the code base.
-Despite these drawbacks, Rust is the most popular language in the annual Stack Overflow Developer Survey for the seventh year in a row, indicating that programmers are willing to trade some ease of use in writing for fewer memory-related bugs and vulnerabilities~\cite{sosurvey}.
+Besides being able to compile to native machine code, Rust is also capable of targeting Wasm as a platform, which makes it possible to use Rust for web development~\cite{rustwasm}.
+Just like C and C++, Rust does not use garbage collection at runtime by default, but unlike those languages, the programmer does not have to explicitly free the memory either.
+It instead relies on its compiler to automatically insert the necessary cleanup code. This is made possible by the ownership system, which tracks the lifetime of every reference in the program and ensures that nothing can be used after it has been deallocated.
+To achieve this, the compiler must enforce a set of rules whose violation results in a compilation error~\cite[Chapter~4]{klabnik2019rust}.
+With this unique approach, the same performance as C/C++ can be achieved without compromising memory safety.
+There are drawbacks to it, however: When more rules are imposed on the programmer, writing and especially refactoring code tends to become more tedious, since a simple change from an owned object to a reference in Rust often requires inserting explicit lifetimes into large portions of the code base.
+Despite this, Rust is the most popular language in the annual Stack Overflow developer survey for the seventh year in a row, suggesting that programmers are willing to trade some ease of use in writing for fewer memory-related bugs and vulnerabilities~\cite{sosurvey}.
 
 \subsection{The advantages of Rust and WebAssembly over JavaScript}
-WebAssembly offers significant performance improvements over JavaScript, often reaching execution times within 10\% of native code. Even the optimized subset of JavaScript known as \verb+asm.js+ is, on average, 33.7\% slower than Wasm~\cite[Chapter~7.3]{wasmspeed}. The advantages do not stop with performance however, if used as a compilation target, it offers the ability to use Rust's powerful and versatile type system on the web.
+WebAssembly offers significant performance improvements over JavaScript, often reaching execution times within 10\% of native code. Even the optimized subset of JavaScript known as \verb+asm.js+ is on average 33.7\% slower than Wasm~\cite[Chapter~7.3]{wasmspeed}.
+The advantages are not limited to performance, but also include the ability to use Rust's powerful and versatile type system on the web.
 This type system, inspired by ML and Haskell~\cite{rustinfluences}, provides programmers with a variety of ways to specify and limit the capabilities of certain types in their applications.
 It enables detection and prevention of entire classes of errors at compile time, drastically reducing the amount of end-to-end testing required. Research has shown that 15\% of errors in public JavaScript projects could have been prevented by a static type system~\cite{7985711}.
 This research was based on a direct extension of JavaScript with a type system, but it is reasonable to assume that a language fundamentally built around such a type system would benefit as much or even more.
@@ -35,13 +38,14 @@ Some features in Rust's type system are especially valuable for writing emulator
 \subsection{The advantages of Rust over other WebAssembly languages} \label{rust-vs-other-wasm}
 Although Rust is relatively new as a language and its version 1.0 was only released in 2015~\cite{rustreleases}, it has already gained a lot of traction in the WebAssembly community.
 There are several reasons for this. Rust tries to strike a balance between high-level programming language accessibility and low-level performance.
-Because of its low-level nature and relatively small runtime without a garbage collector, it is very well suited to run in the browser. Other high-level languages would have to load their entire runtime when the site is loaded, since Wasm itself does not contain any memory management abstractions and instead lets the module manage a simple linear memory buffer.
-Complex runtime environments such as the JVM would have to be loaded when the user first accesses the page, resulting in enormous package sizes and long loading screens.
-Languages that can run in constrained environments without virtual machines are therefore better suited for this use case.
-However, Rust also offers advantages over other low-level languages such as C. Thanks to its focus on compiler-checked security guarantees, it offers a lower barrier to entry than C, while providing users with the same or even better performance~\cite{medin2021performance}.
+Due to its low-level nature and relatively small runtime without a garbage collector, it is very well suited for running in the browser.
+Other high-level languages would have to load their entire runtime when the site is loaded, since Wasm itself does not contain any memory management abstractions and instead lets the module manage a simple linear memory buffer.
+Complex runtime environments such as the Java Virtual Machine (JVM) would consequently lead to enormous package sizes and long loading screens.
+Languages that can run in constrained environments without virtual machines are therefore more suitable for this use case.
+That being said, Rust also offers advantages over other low-level languages such as C. Thanks to its emphasis on compiler-checked security guarantees, it offers a lower barrier to entry than C, while providing users with the same or even better performance~\cite{medin2021performance}.
 Like C++, Rust contains a more feature-rich standard library than C, with commonly used collections such as Vectors, equivalent to Java's ArrayList, and HashMaps.
-Rust is therefore very well suited for Wasm development, and as a result has developed a strong ecosystem of libraries to support it in this area~\ref{rust-deps}.
-The combination of a language that is inherently suited to Wasm development and the strong community behind it gives Rust several important advantages over its competitors for this project.
+Rust is therefore very well suited for Wasm development and as a result has developed a strong ecosystem of libraries to support it in this area~\ref{rust-deps}.
+The combination of a language that is inherently suited to Wasm development, and the strong community behind it, gives Rust several important advantages over its competitors for this project.
 
 % \begin{itemize}
 %   \item Performance and Bundle size (no GC, small runtime)
@@ -53,19 +57,20 @@ The combination of a language that is inherently suited to Wasm development and 
 
 \subsection{ReactJS} \label{react-js}
 The modern web offers a seemingly infinite number of ways to create complex user experiences in the browser, most of which are built in JavaScript.
-However, the nature of this project would have allowed for an implementation without hand-written JS. Since large portions of the project are written in Rust and compiled in WebAssembly, it would have been possible to simply render the entire application, including the interactive user interface, into a single canvas that also contains the screen.
-However, this is not optimal because many features that the web browser inherently provides would not have been available, such as rearranging components to fit the width of the window, zooming into content to increase font size, supporting screen readers, etc.
-Another alternative would have been to use the features provided by the browser, but interact with them directly from Rust.
-Yew is a Rust framework that would have made this process possible. It allows the programmer to use a component-based, responsive front-end architecture from within Rust.
-The main reason ReactJS was preferred over Yew is maturity. At the time of writing, the latest version of the framework is 0.20.0 and the project repository contains a warning about expected breaking API changes~\cite{yewweb}.
-In the future, Yew might be a better choice as it fits more naturally into a Rust-dominated application, but in the present it is not ready.
+Yet, the nature of this project would have allowed for an implementation without hand-written JavaScript.
+Since large portions of the project are written in Rust and compiled to WebAssembly, it would have been possible to simply render the entire application, including the interactive user interface, into a single canvas that also contains the screen.
+However, this is not optimal, because many features that the web browser inherently offers would not have been available, such as rearranging components to fit the width of the window, zooming into content to increase font size, supporting screen readers, etc.
+An alternative approach would have been to use the features provided by the browser, but interact with them directly from Rust.
+Yew is a Rust framework that would have made this process possible. It allows the programmer to use a component-based, responsive front-end architecture in Rust.
+The main reason ReactJS was chosen over Yew is its maturity. At the time of writing, the latest version of the framework is 0.20.0 and the project repository contains a warning about expected breaking API changes~\cite{yewweb}.
+In the future, Yew might be a better choice, as it fits more naturally into a Rust-dominated application, but for now it is not ready.
 
-ReactJS is one of the most popular frontend libraries in the world. It drastically simplifies the creation of interactive user interfaces by making views declarative.
+ReactJS is one of the most popular front-end libraries in the world. It drastically simplifies the creation of interactive user interfaces by making views declarative.
 Instead of updating the HTML code every time something happens, ReactJS automatically updates the required components when the internal state of the application changes.
 It allows programmers to define encapsulated and reusable components that manage their own state and can be assembled into complex interfaces~\cite{reactweb}.
-The use of ReactJS in this project allows for a simplified and streamlined front-end implementation.
-In addition, the declarative nature of React guarantees that the UI will always display the most up-to-date data without having to manually update all the necessary HTML elements. This makes the final application more reliable and easier to maintain.
-There are several other JavaScript frameworks that offer similar features, such as Angular and VueJS, but neither are as widely used as React~\cite{webframework}.
+Using ReactJS in this project allows for a simplified and streamlined front-end implementation.
+The declarative nature of React also ensures that the user interface (UI) always displays the most up-to-date data, without the need to manually update all the required HTML elements. This makes the final application more reliable and easier to maintain.
+There are several other JavaScript frameworks that offer similar features, such as Angular and VueJS, but none of them are as widely used as React~\cite{webframework}.
 For these reasons, ReactJS is a good choice for this application. It is mature, well supported, and easy to use.
 
 % \begin{itemize}

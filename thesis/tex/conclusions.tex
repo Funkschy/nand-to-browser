@@ -1,22 +1,27 @@
 \section{Conclusions and future work}
-All things considered, the project was a success. The original goal of providing an alternative VM emulator implementation in the browser that is faster and better suited for modern displays was achieved.
-Additionally, the CPU emulator was also rewritten and integrated into the same user interface, and the test script workflow was also ported to Rust.
-Not everything is an improvement over the original emulator, however; there are still some opportunities for future improvements, as described in~\cref{future-work}.
-All in all, the technologies chosen worked well to rewrite a complex desktop application for the modern web, and the potential of Wasm as a compilation target for such applications was demonstrated.
-Further acceleration of the already existing trend of developing more and more applications for the web browser can be expected, as developers are now no longer limited to JavaScript or languages that can be compiled to it.
+Overall, this project was a success.
+The original goal of providing an alternative VM emulator implementation in the browser that is faster and better suited for modern displays was achieved.
+On top of that, the CPU emulator has also been rewritten and integrated into the same user interface, and the test script workflow has also been ported to Rust.
+But not every change is an improvement over the original emulator.
+The new tools have fewer debugging features than the old ones~\ref{ui-compatibility} and there are still some opportunities for future improvements, as described further down.
+The technologies chosen worked well, by and large, to rewrite a complex desktop application for the modern web, and the potential of Wasm as a compilation target for such applications was demonstrated.
+It can be expected that the already existing trend of developing more and more applications for the web browser will accelerate further, as developers are now no longer limited to JavaScript or languages that can be compiled for it.
 
 % \subsection{Summary}
 % summary with emphasis on results/comparisons
 % \subsection{Future work}
 \label{future-work}
 While the project resulted in a working application that fullfills the original goals, there are still multiple things that could be improved in the future.
-First and foremost is the inclusion of the last of the three simulators, the hardware simulator. Since this simulator is not affected by performance issues, as only simple tests of the created logic gates are performed, it would benefit least from a rewrite in Rust. Having all of the simulators for the course inside of one single application would, however, be a great benefit for the students participating in the course as they would not have to install anything locally anymore.
+First and foremost is the inclusion of the last of the three simulators, the hardware simulator.
+Since this simulator is not affected by performance issues, as only simple tests of the created logic gates are performed, it would benefit least from a rewrite in Rust.
+Having all of the simulators for the course inside of one single application would, however, be a great benefit for the students participating in the course as they would not have to install anything locally anymore.
 This would require not just a new emulator to be written, but also a completely new user interface, while the VM and CPU can share a single interface due to their many similarities.
 Another point that would greatly benefit the students would be the inclusion of further debugging tools, like breakpoints, more memory views~\ref{ui-showcase} and the inclusion of the test script runner into the web based user interface.
 The last point is especially important, as those test scripts show the students that they correctly solved the problem before submitting their solutions.
 Some minor improvements which could be made, are improved error messages and a compatibility mode for the keyboard handler.
 The former should be relatively simple to implement, as the parsers already include the original source code location of each token in their output~\ref{spans}.
-The latter point refers to something already discussed in~\cref{compatibility}. Instead of just emulating the behaviour of the official emulator perfectly, it might be useful to make the behaviour of the keyboard handler configurable for users.
+The latter point refers to something already discussed in~\cref{compatibility}.
+Instead of just emulating the behaviour of the official emulator perfectly, it might be useful to make the behaviour of the keyboard handler configurable for users.
 
 % hardware simulator
 % more debugging tools

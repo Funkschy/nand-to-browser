@@ -1,10 +1,10 @@
 \section{Related work}
 
-This project builds on much existing material, being both a modern rewrite of an existing tool and a case study of the viability of a number of technologies for porting complex desktop applications to the browser.
+This project builds on much existing material by being both a modern rewrite of an existing tool and a case study about the viability of a number of technologies for porting complex desktop applications to the browser.
 
-It is of course closely related to the Nand to Tetris~\cite{n2tweb} course. All of the high-level functionality was designed and specified by Nisan and Schocken.
-Since the goal of this project is to develop an alternative emulator implementation, care was taken to follow the specifications described in the companion book, specifically the sections 4.2, 7.2, 8.2 and 9.2.7  ~\cite{nisan2005}.
-In addition, many of the integration tests are direct ports of test cases included in the Nand to Tetris course.
+It naturally is closely related to the Nand to Tetris~\cite{n2tweb} course. All of the high-level functionality was designed and specified by Nisan and Schocken.
+Since the goal of this project is to develop an alternative emulator implementation, care was taken to follow the specifications described in the companion book, specifically the sections 4.2, 7.2, 8.2 and 9.2.7~\cite{nisan2005}.
+In addition, many of the integration tests are direct ports of test cases from the Nand to Tetris course.
 
 % \begin{itemize}
 %   \item VM Bytecode design und high level Funktionalität
@@ -14,11 +14,16 @@ In addition, many of the integration tests are direct ports of test cases includ
 % \end{itemize}
 
 \subsection{Existing emulator implementations}
-The main implementation of Nand to Tetris Emulator is, of course, the official one, which can be downloaded directly from the course website and contains all the necessary tools for completing all projects~\cite[Software]{n2tweb}.
+The main implementation of a Nand to Tetris Emulator is, of course, the official one, which can be downloaded directly from the course website and contains every necessary tool to complete all projects~\cite[Software]{n2tweb}.
 \label{pynand}
-However, there are other people who have tried to provide an alternative emulator experience. One of these is pynand, which aims to provide a better experience by eliminating the need for Java installation and making the interface less ``clunky''~\cite{pynand}. However, the developer made several decisions that limit its usefulness. It does little to improve the performance of the emulator and also severely limits the programs that can be run.
-This limitation of possible programs is caused by its architecture, which translates the VM bytecode~\ref{hack-bytecode} into machine code for the hack architecture instead of interpreting it directly. This approach may seem reasonable at first glance, as it is closer to a theoretical implementation of the system in hardware. However, it severely limits the capabilities of the VM emulator, since each VM instruction corresponds to multiple assembly language instructions. This causes more complex VM programs to quickly overflow the available memory for instructions, limiting the emulator to relatively short programs.
-Since the goal of this project was to at least partially replace the official VM emulator implementation, which allows for larger programs than should theoretically be possible, this approach is not an option here.
+That being said, there are other people who have tried to provide an alternative emulator experience.
+One of these is pynand, which aims to provide a better experience by eliminating the need to install Java and by making the interface less ``clunky''~\cite{pynand}.
+However, the developer made several decisions that limit its usefulness.
+It does little to improve the performance of the emulator and also severely limits the programs that can be run.
+This limitation of possible programs is a direct consequence of its architecture, which translates the VM bytecode~\ref{hack-bytecode} into machine code for the hack architecture~\ref{hack-architecture} instead of interpreting it directly.
+At first glance this may seem reasonable, since it is closer to a theoretical implementation of the system in hardware, but it severely limits the possibilities of the VM emulator, since each VM instruction corresponds to several assembly instructions.
+This causes more complex VM programs to quickly overflow the available memory for instructions, limiting the emulator to relatively short programs.
+Since the goal of this project was to partially replace the official VM emulator implementation, which allows for larger programs than should theoretically be possible, this approach is not an option here.
 It also doesn't provide a user interface outside of the display, which makes debugging complex programs difficult. Besides, the user still has to install software on his computer, just Python instead of Java.
 
 % \begin{itemize}
@@ -27,7 +32,7 @@ It also doesn't provide a user interface outside of the display, which makes deb
 % \end{itemize}
 
 % \subsection{Emulators in WebAssembly}
-In recent years, there have been several projects that implemented other emulators in WebAssembly. Notably, an emulator for Intel's 8086 microprocessor~\cite{9824078}, also written in Rust and using a ReactJS frontend. This already shows the viability of these technologies for creating web-based emulators, but obviously does not provide any benefit to the participants of the Nand to Tetris course, which is the main goal of this work.
+In recent years, there have been several projects that implemented other emulators in WebAssembly. Notably, an emulator for Intel's 8086 microprocessor~\cite{9824078}, also written in Rust and using a ReactJS front-end. This already demonstrates the viability of these technologies for creating web-based emulators, but obviously offers no benefit to participants of the Nand to Tetris course, which is the main goal of this work.
 
 % \begin{itemize}
 %   \item https://ieeexplore.ieee.org/abstract/document/9824078
@@ -37,18 +42,20 @@ In recent years, there have been several projects that implemented other emulato
 \label{rust-deps}
 One of the main reasons why Rust was chosen as the language for this project is its strong ecosystem, especially in regard to WebAssembly~\ref{rust-vs-other-wasm}.
 Therefore, it is not surprising that several other Rust projects were used here to be both more efficient and to produce a more stable and reliable final program.
-However, it is also important to use as few dependencies as possible, as any dependency could become a future liability if that library is ever abandoned or compromised by malicious actors.
-For this reason, each library used in this project has a clear purpose and provides enough value to justify its inclusion. Libraries in Rust are often referred to as crates, which is why those terms are used interchangeably throughout the text.
+At the same time, it is also important to use as few dependencies as possible, as any dependency could become a future liability if that library is ever abandoned or compromised by malicious actors.
+For this reason, each library used in this project has a clear purpose and provides enough value to justify its inclusion. Libraries are often referred to as crates in Rust, so these terms are used interchangeably throughout the text.
 
-This section summarizes the reasons to include each crate.
-Rust does not currently allow static constants that require runtime code for initialization. However, this is a very useful feature, for example to use hashmaps to define lookup tables.
-The lazy\_static library is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic} because it provides exactly this functionality in the form of a single macro~\ref{macros}. Among other things, it is used for the lookup table in the keyboard handler, which maps special symbols such as the escape key to the corresponding key codes in the emulator.
-Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts for the emulator. Rust does not offer regular expressions in its standard library, which is why the regex crate was used.
+This section summarizes the rationale for including each crate.
+Rust does not currently allow static constants that require runtime code for initialization. This is however a very useful feature, for example to use hashmaps to define lookup tables.
+The lazy\_static crate is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic} because it provides exactly this functionality in the form of a single macro~\ref{macros-and-error-handling}. Among other things, it is used for the lookup table in the keyboard handler that maps special symbols like the escape key to the corresponding key codes in the emulator.
+Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts for the emulator. Rust does not provide regular expressions in its standard library, so the regex crate was used.
 \label{web-sys}
-The two most important libraries when it comes to the value of Rust for this project are wasm-bindgen and web-sys. The former is responsible for creating bindings between Rust and JavaScript, allowing the two to call each other as if they were the same language. The latter provides implementations for common JavaScript APIs in Rust. It builds directly on wasm-bindgen to provide most of the functionality that users would normally have to write bindings for.
+The two most important libraries when it comes to the value of Rust for this project are wasm-bindgen and web-sys.
+While the former is responsible for creating bindings between Rust and JavaScript so that the two can call each other as if they were the same language, the latter provides implementations for common JavaScript APIs in Rust.
+It builds directly on top of wasm-bindgen to provide most of the functionality that users would normally have to manually write bindings for.
 These two libraries are further complemented by console\_error\_panic\_hook and wasm-pack.
-The former simply prints the stack trace of a Rust panic~\ref{rust-error-handling} to the JavaScript console.
-Wasm-pack, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command-line tool that simplifies building and packaging Rust applications into Wasm modules.
+The former simply prints the stack trace of any unrecoverable Rust error~\ref{macros-and-error-handling} to the JavaScript console.
+Wasm-pack, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command-line tool that builds and packages Rust applications into Wasm modules automatically.
 
 The above dependencies are all that is needed for the web version of the emulator. If the native version is used instead, two different dependencies are used instead of the Wasm-focused dependencies.
 The first is SDL2, which is only included if the application is compiled with the desktop flag enabled~\ref{conditional-compilation}.
@@ -67,7 +74,7 @@ Finally, there is clap, an easy-to-use parsing library for command line argument
 
 % \subsubsection{JavaScript Dependencies}
 ReactJS is the only JavaScript dependency for the web-based user interface.
-Since most of the logic is implemented in Rust, the code needed for the UI is mainly focused on displaying the internal state of the emulator. There are no complex UI components or procedures that would warrant using separate libraries.
+Since most of the logic is implemented in Rust, the code needed for the user interface is mainly focused on displaying the internal state of the emulator.
+There are no complex UI components or procedures that would justify the use of separate libraries.
 The entire front-end simply uses React hooks for all state handling.
-In addition, the UI was intentionally kept minimalistic to match the emulator's black-and-white display, so no external CSS libraries were required.
-
+In addition, the interface was intentionally kept minimalist to match the emulator's black-and-white display, so no external CSS libraries are required.
