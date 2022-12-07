@@ -9,10 +9,11 @@ function BytecodeLine({highlightLine, activeLine, children}) {
         behavior: 'smooth',
         block: 'center'
       });
+
       // scroll page back up in case the bytecode view is below the canvas
-      window.scroll({
-        top: ref.current?.offsetParent.offsetTop,
-      });
+      // window.scrollTo({
+      //   top: ref.current?.offsetParent.offsetTop,
+      // });
     }
   }, [activeLine, highlightLine]);
 
