@@ -52,14 +52,13 @@ pub fn wait(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     let duration = params[0] as State * 1000;
 
     if state == 0 {
-        if duration < 2 {
+        if duration == 0 {
             return Ok(StdlibOk::Finished(params[0]));
         }
-        // 2 because one tick is already used
-        return Ok(StdlibOk::ContinueInNextStep(2));
+        return Ok(StdlibOk::ContinueInNextStep(1));
     }
 
-    if duration > state {
+    if duration >= state {
         return Ok(StdlibOk::ContinueInNextStep(state + 1));
     }
 
