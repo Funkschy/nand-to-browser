@@ -50,15 +50,7 @@ pub fn wait(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     // unfortunately this cannot actually be implemented correctly in wasm because wasm currently
     // offers no way to get the current system time. Therefore we can only use ticks as an estimate
     let duration = params[0] as State * 1000;
-
-    if state == 0 {
-        if duration == 0 {
-            return Ok(StdlibOk::Finished(params[0]));
-        }
-        return Ok(StdlibOk::ContinueInNextStep(1));
-    }
-
-    if duration >= state {
+    if state < duration {
         return Ok(StdlibOk::ContinueInNextStep(state + 1));
     }
 
