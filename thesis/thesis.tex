@@ -145,6 +145,26 @@
   morecomment=[s]{/*}{*/}, % s is for start and end delimiter
   morestring=[b]" % defines that strings are enclosed in double quotes
 }
+
+\lstdefinelanguage{HackAsm}{
+  keywords={},
+  sensitive=false, % keywords are not case-sensitive
+  morecomment=[l]{//}, % l is for line comment
+  morecomment=[s]{/*}{*/}, % s is for start and end delimiter
+  morestring=[b]" % defines that strings are enclosed in double quotes
+}
+
+\lstdefinelanguage{HackScript}{
+  keywords={output-file, compare-to, output-list, repeat, output, set},
+  ndkeywords={sp, local, argument, this, that, vmstep, load},
+  ndkeywordstyle=\color{red}\bfseries,
+  sensitive=false, % keywords are not case-sensitive
+  alsoletter=-,
+  morecomment=[l]{//}, % l is for line comment
+  morecomment=[s]{/*}{*/}, % s is for start and end delimiter
+  morestring=[b]" % defines that strings are enclosed in double quotes
+}
+
 \lstdefinelanguage{Rust}{
   keywords={as,break,const,continue,crate,else,enum,extern,false,fn,for,if,impl,
     in,let,loop,match,mod,move,mut,pub,ref,return,self,Self,static,struct,super,trait,true,type,unsafe,use,where,while
@@ -198,6 +218,7 @@
 
 %% Dieser Part kann auskommentiert werden, sollte kein Anhang nötig sein
 % \appendix
+\newpage
 \input{appendix.tex}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -18,8 +18,28 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % TODO
+% important
+% [x] ehrenwörtliche erklärung unterschreiben
+% [x] table of bytecodes and segments + short explanation (problematic for 5.3.1)
+% [x] CPU besser erklären, auch unterschied CPU und VM (was ist mit assembly hier gemeint)
+% [x] sys.init ist nicht eigenleistung + nicht erklärt
+% [x] 5.2.2 welche emulator spezifischen instruktionen
+% [x] make explanation of bytecode representation (5.3.1) easier (maybe example with 3 different bytecodes in combination)
+% [x] übergang implementierung -> entscheidungen rechtfertigen nicht klar
+% [x] pointer section in bytecode explanation nicht klar
+% [x] closure in macro nicht klar
+% [x] error handling auch nicht klar
+% [x] parser: methods vs predicate nicht klar
+% [x] welche der alternativen in 5 jetzt gewählt
+% [x] klar den unterschied zwischen assembly, bytecode und scripts erklären
+% [x] verwendung der methoden im generic parser nicht erklärt, worauf hinaus?
+% [x] peekable ohne vorheriges beispiel sinnlos -> lexer erklären
+% [x] was sind identifier in bytecode (5.4.3) -> bild
+% [x] hohe indizes nutzen nicht verstanden (5.4.3)
+%
+% not important
 % [x] conclusions
-% [ ] subsections should not be shorter than half a page
+% [x] subsections should not be shorter than half a page
 % [x] token span in parser section
 % [x] hack vm erklären, bytecode (vielleicht mit stack bild)
 % [x] abstract Neu
@@ -28,16 +48,18 @@
 % [x] architektur schriftgröße erhöhen
 % [x] bilder an korrekte stellen (keine bilder und co section mehr)
 % [ ] write more about unit tests in compatability section
+% [ ] benchmarks: speed for web is very browser/os dependent
+% [ ] intro: existenzgrund der emulatoren besser erklären (vielleicht nicht wirklich andere bearbeitungs reihenfolge)
+% [ ] table for 3.2 (deps)
+% [ ] why not just fix the old emulator, why is my emulator more future proof?
+
+% Feedback
+% [x] simplify explanation: error handling & macros
 % [ ] rewrite sys.wait to return 1 as the second state or refer to the code
 % [ ] explain dynamic dispatch (maybe glossary)
 % [ ] intro to 6 and 7 is too similar
-% [ ] explain hack archicture
-% [ ] absolute jumps maybe not known
-% [ ] benchmarks: speed for web is very browser/os dependent
-
-% Feedback
-% bytecode representation is hard to read
-% too much explanation: error handling & macros
+% [x] explain hack archicture
+% [x] the term absolute jump may not be known to everyone
 
 \input{tex/intro.tex}
 \input{tex/technologies.tex}

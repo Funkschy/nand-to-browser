@@ -56,6 +56,7 @@ It builds directly on top of wasm-bindgen to provide most of the functionality t
 These two libraries are further complemented by console\_error\_panic\_hook and wasm-pack.
 The former simply prints the stack trace of any unrecoverable Rust error~\ref{macros-and-error-handling} to the JavaScript console.
 Wasm-pack, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command-line tool that builds and packages Rust applications into Wasm modules automatically.
+This tool is only used at compile time and is therefore only needed to compile the application, not to run it.
 
 The above dependencies are all that is needed for the web version of the emulator. If the native version is used instead, two different dependencies are used instead of the Wasm-focused dependencies.
 The first is SDL2, which is only included if the application is compiled with the desktop flag enabled~\ref{conditional-compilation}.
@@ -78,3 +79,5 @@ Since most of the logic is implemented in Rust, the code needed for the user int
 There are no complex UI components or procedures that would justify the use of separate libraries.
 The entire front-end simply uses React hooks for all state handling.
 In addition, the interface was intentionally kept minimalist to match the emulator's black-and-white display, so no external CSS libraries are required.
+
+The appendix also contains a table with every dependency used in the project~\ref{table:dependencies}.

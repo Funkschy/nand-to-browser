@@ -51,7 +51,7 @@ There are three possible entry points for the application, listed in the ``Inter
 Two of them are intended for use via the command line.
 Both provide the ability to use the test scripts included in the project within the new emulator, but work in slightly different ways, as the VM emulator can run without a test script, while the CPU emulator does not currently have this capability.
 For this reason, the VM emulator can either accept a path to such a test script or a path to a directory containing bytecode, while the CPU emulator accepts only a file path for a test script as input.
-If the user passes a path to a directory, the application loads all files with the vm extension from that directory and then tries to execute them by calling the \verb+Sys.init+ function, which in turn should call the main function.
+If the user passes a path to a directory, the application loads all files with the vm extension from that directory and then tries to execute them.
 If a test script is passed instead, that script is executed as described in~\cref{test-script-workflow}.
 In the first case, a window is displayed if the application was compiled with the desktop function enabled.
 Otherwise, a message is printed telling the user that the application is running in headless mode.
@@ -72,7 +72,8 @@ The VM is more complex, however, and also includes the Stdlib module, which cont
 
 Unlike the simulators module, the Parsing module actually contains three different submodules, as the script parsing is mostly independent from the emulator implementation used.
 All of the parsers share a lot of common code, so it makes sense to combine them into one module.
-Having said that, there are some emulator specific instructions in the scripts whose parsing is actually contained in the Script module of the respective emulator.
+Having said that, there are some emulator specific instructions in the scripts, which were already highlighted in~\cref{test-scripts}.
+The code to parse these special instructions is contained in the Script module of the respective emulator, instead of the module with the shared code.
 This division was done intentionally, because parsing those instructions is only a small part of the whole script parsing process and is closely linked to the way the script is interpreted by the emulator.
 
 \subsection{VM development in Rust} \label{rust-vm-dev}
@@ -85,37 +86,44 @@ The final step is the actual execution, which is of course specific to the instr
 Before starting to implement a VM, one must first decide on an internal representation for the bytecode that will run on that VM.
 The design of the bytecode will always require a tradeoff between performance and ease of use during development.
 In the original emulator implementation, a very inefficient representation was chosen where each instruction is an object of an instruction class.
-The instruction class contains a field for the opcode, the actual instruction that is executed, and several fields for possible arguments, plus another integer that determines the number of arguments.
+This class contains a field for the opcode, the integer which identifies each instruction, and several fields for possible arguments, plus another integer that determines the number of arguments.
+Using the example of \verb+push constant 3+, the opcode would be an integer that means \verb+push+, while \verb+constant+ and \verb+3+ would be the arguments, so the number of arguments is two.
 On top of that, it also contains a string argument that is used for call instructions, because functions are actually called by their name at runtime.
 This design has several disadvantages from a performance standpoint.
-Each instruction has the maximum size, even if it takes no arguments.
-More importantly, each instruction must be allocated on the heap and therefore requires pointer indirection during execution, which is know to have drastic impacts on performance as it reduces spatial locality~\cite{6498541}.
+Each instruction must be allocated on the heap and therefore requires pointer indirection during execution, which is know to have drastic impacts on performance as it reduces spatial locality~\cite{6498541}.
 Furthermore, using strings to dispatch call instructions is a lot less efficient than just jumping to the correct bytecode position directly.
 
-Two different bytecode designs were considered during the development of the new emulator.
-The first, which is more efficient but also posed serious problems from an implementation point of view, uses unions to minimize the space required for storing the instruction vector~\ref{lst:original-bytecode}.
-A union is similar to a struct, but only one declared field is used in a particular instance at one time~\cite{klabnik2019rust}.
-This allows putting opcodes, segments, and constants into a single type.
+There are two fundamental ways to represent instructions in an emulator.
+Instructions can either have a fixed size, or they can have varying sizes.
+Making all instructions the same fixed size makes development simpler, as a single element in the program vector corresponds to a single instruction.
+But representing an instruction set like the VM bytecode, where some instructions take arguments and others do not~\ref{table:vm-instructions} with a fixed size, means that some instructions require padding.
+\begin{center}
+  \begin{figure}[ht]
+    \centering
+    \includegraphics[width=12cm]{fig/instruction-size.png}
+    \caption{The difference between fixed and varying size instructions.}
+    \label{fig:instruction-size}
+  \end{figure}
+\end{center}
+In the fixed size vector in~\cref{fig:instruction-size}, the add instruction has the same size as the push instructions.
+Because the add instruction has no arguments and therefore stores less information than the push instructions, this wastes some space.
+In constrast, the varying size vector does not waste any space, but each instruction is now represented by multiple elements.
+The instructions have essentially been split into bytes without any high level structure.
+As we will see later, the composition of bytecode in real applications makes the advantage of not wasting space far less significant than one might first assume.
+
+Actually implementing the varying size approach in code~\ref{lst:original-bytecode} requires the usage of unions, which are similar to structs, but only one declared field can be used in a particular instance at one time~\cite{klabnik2019rust}.
+% Two different bytecode designs were considered during the development of the new emulator.
+% The first, which is more efficient but also posed serious problems from an implementation point of view, uses unions to minimize the space required for storing the instruction vector~\ref{lst:original-bytecode}.
+% A union
+% This allows putting opcodes, segments, and constants into a single type.
 Since each of the union variants can be represented by a single byte, the entire union also fits into only a single byte.
-This byte can then be interpreted either as an opcode, as a segment or as a constant byte, depending on the context, with a complete instruction consisting of several instances of this union.
-Using this approach has the advantage that each instruction takes up only as much space as it actually needs, without padding bytes.
-The instruction vector is simply a vector of bytes that can be interpreted depending on the state of the VM.
-As we will see later, however, the composition of bytecode in real-world applications makes this advantage far less significant than one might initially assume.
-This approach is efficient, but also has drawbacks.
-Reading the values requires unsafe Rust code, since there is no runtime information about the nature of each union instance contained in the instance itself.
-More importantly, a single instruction in the textual representation of the bytecode can now correspond to multiple entries in the instruction vector, e.g.\ ``push segment 3'' would require three entries in the program vector.
-As a result, the index of a statement in the program at runtime is often significantly larger than the line number of the instruction in the input, leading to two major problems.
-The first and less important is that additional metadata is required to determine the line number in the input from the current instruction in the runtime representation, which drastically increases the complexity needed to implement the code view in the UI.
-The more important issue, however, is the reduction of the available address space.
-Jump instructions in the Hack Bytecode are absolute, not relative as for example in the JVM.
-This means that by assigning multiple indices to each instruction, we would reduce the number of available jump locations significantly, prohibiting us from loading bigger projects like Hackenstein~\ref{fig:hackenstein-official}.
-Alternatively, we could dispense with the one-to-one mapping of addresses and bytecode indices, but that would further complicate the VM implementation.
-A similar problem has already been discussed in~\cref{pynand} to explain why translating bytecode to assembly is not a good solution for this project.
+% This byte can then be interpreted either as an opcode, as a segment or as a constant byte, depending on the context, with a complete instruction consisting of several instances of this union.
+% Using this approach has the advantage that each instruction takes up only as much space as it actually needs, without padding bytes.
 
 \begin{lstlisting}[
   language=Rust,
   label={lst:original-bytecode},
-  caption={Bytecode representation based on unions},
+  caption={Bytecode representation based on unions (not implemented)},
   captionpos=b
   ]
   pub enum Segment {
@@ -140,22 +148,27 @@ A similar problem has already been discussed in~\cref{pynand} to explain why tra
   }
 \end{lstlisting}
 
-For the reasons mentioned above, the new emulator actually uses a different bytecode representation.
-Instead of focusing purely on performance, it is more similar to the official emulator's approach, but with the pointer indirections and some of the overhead removed.
-This approach is based on Rust's enum types.
+Each byte can then be interpreted depending on the state of the VM.
+This approach is efficient, but also has drawbacks.
+Reading the values requires unsafe Rust code, since there is no runtime information about the nature of each union instance contained in the instance itself.
+More importantly, a single instruction in the textual representation of the bytecode can now correspond to multiple entries in the instruction vector, e.g.\ ``push segment 3'' requires three entries in the program vector.
+As a result, the index of a statement in the program at runtime is often significantly larger than the line number of the instruction in the input.
+% The first and less important is that additional metadata is required to determine the line number in the input from the current instruction in the runtime representation, which drastically increases the complexity needed to implement the code view in the UI.
+This is a problem because jump instructions in hack bytecode are absolute, i.e., a jump must know the index of its target instruction in the program vector, not just its position relative to itself.
+For example, the add instruction in the fixed size representation in~\cref{fig:instruction-size} has the index two, but in the varying size vector its index is actually six.
+This means that by assigning multiple indices to each instruction, the number of available jump locations is reduced significantly, which prohibits loading bigger projects like Hackenstein~\ref{fig:hackenstein-official}.
+% Alternatively, we could dispense with the one-to-one mapping of addresses and bytecode indices, but that would further complicate the VM implementation.
+A similar problem has already been discussed in~\cref{pynand} to explain why translating bytecode to assembly is not a good solution for this project.
+
+For the reasons mentioned above, the new emulator actually uses the fixed size bytecode representation, which was implemented with enums~\ref{lst:enum-bytecode}.
 Enums allow the programmer to define a type by enumerating its possible variants~\cite[Chapter~6]{klabnik2019rust}.
 Unlike unions, enums contain the information to identify the content currently stored in them.
-Moreover, its variants can directly have different fields, which is possible with unions only by storing structs in them.
-For this reason, they are much more powerful than enums in C, which are merely an abstraction over a simple integer.
+Their variants can also have different fields, which makes them much more powerful than enums in C.
 Rust enums are closer to tagged unions in C, a combination of a union with a tag to identify the variant used.
-Enums are typically used in conjunction with pattern matching, a feature that allows the programmer to compare a value against a series of patterns and then execute code based on which pattern matches~\cite[Chapter~6.2]{klabnik2019rust}.
-This makes it very easy to not only identify the current instruction, but also extract all the necessary data from it~\ref{lst:bytecode-pattern-matching}.
-With this approach, an entire instruction with all of its arguments is now contained in a single instance of the instruction enum~\ref{lst:enum-bytecode}.
-
 \begin{lstlisting}[
   language=Rust,
   label={lst:enum-bytecode},
-  caption={Bytecode representation based on a single enum},
+  caption={The bytecode representation used in the final implementation.},
   captionpos=b
   ]
   pub enum Instruction {
@@ -168,26 +181,15 @@ With this approach, an entire instruction with all of its arguments is now conta
     Call { function: Word, n_args: Word },
   }
 \end{lstlisting}
-
-\label{call-instruction}
-The size of the enum type corresponds to the size of its largest variant in addition to a tag, so padding bytes must be added at the end of smaller variants.
-This may sound wasteful at first, but it is actually not a problem.
-By writing a script that groups the lines of all bytecode files in a directory based on their first word, one can analyze the frequency of different instructions in VM programs.
-In fact, analysis of several different Jack programs~\ref{table:tested} and the Jack standard library showed that push and pop together account for about 70\% of all bytecode instructions in real programs, while call instructions make up another 10\%.
-Call instructions in the new emulator are not dispatched based on the function name.
-Instead, the bytecode parser already resolves the name to the index of the function within the bytecode vector~\ref{bytecode-parser}, therefore enabling the VM to simply set the program counter to that value directly.
-This has the additional benefit of making the Call instruction, which would otherwise be the largest variant, the same size as the Push and Pop instructions.
-Since these instructions have the same maximum size, only 20\% of instructions need padding at all.
-Based on this, the padding caused by using enums is not really relevant for the memory requirements and cache efficiency of actual programs.
-Pointer redirections, which are still relevant, also play no role in this representation because it does not contain any pointers.
-For the above reasons, this representation is a good choice, both for performance and ease of use during development.
+Enums are typically used in conjunction with pattern matching, a feature that allows the programmer to compare a value against a series of patterns and then execute code based on which pattern matches~\cite[Chapter~6.2]{klabnik2019rust}.
+This makes it very easy to not only identify the current instruction, but also extract all the necessary data from it.
+With this approach, an entire instruction with all of its arguments is now contained in a single instance of the instruction enum.
 \cref{lst:bytecode-pattern-matching} shows how pattern matching can be used in combination with enums to implement the decoding phase of the VM cycle in a clear and concise way by directly extracting the arguments of, for example, push and function instructions and binding them to new local names.
 The ``tos\_binary!'' and ``?'' will be explained in~\cref{macros-and-error-handling}.
-
 \begin{lstlisting}[
   language=Rust,
   label={lst:bytecode-pattern-matching},
-  caption={Using pattern matching to deconstruct the instruction data},
+  caption={Using pattern matching to deconstruct the instruction data.},
   captionpos=b
   ]
   match instruction {
@@ -206,6 +208,19 @@ The ``tos\_binary!'' and ``?'' will be explained in~\cref{macros-and-error-handl
     }
   }
 \end{lstlisting}
+\label{call-instruction}
+The size of the enum type corresponds to the size of its largest variant in addition to a tag, so padding bytes must be added at the end of smaller variants.
+So why is the disadvantage of wasting space for smaller instructions not as significant as it first seems?
+By writing a script that groups the lines of all bytecode files in a directory based on their first word, one can analyze the frequency of different instructions in VM programs.
+In fact, analysis of several different Jack programs~\ref{table:tested} and the Jack standard library showed that push and pop together account for about 70\% of all bytecode instructions in real programs, while call instructions make up another 10\%.
+Call instructions in the new emulator are not dispatched based on the function name.
+Instead, the bytecode parser already resolves the name to the index of the function within the bytecode vector~\ref{bytecode-parser}, therefore enabling the VM to simply set the program counter to that value directly.
+This has the additional benefit of making the Call instruction, which would otherwise be the largest variant, the same size as the push and pop instructions.
+Since these instructions have the same maximum size, only 20\% of instructions need padding at all.
+Based on this, the padding caused by using enums is not really relevant for the memory requirements and cache efficiency of actual programs.
+Compared to the bytecode representation in the official emulator, this enum based approach is also still more efficient because it contains no pointers and therefore no indirections.
+It also does not resolve functions by their names at runtime, which makes call instructions faster.
+For the above reasons, the fixed size representation is a good choice, both for performance and ease of use during development.
 
 \subsubsection{Step by step execution with pattern matching} \label{step-by-step}
 The architecture with its different entry points and ways to use the emulators~\ref{fig:arch} places unique demands on the VM implementation.
@@ -218,7 +233,8 @@ Rusts pattern matching handles the selection of the correct branch automatically
 \subsubsection{Macros and error handling in Rust} \label{macros-and-error-handling}
 Macros are a way of writing code that writes other code, which is known as metaprogramming~\cite[Chapter~19.5]{klabnik2019rust}.
 They allow the programmer to extend the language in certain ways that would not be possible with functions alone.
-One of those ways is the ability to pass language operators as arguments, which would require the creation of a closure when using functions.
+One of those ways is the ability to pass language operators, such as ``+'', as arguments.
+Passing an operator to a function would only be possible if that operator was also wrapped in another function, but with macros any token can be passed as an argument.
 Another advantage of macros is that, unlike functions, they have no runtime overhead, since the code is only inserted at the position of the caller, without an actual function call at runtime.
 
 In the code examples in the sections above, there are several lines that end with a question mark.
@@ -231,78 +247,93 @@ This operator can be placed after any expression that has a result type.
 If the expression was an error, that error is immediately returned as the return value of the entire function.
 On the other hand, if the expression was an actual value, that value is automatically unwrapped, allowing it to be used without further checking.
 This drastically reduces the amount of code required to handle errors, while still keeping all the error handling explicit.
+\cref{lst:bytecode-pattern-matching} shows this in three of its lines.
+The \verb+get_value+ method in line 5 returns a result that should contain the value of the memory at the specified index in the specified segment.
+But it could also be an error if the calculated address is outside the available memory area.
+If it is an error, the surrounding function returns immediately with this error as return value.
+Otherwise, the following code can assume that a correct value was read.
+The emulator specific error types are located inside the error package of each emulator module~\ref{fig:arch}.
+
 Unrecoverable errors, in contrast, do not need to be visible to the programmer because, by definition, the programmer cannot handle them.
 They will cause the program to abort immediately and should be used only when absolutely necessary.
 To provide a good user experience, none of the emulator-related code contains unrecoverable errors.
 The only errors of this kind are in the native interfaces to the application, for example, if the window could not be initialized in desktop mode because the application is running on a server without graphical capabilities.
-The emulator specific error types are located inside the error package of each emulator module~\ref{fig:arch}.
 
 \subsection{Parser development in Rust} \label{parser-dev}
-As a multi-paradigm programming language, Rust provides both object-oriented and functional features that can be used to create parsers.
-Using methods on a parser type makes it easy to group the logic that acts on the state of the parser, while anonymous functions can be used to pass conditions around easily.
-
 Parsing usually consists of at least two stages, the first being lexical analysis, also known as tokenization.
-At this stage, the individual characters of the input are grouped into tokens, which are assigned tags such as identifier, number, or symbol.
+At this stage, the individual characters of the input are grouped into tokens, which are assigned tags such as symbol, number, or keyword.
 This is followed by the actual parsing stage, where the tokens are further grouped into constructs, such as arithmetic expressions or loops.
-A token, in its simplest form, is a tuple of a part of the original source code called a lexeme and a tag that assigns a particular meaning to the lexeme.
-Some things, such as parsing integer literals from strings into actual numbers, can be done either within the lexer or, alternatively, only during the actual code generation or interpretation of the program~\cite{nystrom2021crafting}.
+In its simplest form, a token is a tuple of a piece of the original source code, called a lexeme, and the tag that assigns a specific meaning to the lexeme.
+% Some things, such as parsing integer literals from strings into actual numbers, can be done either within the lexer or, alternatively, only during the actual code generation or interpretation of the program~\cite{nystrom2021crafting}.
 Neither bytecode nor assembly really has any complex constructs, since both are already flat lists of instructions.
 The test scripts, on the other hand, also contain more complex instructions, such as repeat, which is essentially a for loop.
 
 \subsubsection{Generic lexer}
 Much of the lexical analysis code can be shared by all three parsers.
 At its core, a lexer only needs to consume characters as long as certain conditions are met, and then return a token containing those characters, their position in the original source code for error reporting, and the type of token that was consumed.
-The generic lexer therefore offers a method ``take\_chars\_while'', which again takes a higher order predicate function as its argument.
-This function is evaluated for each character, starting from the current position of the lexer, until it returns false for the first time.
+The generic lexer therefore offers a method \verb+take_chars_while+, which again takes a higher order predicate function as its argument.
+This predicate function is evaluated for each character, starting from the current position of the lexer, until it returns false for the first time.
 Then all characters that evaluated true when applied to the predicate are returned as a single string with information about the token's position.
-In addition, there is also a method that takes a string and returns the characters until that string appears in the source code.
+A possible predicate might be \verb+char::is_numeric+ which tests if a given character is a digit.
+So calling \verb+generic_lexer.take_chars_while(char::is_numeric)+ would consume an entire number from the input string and return it wrapped in a span.
 \label{spans}
-All lexemes extracted by the generic lexer are wrapped in a span.
 The span is a structure that can wrap any generic inner type with information about its position in the source code, e.g.\ the line where the element occured.
-This information can later be used to improve error messages for the programmer by indicating not only what went wrong, but also where it happened.
+This information can later be used to improve error messages for the programmer by indicating not only what went wrong, but also where the error happened.
 
-\subsubsection{Peekable as an example for the usefulness of traits}
-Each parser has its own lexer, which in turn uses the generic lexer internally.
-The lexers themselves are quite simple.
-They simply encode the rules for each token into predicates, which are then passed to the generic lexer, and then convert the string returned by that lexer into the correct token type.
-To provide a more uniform interface, these lexers also implement one of Rust's most important traits, the Iterator trait.
-This interface allows the use of types within for-each loops by providing a ``next'' method that can return the next element or nothing.
-This would be useful in and of itself, but Rusts powerful type system offers the ability to extend types that satisfy certain conditions by wrapping them with other types that offer even more functionality.
-One such type is called Peekable, which can be wrapped around any other type that implements the Iterator trait, allowing the user to peek at the next item without actually consuming it.
-Rust calls features like this ``zero cost abstractions'' because there is no runtime overhead compared to adding the functionality directly to each lexer.
-It is not implemented via dynamic dispatch, but is fully resolved at compile time.
-In addition, the Peekable type itself also implements the Iterator trait, so it just extends the interface without removing any functionality.
-Any type that implements the Iterator trait automatically has a ``peekable'' method that returns the Iterator instance wrapped in this type.
+% \subsubsection{Peekable as an example for the usefulness of traits}
+% Each parser has its own lexer, which in turn uses the generic lexer internally.
+% The lexers themselves are quite simple.
+% They simply encode the rules for each token into predicates, which are then passed to the generic lexer, and then convert the string returned by that lexer into the correct token type.
+% To provide a more uniform interface, these lexers also implement one of Rust's most important traits, the Iterator trait.
+% This interface allows the use of types within for-each loops by providing a ``next'' method that can return the next element or nothing.
+% This would be useful in and of itself, but Rusts powerful type system offers the ability to extend types that satisfy certain conditions by wrapping them with other types that offer even more functionality.
+% One such type is called Peekable, which can be wrapped around any other type that implements the Iterator trait, allowing the user to peek at the next item without actually consuming it.
+% Rust calls features like this ``zero cost abstractions'' because there is no runtime overhead compared to adding the functionality directly to each lexer.
+% It is not implemented via dynamic dispatch, but is fully resolved at compile time.
+% In addition, the Peekable type itself also implements the Iterator trait, so it just extends the interface without removing any functionality.
+% Any type that implements the Iterator trait automatically has a ``peekable'' method that returns the Iterator instance wrapped in this type.
 
 \subsubsection{The bytecode parser} \label{bytecode-parser}
 The bytecode parser is the simplest of the three parsers.
 As shown in~\cref{lst:hack-bytecode}, it is a flat and simple format, with simple and well-defined rules.
-Nevertheless, it has some complexity due to the way identifiers are resolved.
-Functions and labels can be referenced before they are declared.
+Nevertheless, it has some complexity due to the way symbols are resolved.
+Functions and labels both declare symbols, which can be referenced before they are declared.
 This is relevant because, as described in~\cref{call-instruction}, call instructions and labels are resolved into indices in the program vector during parsing.
 To achieve this, the parsing is divided into two different steps.
 The first step is to parse the source code from beginning to end.
 At this stage, the bytecode vector does not yet contain the completed instructions.
-It instead contains instances of an enum, which can be either a fully resolved instruction or a partially constructed instruction with an identifier it is waiting for.
+It instead contains instances of an enum, which can be either a fully resolved instruction or a partially constructed instruction with an symbol it is waiting for.
 While reading the source code, the parser keeps track of all declared functions and labels.
-When such an identifier is referenced in the code, the parser tries to find it in the environment.
-If the identifier is already declared, the instruction is inserted into the result vector as a fully resolved instruction.
-However, if the instruction references an undeclared identifier, the instruction is inserted with a placeholder and another string with the name of the missing identifier.
+When such an symbol is referenced in the code, the parser tries to find it in the environment.
+If the symbol is already declared, the instruction is inserted into the result vector as a fully resolved instruction.
+However, if the instruction references an undeclared symbol, the instruction is inserted with a placeholder and another string with the name of the missing symbol.
 These placeholders are then replaced with the correct indices in the second stage.
 Here the parser iterates over the previous result vector and handles any instructions with placeholders.
-At the end, the parser performs a final check to see if there are any unresolved identifiers left.
+This process of filling in the missing information is commonly referred to as backpatching.
+At the end, the parser performs a final check to see if there are any unresolved symbols left.
 Should this be the case, it returns an error, otherwise the parser is done.
 One thing which has yet to be explained: If function dispatching is based on the function's index in the program's bytecode vector, how are built-in standard library functions called?
-These functions actually use the highest possible indices.
-So if \(N\) is the largest integer that still fits into Rust's index type, and if \(n\) is the number of standard library functions, then the addresses in the range \([N - n + 1, N]\) are used to call those functions.
-The exact index for each standard library function is determined before parsing, so the parser can simply replace any identifier referring to such a function with the correct index.
-The connection between this index and the associated identifier can be resolved bidirectionally, so the VM can also resolve any call with an index greater than \(N - n\) to the appropriate native function.
+These functions are not part of the bytecode and therefore not included in the parsed program.
+They are assigned the highest possible addresses that would be valid indices into the bytecode vector.
+So if \(N\) is the largest integer that still fits into the index type, and if \(n\) is the number of standard library functions, then the addresses in the range \([N - n + 1, N]\) are used to call those functions.
+These addresses are not really part of the bytecode, they are just numbers known to the emulator that resolve to the implementation of a function in the native standard library, rather than a real instruction in the bytecode.
+The exact index for each standard library function is determined before parsing, so the parser can simply replace any symbol referring to such a function with the correct index.
+\begin{center}
+  \begin{figure}[ht]
+    \centering
+    \includegraphics[width=12cm]{fig/bytecode-parsing.png}
+    \caption{The two stages of bytecode parsing.}
+    \label{fig:bytecode-parsing}
+  \end{figure}
+\end{center}
+The connection between this index and the associated symbol can be resolved bidirectionally, so the VM can also resolve any call with an index greater than \(N - n\) to the appropriate native function.
+This process can be seen in~\cref{fig:bytecode-parsing}, were the \verb+foo+ call is resolved to an actual index in the result, while the \verb+Math.multiply+ call is resolved to the highest possible index.
 
 \subsection{The test script workflow} \label{test-script-workflow}
 To allow automatic testing of student submissions, the Nand to Tetris course includes test scripts for most of its projects.
 These scripts are able to load programs depending on the emulator, set internal values in the emulator's memory, execute the program in a certain way, and then compare the values at specific memory addresses in the emulator with expected values loaded from a file.
-This functionality is not only useful for students, but also for the instructor of the course.
-Test scripts share most of their functionality and syntax between all three emulators, but there are some emulator-specific features that pose a challenge to implementation.
+This functionality is not only useful for students, but also for the instructors of the course.
+As described in~\cref{test-scripts}, Test scripts share most of their functionality and syntax between all three simulators, but there are some simulator-specific features that pose a challenge to implementation.
 The application must know which emulator the script is to be run in, so that only the correct instructions are parsed and executed.
 Since the different emulators actually produce different executables~\ref{interfaces}, the emulator is already known, but it is not immediately obvious how to structure the code to allow only some of the possible commands to occur and be executed based on the current interface, while sharing as much code as possible.
 
@@ -365,10 +396,10 @@ This implementation has to contain the missing parse function for VM specific co
 % \subsubsection{Compile time check for the combination of parser and executor}
 So far we have looked at the implementation of the test script parser, but of course the scripts need to be executed to be useful.
 Just like parsing, most of the logic is shared among all simulators, which means that individual emulators should implement only the commands that are unique to them and share all other code.
-The trait that specifies these methods also has a generic type parameter, just as the ``C'' parameter in~\cref{lst:generic-parser}.
+The trait that specifies these methods also has a generic type parameter, just like the ``C'' parameter in~\cref{lst:generic-parser}.
 This ensures at compile time that the parser and executor are compatible.
 Rust's powerful type inference even allows it to determine the correct script parser implementation based on the executor provided.
-The various interfaces can simply call the ``execute\_script'' function with one of the simulators as its argument and the compiler will automatically infer the correct parser.
+The various interfaces can simply call the \verb+execute_script+ function with one of the simulators as its argument and the compiler will automatically infer the correct parser.
 
 \subsection{The native standard library protocol} \label{jack-stdlib-in-rust}
 Theoretically, the VM could simply use the implementation of the standard library written directly in bytecode.
@@ -428,7 +459,7 @@ For bytecode functions, this is useful for displaying the current call stack in 
 After a native function is suspended, which in Rust just means a normal return, its state in the stack is set to the newly returned state.
 Or the element is removed from the stack altogether if the special final state is returned.
 Each time the VM is instructed to execute a step, it first checks if the top of the internal call stack is a built-in function that needs to be continued.
-If it is, it calls that function again, using the previous return value as the new state.
+If it is, that function is called again, using the previous return value as the new state.
 Continuing the function in the correct place is then as simple as putting the contents of the native function into a match statement that jumps to the correct branch based on the state argument.
 In addition to the state, the native function receives the VM as a mutable reference and the formal arguments as a vector of words.
 Mutable access to the VM is needed for several functions, e.g.\ drawing to the display memory to display something on the screen.
@@ -444,13 +475,11 @@ This system is powerful enough to solve all of the aforementioned problems if ap
 \subsubsection{Example: Sys.wait} \label{sys.wait-example}
 \verb+Sys.wait+~\ref{lst:sys.wait} is a good example of how the state argument can be used.
 Since state is just an alias for u32, a 32-bit unsigned integer, it can be used as a counter.
-A special case here is the requirement that the parameter be positive, since we cannot wait for a negative time period, so an error is returned in this case.
-The first time the function is called, the state is \(0\), so we enter the second if-statement.
-Here the function will terminate if the user has waited a single tick or not at all.
-Normally this is not the case, so the function returns \(2\) as the next state.
-When the emulator executes the next step, it checks its internal call stack, which contains the \verb+Sys.wait+ call with state \(2\) as the top element.
-For that reason, instead of executing the next statement, the emulator calls the wait function again, but this time with a state of \(2\).
-This means that the function skips the first and second if-statements and returns a new state of \(3\) instead.
+The first time the function is called, the state is \(0\), so we enter the first if-statement.
+Unless the user passed a zero as the time to be waited, the function returns \(1\) as the next state.
+When the emulator executes the next step, it checks its internal call stack, which contains the \verb+Sys.wait+ call with state \(1\) as the top element.
+For that reason, instead of executing the next statement, the emulator calls the wait function again, but this time with a state of \(1\).
+This means that the function skips the first if-statement and returns a new state of \(2\) instead.
 This loop then continues until the state is the same size as the first argument multiplied by 1000.
 When this happens, the original first argument is returned inside the special finished state, which means that the function should be removed from the emulator's internal call stack and the next statement can finally be executed.
 The multiplication by 1000 is relatively arbitrary here, since the actual duration depends on the current tick rate, which is a feature of the user interface and therefore unknown to the emulator~\ref{step-by-step}.
@@ -463,27 +492,15 @@ But currently this is not possible, because WebAssembly does not provide an API 
   caption={Implementation of the Sys.wait function},
   captionpos=b
   ]
-pub fn wait(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
-    if params[0] < 0 {
-        return Err(StdlibError::SysWaitNegativeDuration);
-    }
-
+  pub fn wait(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     let duration = params[0] as State * 1000;
 
-    if state == 0 {
-        if duration <= 1 {
-            return Ok(StdlibOk::Finished(params[0]));
-        }
-        // 2 because one tick is already used
-        return Ok(StdlibOk::ContinueInNextStep(2));
-    }
-
-    if duration > state {
-        return Ok(StdlibOk::ContinueInNextStep(state + 1));
+    if state < duration {
+      return Ok(StdlibOk::ContinueInNextStep(state + 1));
     }
 
     Ok(StdlibOk::Finished(params[0]))
-}
+  }
 \end{lstlisting}
 
 \subsubsection{Example: Output.printString} \label{complex-example}
@@ -493,6 +510,14 @@ This function can be used to output an entire string to the emulator's screen.
 It does not implement all of the functionality itself, instead relying on the string module to iterate over the characters, and the output module's printChar function to print just a single character.
 In theory, this function would be trivial, a simple for loop from zero to the length of the string, with only a single call to the printChar function as the loop body.
 Yet it is not trivial in practice due to the limitations described in~\cref{stdlib-issues}.
+\begin{center}
+  \begin{figure}[ht]
+    \centering
+    \includegraphics[width=10cm]{fig/printString.png}
+    \caption{The Output.printString function as a diagram.}
+    \label{fig:printstring-dfa}
+  \end{figure}
+\end{center}
 Each time a function is called within a standard native library function, the latter must be stopped, since the former might be a function written in bytecode, and therefore subject to the user interface's stepwise debugger.
 For example, if the native output implementation is used in combination with a string implementation in bytecode, the user might reasonably expect to step through the charAt function called by the printString function in the user interface.
 This is indeed possible with this system.
@@ -500,9 +525,9 @@ Features like this necessitate the complexity of these native implementations, a
 In the future, it may be possible to implement this in Rust in a more idiomatic way using the planned yield statement, however this is still a proposal at the time of writing.
 Most of the logic is explained in the comments of~\cref{lst:output.printstring}, but the basic idea is simply to use the state argument both as an index for the loop and to store the length of the string.
 This is possible because the state type is a 32-bit integer, whereas the VM emulator uses only 16-bit integers, so the state can contain two different values.
-Depending on whether the state is even or odd, we alternately call the charAt or printChar function until the counter reaches twice the length of the string.
+Depending on whether the state is even or odd, we alternately call the charAt or printChar function until everything has been printed.
 Although the function is actually rather simple, it appears quite complicated in the code, so it is shown again in~\cref{fig:printstring-dfa}, but this time in a graphical representation of the state machine.
-Each state transition in the graphical representation is a suspension point for the function, with the transition to state \(3\) representing the final return.
+Each state transition in the graphical representation is a suspension point for the function, with the transition to state \(3\) representing the final return in line 28 of the code.
 
 \begin{lstlisting}[
   language=Rust,
@@ -511,14 +536,14 @@ Each state transition in the graphical representation is a suspension point for 
   captionpos=b
   ]
   pub fn print_string(vm: &mut VM, state: State, params: &[Word])
-      -> StdResult {
+  -> StdResult {
     // State is 32 bits wide. The upper 16 bits are used to keep
     // the length information, while
     // the lower 16 bits are used for the actual state counter
     let string = params[0];
     let real_state = state & 0xFFFF;
 
-    // in the first tick, get the length of the string to be printed
+    // in the first tick: get the length of the string to be printed
     if state == 0 {
       return call_vm!(vm, state, "String.length", &[string]);
     }
@@ -552,14 +577,6 @@ Each state transition in the graphical representation is a suspension point for 
     }
   }
 \end{lstlisting}
-\begin{center}
-  \begin{figure}[ht]
-    \centering
-    \includegraphics[width=10cm]{fig/printString.png}
-    \caption{The Output.printString function as a diagram.}
-    \label{fig:printstring-dfa}
-  \end{figure}
-\end{center}
 
 \subsection{Using conditional compilation in Rust} \label{conditional-compilation}
 Like C, Rust has the ability to use macros to rewrite code at the AST level during compilation~\ref{macros-and-error-handling}.

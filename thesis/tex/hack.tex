@@ -1,9 +1,10 @@
 \section{Nand to Tetris and the Hack Architecture} \label{hack-architecture}
 Nand to Tetris is divided into several sections that can be worked on or skipped more or less independently of each other.
 Each section is further removed from the actual hardware than its predecessor.
+They each describe a further abstraction in the Hack architecture, the computer system specifically designed for this course, which the students implement themselves.
 In the beginning, the students create the necessary chips and logic gates, starting with only a nand gate.
 This section is not part of this thesis, but it may become relevant in future additions to the application~\ref{future-work}.
-After that, students will work with assembler and create their own assembler with generated code targeting the CPU from the previous section.
+After that, students will work with assembly language~\ref{hack-assembly} and create their own assembler with generated code targeting the CPU from the previous section.
 The application created as part of this work contains an emulator that can run that assembly directly without further compilation.
 This allows students to run their assembly code in the same application as their VM code from the later sections.
 In the next section, students work closely with VM bytecode, first writing a translator from bytecode to assembly, and later writing a complete game using the high-level programming language Jack, which was designed for this course.
@@ -16,6 +17,17 @@ Although Project 9 is not the final project, for many it is the highlight of the
 This is illustrated by the fact that nine of the twelve examples listed under the ``Cool Stuff''~\cite{n2tweb} tab on the official website are Jack programs that would qualify as Project 9 solutions.
 So if the goal is to improve the overall student experience, it makes sense to focus on this part.
 Nevertheless, the emulators created as part of this thesis can also improve the experience for other projects~\ref{evaluation}.
+It is important to keep in mind, that both the VM bytecode and the assembly are meant as intermediate steps for the compilation of Jack code into machine language, even though this project is about interpreting them directly.
+The entire pipeline with many of the relevant terms that will be used throughout the thesis is shown in~\cref{fig:hack-pipeline}.
+
+\begin{center}
+  \begin{figure}[ht]
+    \centering
+    \includegraphics[width=14cm]{fig/hack-pipeline.png}
+    \caption{The transformation from Jack code to machine code.}
+    \label{fig:hack-pipeline}
+  \end{figure}
+\end{center}
 
 % \subsection{The sections of Nand to Tetris}
 % \begin{itemize}
@@ -24,8 +36,43 @@ Nevertheless, the emulators created as part of this thesis can also improve the 
 %   \item Virtuelle Machine
 %   \item High level Sprache und Betriebssystem (nicht Teil der Arbeit)
 % \end{itemize}
+%
+\subsection{Hack assembly} \label{hack-assembly}
+There are three different languages in the Nand to Tetris course, which are important for this work.
+The first and least complex of the three is the assembly language.
+Assembly in this case simply means that the language has a direct mapping to the machine language which the CPU can actually understand.
+Each assembly instruction can be mapped to a single number which can be understood by the hardware of the machine.
+Assembly in modern systems is often complicated with a plethora of instructions~\cite{guide2011intel}, but Hack assembly only has two different instructions.
+These two instructions are used to manipulate two physical registers called A and D.
+In addition, there is a third register, called M, which is actually just the memory cell pointed to by the address in the A register.
+This allows the assembly to work without any dedicated instructions for memory manipulation.
+The first instruction is called A-Instruction because the only thing it does, is putting a constant value into the A register.
+In the assembly code it is written as ``@value'', so for example ``@42'' would write the value 42 into the A-register.
+The C-Instruction, on the other hand, can perform a multitude of different functions.
+These range from negating the value of a single register to performing a binary-or operation on two registers and jumping to another instruction when that value is greater than zero.
+The target of that jump would be determined by the value inside the A register.
+C-Instructions consist of one or multiple target registers, an equals sign, an expression, such as D-A and optionally a jump.
+Understanding the functionality of Hack assembly on a deeper level than this is not required to understand the following sections.
+\cref{lst:hack-assembly} shows a simple assembly program, which checks if the value in memory at address 3 is equal to 5 and if it is, jumps to address instruction 100.
 
-\subsection{The operating principles of the Hack VM}
+\begin{lstlisting}[
+  language=HackAsm,
+  caption={A simple Hack assembly program},
+  label={lst:hack-assembly},
+  captionpos=b]
+@3
+D=M   // D == RAM[3]
+@5
+D=D-A // D := D - 5
+@100
+D;JEQ // if (D == 0) goto 100
+\end{lstlisting}
+
+\subsection{Hack bytecode}
+\label{hack-bytecode}
+% \subsection{The operating principles of the Hack VM}
+Hack bytecode is the most important language for this thesis, as it is the language interpreted by the VM emulator.
+Since it has way more instructions than the assembly, it makes sense to start with an example instead of explaining each instruction in detail.
 The simple C program in~\cref{lst:c-add-123} shows how one might write a loop that adds the numbers 1, 2, and 3 together.
 In mathematical notation, it would be written as \(\sum_{i=1}^{3}i\).
 This program may seem unremarkable at first glance, but it incorporates quite a few important concepts of modern programming languages, such as variables, loops, conditions, and arithmetic operations.
@@ -73,9 +120,11 @@ Unlike many other architectures, push and pop in the Hack architecture can also 
 This is made possible by extending both instructions with a segment and an index. The segment acts as an offset that the VM adds to the index that follows it.
 The address for the instruction is therefore computed as \(address=offset(segment)+index\).
 It is used either as the destination where the result of a pop operation is written, or as the source location of a value to be pushed.
+\cref{table:segments} in the appendix shows all of the possible segments and their purpose.
 
 Only two of the eight possible segments are used in~\cref{lst:hack-bytecode}.
-The local offset reads its offset from the first memory cell: \(address=RAM[1]+index\). So a ``pop local 3'' would remove the top most element of the stack and write it to \(RAM[1]+3\).
+The local offset reads its offset from the first memory cell: \(address=RAM[1]+index\).
+So a \verb+pop local 3+ would perform the following operation: \(RAM[RAM[1]+3] = pop()\).
 In contrast, the constant segment differs from all other segments in that it does not add anything to the index before treating the result as an address, but simply pushes the index directly onto the stack without performing a memory read.
 This means that the constant segment cannot be used with the pop instruction.
 
@@ -93,7 +142,6 @@ To update \(sum\), the VM loads the current value of \(sum\) onto the stack, the
 Updating \(i\) works basically the same way, but with a constant value of one instead of another local variable being added.
 Then we simply jump back to the beginning of the loop, where the next check for the exit condition is performed, and continue this process until that condition is met.
 
-\subsection{Hack Bytecode} \label{hack-bytecode}
 \begin{lstlisting}[
   language=Hack,
   caption={A Hack VM program to calculate \(\sum_{i=1}^{3}i\).},
@@ -133,4 +181,80 @@ Then we simply jump back to the beginning of the loop, where the next check for 
   // jump to the beginning of the loop again
   goto LOOP_START
   label LOOP_END
+\end{lstlisting}
+
+\cref{table:vm-instructions} lists most instructions in the VM bytecode.
+As they all work the same way, \verb+add+ represents every instruction which pops two arguments from the stack, such as \verb+and+, \verb+lt+ (less than) or \verb+sub+.
+The ``Arguments'' column here refers to arguments given in the source code, such as \verb+argument+ and \verb+1+ for the instruction \verb+push argument 1+.
+This differs, for example, from the addition instruction, which takes its arguments from the stack.
+TOS is an abbreviation for top of stack, the value which was pushed last.
+
+\begin{table}[h]
+  \begin{center}
+    \centering
+    \begin{tabular}{@{}lllll@{}}
+      \toprule
+      Name     & Purpose                                                        & Arguments \\
+      \midrule
+      add      & Add the two numbers on top of the stack                        & - \\
+      not      & Bit-invert the value on TOS                                    & - \\
+      neg      & Multiply the TOS with -1                                       & - \\
+      push     & Push \(RAM[offset(segment)+index]\) onto the stack             & segment, index \\
+      pop      & Pop the TOS and write it to \(RAM[offset(segment)+index]\)     & segment, index \\
+      label    & Declare a label, i.e., a name referring to a line of code       & label \\
+      goto     & Jump to the specified label                                    & label \\
+      if-goto  & Jump to the label, which is passed as an argument if TOS != 0  & label \\
+      function & Declare a new function and push \(n_{local}\) zeros to the stack & function name, \(n_{local}\) \\
+      call     & Call a function with \(n_{args}\) arguments                     & function name, \(n_{args}\) \\
+      return   & Return from a function                                         &         - \\
+      \bottomrule
+    \end{tabular}
+    \caption{The Hack VM bytecode instructions.}
+    \label{table:vm-instructions}
+  \end{center}
+\end{table}
+
+\subsection{Hack test scripts} \label{test-scripts}
+The third and last language relevant to this thesis, is the test script language.
+This script language is special, because students participating in the course usually do not interact with it directly, which is also why the scripts do not appear in~\ref{fig:hack-pipeline}.
+Instead, Schocken and Nisan already supplied test scripts for most of the exercises in the book themselves.
+These scripts are used both by students, to determine if they actually solved the exercise, but also by the teachers grading the project submissions.
+Test scripts can automatically load a program, initialize values in the emulator's memory, run the program, and compare the memory after running for a certain number of ticks with a set of expected values.
+An example of such a script can be seen in~\cref{lst:hack-test-script}.
+All the commands, which are specific to a single emulator, in this case the VM emulator, are highlighted in red.
+The script starts by loading the program it is supposed to test, in this case \verb+MyProgram.vm+.
+Loading behaves differently for the emulators, because the VM emulator is capable of loading an entire directory, while the CPU emulator may only load a single file.
+In order to test the functionality of a program, it is necessary to specify the memory addresses which should be compared and their respective expected values.
+This is done in the next three lines.
+After executing the program, the values specified in output-list will be written in the format dictated after the \%-Symbol into the output-file.
+In the case of~\cref{lst:hack-test-script}, this means writing the values behind the addresses 256 and 300 into \verb+MyProgram.out+, each with one byte of padding on the left and right and a length of six for the value itself.
+The format here will be decimal, as specified by the D.
+Before any of this can happen, however, the program has to first be executed.
+To do this, the test script can first set any value in the emulator's memory to a constant value.
+This is done with the set command, which is specific to each emulator, since each emulator has different requirements.
+The CPU emulator, for example, has no understanding of a stack pointer (sp) or a local segment, as those terms are specific to the VM emulator.
+When everything has been setup, the emulator is interpreted step-by-step with the repeat instruction, in this case 42 VM ticks will be executed.
+The instruction to step the emulator has a different name for each one, but fundamentally behaves the same.
+Finally, the output command writes all the values from the output-list into the output-file which is then compared to the compare-to file.
+These two files should be identical if the program ran correctly, if not an error will be reported.
+
+\begin{lstlisting}[
+  language=HackScript,
+  caption={A simple script to test a bytecode program (red means simulator-specific).},
+  label={lst:hack-test-script},
+  captionpos=b]
+load MyProgram.vm,
+output-file MyProgram.out,
+compare-to MyProgram.cmp,
+output-list RAM[256]%D1.6.1 RAM[300]%D1.6.1
+
+set sp 256,        // sp contains the address of the top of the stack
+set local 300,     // the base address of the local segment
+
+repeat 42 {        // run for 42 ticks
+  vmstep;
+}
+
+// Outputs the values specified in output-list to the output-file
+output;
 \end{lstlisting}
