@@ -1,0 +1,11 @@
+digraph finite_state_machine {
+	fontname="Helvetica,Arial,sans-serif"
+	node [fontname="Helvetica,Arial,sans-serif"]
+	edge [fontname="Helvetica,Arial,sans-serif"]
+	rankdir=LR;
+	node [shape = doublecircle]; 2;
+	node [shape = circle];
+    0 -> 1 [label = "millis >= 0"];
+    1 -> 2 [label = "state >= duration"];
+    1 -> 1 [label = "state < duration"];
+}

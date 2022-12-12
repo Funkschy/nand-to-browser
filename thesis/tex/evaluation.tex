@@ -10,13 +10,15 @@ However, this is also not necessary, since the expected behavior of the emulator
 By following the specification and testing the new implementation with a reasonable number of representative programs, one can determine the degree of compatibility.
 Those programs are listed in the appendix~\ref{table:tested}.
 The number of possible instructions in the VM is also manageable, so a sufficiently complex program will use every single available instruction, which further supports this claim.
+Additionally, the course materials include a variety of test cases to help users implement the Jack compiler.
+These tests were used to further verify the correct behavior of the new VM implementation.
 By and large, the new emulator behaves exactly like the old one.
 This even applies to behaviors that could be considered bugs, such as the way the keyboard handler in the Java implementation interprets each letter as a capital letter, thus limiting the entire input system to uppercase letters.
 This is not a technical limitation of either the VM or the Java input event, but simply a consequence of the implementation of the keyboard handler, and could easily be changed to allow lowercase letters as well.
 But that would affect a number of existing applications, since they only check for uppercase letters in their game code, which means that those applications could no longer be used without problems.
 For this reason, the new emulator also only passes uppercase letters to the VM, even if it needs a bit more code to behave that way.
 All keys are converted directly to uppercase after being read.
-In the future, it might be useful to add a compatibility setting to allow users to process lowercase letters as well, but due to time constraints in this project, it was decided to prioritize compatibility over correctness.
+In the future, it might be useful to add a compatibility setting to allow users to process lowercase letters as well, but due to the time constraints of this project, it was decided to prioritize compatibility over correctness.
 There is only a single part of the new emulator that is known to behave at least partially differently to the official implementation.
 That is the implementation of the \verb+Sys.wait+ function, which was already discussed in~\cref{sys.wait-example}.
 
@@ -35,7 +37,7 @@ One such feature is the ability to animate the running program.
 When this option is enabled, the information about the internal memory and the current instruction is updated after each tick.
 Everytime one of those values changes, it is highlighted in the UI.
 This may seem useful at first, but while debugging, the user will usually use the step button instead, and when running the game, the animations have to be disabled for performance reasons.
-So this feature does not provide much value to the user.
+Thus, this feature does not offer much benefit to the user.
 Instead of offering every possible feature, the new user interface is intentionally kept minmal to simplify usage and provide an experience that is more focused on actually running games at full speed.
 This is also the reason why most of the UI elements are completely hidden while the game is running.
 For the compiler development that is part of projects 10 and 11, it may be advantageous to continue using the official emulators for their advanced debugging features.
@@ -43,14 +45,6 @@ In contrast, when it comes to playing and testing full games, the new emulators 
 They also open up these games and programs to additional platforms, because the new emulators also work on phones and tablets, as long as a physical keyboard is connected or the application does not require user input~\ref{fig:ui-demo-mobile}.
 Another benefit of the new user interface is the unification of the VM and CPU emulators.
 The new emulator handles both types of applications within a single application, distinguishing between them based on their respective file extensions.
-\begin{center}
-  \begin{figure}[ht]
-    \centering
-    \includegraphics[width=6cm]{fig/ui-demo-mobile.png}
-    \caption{The web-based user interface in a phone format.}%
-    \label{fig:ui-demo-mobile}
-  \end{figure}
-\end{center}
 % \begin{itemize}
 %   \item official has more features (including test scripts)
 %   \item mine scales better
@@ -59,20 +53,9 @@ The new emulator handles both types of applications within a single application,
 % \end{itemize}
 
 % \subsubsection{Hosting the application}
-One of the biggest advantages of web-based applications is the ability to use them without a local installation, simply by opening a link in the user's web browser.
-This only works if the application is hosted on a public web server.
-For many applications, this means renting or operating an expensive server infrastructure for the backend of their service.
-In contrast, the new emulators are compiled to WebAssembly, which allows them to run entirely in the client's web browser.
-This means that no backend is needed and therefore a simple static file server is sufficient to host the entire application.
-GitHub offers such a file hosting service free of charge.
-It is called ``GitHub Pages'' and allows users to host static web resources by simply uploading them to a directory on GitHub's servers and marking that directory as public in the repository settings.
-In addition, GitHub offers a service called ``GitHub Actions'' that allows arbitrary code to be executed on Microsoft's servers depending on various events in the repository, such as a push to the main branch.
-Combining these two services, one can automatically build and deploy the entire WebAssembly application to Pages every time there is a push to the main branch.
-That is exactly what this project does, even though it is technically hosted on the HHU's internal GitLab instance.
-Every time there is a push to the GitLab instance, that push is automatically mirrored to GitHub, which then builds the Wasm and JavaScript code and deploys it to GitHub Pages.
 
 \subsection{Comparison with the official Emulator based on Performance} \label{sec:benchmarks}
-There are two distinct modes in which the Emulators can operate: the interactive mode, in which the display memory is actually rendered to a visible canvas, and the test mode, in which a test scripts runs without any further user input to verify the correctness of a hack program.
+There are two distinct modes in which the emulators can operate: interactive mode, in which the display memory is actually rendered onto a visible canvas, and test mode, in which a test script runs without further user input to verify the correctness of a VM or CPU program.
 From a performance point of view, only the former is relevant, since all test scripts used in the course finish so quickly that measuring the performance differences between emulators would basically be meaningless.
 So, to really evaluate the new emulators, a sufficiently complex graphical program is required.
 For this task, one of Gavin Stewart's impressive graphical demonstrations for the Hack platform was chosen.
@@ -96,8 +79,11 @@ Both print the current system time in milliseconds and get executed when the sta
 Additionally in the third column of the ~\cref{table:gaschunky}, the one millisecond wait instruction in the FastforwardTask of the \verb+HackController.java+ was removed to ensure that the official emulator could run at its maximum speed.
 The new emulator was run both from the web UI and in desktop mode.
 In both cases the tickrate was set to one million, which is ten times as much as the normal maximum tickrate in the web UI.
-This limit is however arbitrarily chosen and therefore does not reflect the true performance of the system.
+This normal maximum is arbitrarily chosen and therefore does not reflect the true performance of the system.
 At a tick rate of one million, the viewer can still see the animation clearly, which allows for a fair comparison~\ref{fig:gachunky-plot}.
+The web version of the new emulator was run in the Firefox web browser on a Linux machine.
+Since the speed of Wasm implementations is different in each browser and even operating system, the exact numbers may change on a different system.
+However, the results are still relevant since they were all measured on the same system and are therefore comparable.
 
 \begin{table}[ht]
   \begin{center}
@@ -188,9 +174,9 @@ At a tick rate of one million, the viewer can still see the animation clearly, w
   \label{fig:gachunky-plot}
 \end{figure}
 
-It is clearly visible that the new Emulator is several times faster than the official implementation.
+It is clearly visible that the new emulator is several times faster than the official implementation.
 On average, the official emulator without modifications takes around 36 seconds to render the full animation once.
 Meanwhile the Web version of the new emulator manages to achieve the same result in just one second on average.
-The native version of the new emulator which uses SDL to render the internal display is even slightly faster.
+The native version of the new emulator, which uses SDL to render the internal display, is even slightly faster.
 While the official emulator can be sped up drastically, it still does not come close.
 This shows us that even though the new emulator only uses a single thread and runs in a browser, it still offers massive performance benefits over the official implementation.

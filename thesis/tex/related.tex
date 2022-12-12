@@ -32,7 +32,7 @@ It also doesn't provide a user interface outside of the display, which makes deb
 % \end{itemize}
 
 % \subsection{Emulators in WebAssembly}
-In recent years, there have been several projects that implemented other emulators in WebAssembly. Notably, an emulator for Intel's 8086 microprocessor~\cite{9824078}, also written in Rust and using a ReactJS front-end. This already demonstrates the viability of these technologies for creating web-based emulators, but obviously offers no benefit to participants of the Nand to Tetris course, which is the main goal of this work.
+In recent years, there have been several projects that implemented other emulators in WebAssembly. Notably, an emulator for Intel's 8086 microprocessor~\cite{9824078}, also written in Rust and using a ReactJS front-end. This already demonstrates the viability of these technologies for creating web-based emulators.
 
 % \begin{itemize}
 %   \item https://ieeexplore.ieee.org/abstract/document/9824078
@@ -46,20 +46,23 @@ At the same time, it is also important to use as few dependencies as possible, a
 For this reason, each library used in this project has a clear purpose and provides enough value to justify its inclusion. Libraries are often referred to as crates in Rust, so these terms are used interchangeably throughout the text.
 
 This section summarizes the rationale for including each crate.
-Rust does not currently allow static constants that require runtime code for initialization. This is however a very useful feature, for example to use hashmaps to define lookup tables.
-The lazy\_static crate is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic} because it provides exactly this functionality in the form of a single macro~\ref{macros-and-error-handling}. Among other things, it is used for the lookup table in the keyboard handler that maps special symbols like the escape key to the corresponding key codes in the emulator.
-Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts for the emulator. Rust does not provide regular expressions in its standard library, so the regex crate was used.
+Rust does not currently allow static constants that require runtime code for initialization.
+This is however a very useful feature, for example to use hashmaps for defining lookup tables.
+The lazy\_static crate is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic}, because it provides exactly this functionality in the form of a single macro.
+Among other things, it is used for the lookup table in the keyboard handler that maps special symbols like the escape key to the corresponding key codes in the emulator.
+Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts~\ref{test-scripts} for the emulator. Rust does not provide regular expressions in its standard library, so the regex crate was used.
 \label{web-sys}
 The two most important libraries when it comes to the value of Rust for this project are wasm-bindgen and web-sys.
 While the former is responsible for creating bindings between Rust and JavaScript so that the two can call each other as if they were the same language, the latter provides implementations for common JavaScript APIs in Rust.
 It builds directly on top of wasm-bindgen to provide most of the functionality that users would normally have to manually write bindings for.
 These two libraries are further complemented by console\_error\_panic\_hook and wasm-pack.
-The former simply prints the stack trace of any unrecoverable Rust error~\ref{macros-and-error-handling} to the JavaScript console.
-Wasm-pack, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command-line tool that builds and packages Rust applications into Wasm modules automatically.
+The former simply prints the stack trace of any unrecoverable Rust error~\ref{error-handling} to the JavaScript console.
+Wasm-pack, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command line utility which automatically builds Rust applications and packages them into Wasm modules.
 This tool is only used at compile time and is therefore only needed to compile the application, not to run it.
 
 The above dependencies are all that is needed for the web version of the emulator. If the native version is used instead, two different dependencies are used instead of the Wasm-focused dependencies.
-The first is SDL2, which is only included if the application is compiled with the desktop flag enabled~\ref{conditional-compilation}.
+The first is SDL2, a library for building native desktop applications and games.
+It is included only if the application was compiled with the desktop flag enabled~\ref{conditional-compilation}.
 Finally, there is clap, an easy-to-use parsing library for command line arguments.
 
 % \begin{itemize}
