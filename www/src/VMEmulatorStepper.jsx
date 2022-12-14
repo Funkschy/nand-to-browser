@@ -1,4 +1,4 @@
-import React, { useEffect, useState} from 'react';
+import React, { useEffect, useState, useRef} from 'react';
 import { Screen } from './Screen.jsx';
 import { Button } from './Button.jsx';
 import { FilePicker } from './FilePicker.jsx';
@@ -60,7 +60,7 @@ const showError = alert;
 // gets recreated
 export function VMEmulatorStepper({app}) {
   const minStepsPerTick = 500;
-  const maxStepsPerTick = 100000;
+  const maxStepsPerTick = 1000000;
 
   const [running, setRunning] = useState(false);
   const [stepsPerTick, setStepsPerTick] = useState((maxStepsPerTick - minStepsPerTick) / 2);
@@ -76,7 +76,7 @@ export function VMEmulatorStepper({app}) {
       app.step_times(stepsPerTick);
     } catch(error) {
       setRunning(false);
-      showError(error);
+      // showError(error);
     }
   };
 
@@ -92,6 +92,14 @@ export function VMEmulatorStepper({app}) {
       };
     }
   }, [running, stepsPerTick]);
+
+  let last_time = useRef(new Date());
+  useEffect(() => {
+    let current_time = new Date();
+    let diff = current_time - last_time.current;
+    console.log(diff / 1000);
+    last_time.current = current_time;
+  }, [running]);
 
   useEffect(() => {
     const readFiles = async () => {
