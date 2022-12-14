@@ -61,6 +61,7 @@ So, to really evaluate the new emulators, a sufficiently complex graphical progr
 For this task, one of Gavin Stewart's impressive graphical demonstrations for the Hack platform was chosen.
 The GASchunky program~\cite{demos} renders a complex animation in an infinite loop to the internal display.
 It requires no user input, but uses almost all of the available functionality of the platform, making it a perfect choice for benchmarking.
+Since the number of instructions and standard library functions is relatively small, a single complex program can adequately represent the speed of the entire platform.
 In order to turn it into a proper benchmark, the loop was removed, leaving only a single iteration of the animation to be played.
 \cref{fig:gaschunky-screenshot} shows a frame of the generated animation.
 Additionally, to make the comparisons fair, all \verb+Sys.wait+ calls have been removed from the program.
@@ -76,42 +77,40 @@ The reason why this is important was discussed at the end of \cref{sys.wait-exam
 There were also some changes made to the emulators themselves.
 Two statements have been added to the code for both the official and the new emulator.
 Both print the current system time in milliseconds and get executed when the start button is pressed and when the program returns from the main function respectively.
-Additionally in the third column of the ~\cref{table:gaschunky}, the one millisecond wait instruction in the FastforwardTask of the \verb+HackController.java+ was removed to ensure that the official emulator could run at its maximum speed.
+Additionally in the ``Official (no wait)'' column of the ~\cref{table:gaschunky}, the one millisecond wait instruction in the FastforwardTask of the \verb+HackController.java+ was removed to ensure that the official emulator could run at its maximum speed.
 The new emulator was run both from the web UI and in desktop mode.
-In both cases the tickrate was set to one million, which is ten times as much as the normal maximum tickrate in the web UI.
-This normal maximum is arbitrarily chosen and therefore does not reflect the true performance of the system.
+For the ``Native'' and ``Linux 10x Firefox'' columns, the tick rate has been set to one million, instead of the default maximum tick rate of one hundred thousand in the web UI.
+This normal maximum of 100,000 is arbitrarily chosen and therefore does not reflect the true performance of the system.
 At a tick rate of one million, the viewer can still see the animation clearly, which allows for a fair comparison~\ref{fig:gachunky-plot}.
-The web version of the new emulator was run in the Firefox web browser on a Linux machine.
-Since the speed of Wasm implementations is different in each browser and even operating system, the exact numbers may change on a different system.
-However, the results are still relevant since they were all measured on the same system and are therefore comparable.
+That said, the other four columns for both Linux and Windows use this arbitrary limit because that is the experience users will have by default.
+This limit was chosen to ensure that games developed for the official emulator run at a reasonable speed by default and are neither too fast nor too slow.
 
 \begin{table}[ht]
-  \begin{center}
-    \centering
-    \begin{tabular}{@{}lllll@{}}
-      \toprule
-      Run & Official & Official (no wait) & Native &   Web \\ \midrule
-      1   &   36.16s &             30.76s &  1.01s & 1.02s \\
-      2   &   36.19s &             31.17s &  0.99s & 1.03s \\
-      3   &   35.93s &             30.58s &  1.02s & 1.04s \\
-      4   &   36.14s &             30.65s &  0.97s & 1.06s \\
-      5   &   36.16s &             30.99s &  0.95s & 1.02s \\
-      6   &   36.12s &             30.81s &  1.03s & 1.07s \\
-      7   &   36.27s &             30.86s &  1.06s & 1.06s \\
-      8   &   36.29s &             30.86s &  0.99s & 1.05s \\
-      9   &   35.86s &             30.81s &  1.01s & 1.03s \\
-      10  &   36.12s &             30.74s &  1.02s & 1.04s \\ \bottomrule
-    \end{tabular}
-    \caption{GASchunky benchmark (lower is faster).}%
-    \label{table:gaschunky}
-  \end{center}
+  \begin{tabular}{c p{1.5cm} c p{1.7cm} p{1.5cm} p{2cm} p{2cm} p{1.5cm}}
+    \toprule
+    Official & Official (no wait) & Native & Linux 10x Firefox & Linux Firefox & Linux Chrome  & Windows Firefox & Windows Chrome\\
+    \midrule
+    36.16s &             30.76s &  1.01s & 1.02s               & 2.91s         & 5.68s         & 10.39s           & 3.43s          \\
+    36.19s &             31.17s &  0.99s & 1.03s               & 2.92s         & 5.66s         & 10.39s           & 3.47s          \\
+    35.93s &             30.58s &  1.02s & 1.04s               & 2.81s         & 5.59s         & 10.39s           & 3.51s          \\
+    36.14s &             30.65s &  0.97s & 1.06s               & 2.81s         & 5.80s         & 10.39s           & 3.54s          \\
+    36.16s &             30.99s &  0.95s & 1.02s               & 2.81s         & 5.38s         & 10.40s           & 3.49s          \\
+    36.12s &             30.81s &  1.03s & 1.07s               & 2.87s         & 5.39s         & 10.38s           & 3.51s          \\
+    36.27s &             30.86s &  1.06s & 1.06s               & 2.95s         & 5.38s         & 10.36s           & 3.54s          \\
+    36.29s &             30.86s &  0.99s & 1.05s               & 2.95s         & 5.39s         & 10.38s           & 3.49s          \\
+    35.86s &             30.81s &  1.01s & 1.03s               & 2.94s         & 5.36s         & 10.39s           & 3.39s          \\
+    36.12s &             30.74s &  1.02s & 1.04s               & 2.91s         & 5.45s         & 10.29s           & 3.43s          \\
+    \bottomrule
+  \end{tabular}
+  \caption{GASchunky benchmark in seconds (lower is faster).}%
+  \label{table:gaschunky}
 \end{table}
 
 \begin{figure}[ht]
   \centering
   \begin{tikzpicture}
     \begin{axis}[
-      ymode=log,
+      % ymode=log,
       ylabel=Seconds,
       xlabel=Run,
       legend pos=outer north east,
@@ -164,19 +163,72 @@ However, the results are still relevant since they were all measured on the same
         (9,  1.03)
         (10, 1.04)
       };
+      \addplot coordinates {
+        (1,  2.91)
+        (2,  2.92)
+        (3,  2.81)
+        (4,  2.81)
+        (5,  2.81)
+        (6,  2.87)
+        (7,  2.95)
+        (8,  2.95)
+        (9,  2.94)
+        (10, 2.91)
+      };
+      \addplot coordinates {
+        (1,  5.68)
+        (2,  5.66)
+        (3,  5.59)
+        (4,  5.80)
+        (5,  5.38)
+        (6,  5.39)
+        (7,  5.38)
+        (8,  5.39)
+        (9,  5.36)
+        (10, 5.45)
+      };
+      \addplot coordinates {
+        (1,  10.39)
+        (2,  10.39)
+        (3,  10.39)
+        (4,  10.39)
+        (5,  10.40)
+        (6,  10.38)
+        (7,  10.36)
+        (8,  10.38)
+        (9,  10.39)
+        (10, 10.29)
+      };
+      \addplot coordinates {
+        (1,  3.43)
+        (2,  3.47)
+        (3,  3.51)
+        (4,  3.54)
+        (5,  3.49)
+        (6,  3.51)
+        (7,  3.54)
+        (8,  3.49)
+        (9,  3.39)
+        (10, 3.43)
+      };
       \addlegendentry{Official}
       \addlegendentry{Official (no wait)}
       \addlegendentry{Native}
-      \addlegendentry{Web}
+      \addlegendentry{Linux Firefox 10x}
+      \addlegendentry{Linux Firefox}
+      \addlegendentry{Linux Chrome}
+      \addlegendentry{Windows Firefox}
+      \addlegendentry{Windows Chrome}
     \end{axis}
   \end{tikzpicture}
   \caption{GASchunky benchmark (lower is faster).}%
   \label{fig:gachunky-plot}
 \end{figure}
 
-It is clearly visible that the new emulator is several times faster than the official implementation.
+It can be clearly seen that the performance of the new emulator, while very much dependent on the particular web browser and operating system, is consistently several times faster than the official implementation.
 On average, the official emulator without modifications takes around 36 seconds to render the full animation once.
-Meanwhile the Web version of the new emulator manages to achieve the same result in just one second on average.
+The web version of the new emulator can achieve the same result in just one second on average when the artificial upper limit for the tick rate is removed.
 The native version of the new emulator, which uses SDL to render the internal display, is even slightly faster.
 While the official emulator can be sped up drastically, it still does not come close.
 This shows us that even though the new emulator only uses a single thread and runs in a browser, it still offers massive performance benefits over the official implementation.
+It is worth noting that not only the browser is relevant for the final performance, but also the combination of browser and operating system.
