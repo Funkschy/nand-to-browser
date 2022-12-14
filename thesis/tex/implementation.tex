@@ -248,7 +248,6 @@ If the symbol is already declared, the instruction is inserted into the result v
 However, if the instruction references an undeclared symbol, the instruction is inserted with a placeholder and another string with the name of the missing symbol.
 These placeholders are then replaced with the correct indices in the second stage.
 Here the parser iterates over the previous result vector and handles any instructions with placeholders.
-This process of filling in the missing information is commonly referred to as backpatching.
 \begin{center}
   \begin{figure}[ht]
     \centering
