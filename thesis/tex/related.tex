@@ -24,7 +24,8 @@ This limitation of possible programs is a direct consequence of its architecture
 At first glance this may seem reasonable, since it is closer to a theoretical implementation of the system in hardware, but it severely limits the possibilities of the VM emulator, since each VM instruction corresponds to several assembly instructions.
 This causes more complex VM programs to quickly overflow the available memory for instructions, limiting the emulator to relatively short programs.
 Since the goal of this project was to partially replace the official VM emulator implementation, which allows for larger programs than should theoretically be possible, this approach is not an option here.
-It also doesn't provide a user interface outside of the display, which makes debugging complex programs difficult. Besides, the user still has to install software on his computer, just Python instead of Java.
+It also doesn't provide a user interface outside of the display, which makes debugging complex programs difficult.
+Besides, the user still has to install software on their computer, just Python instead of Java.
 
 % \begin{itemize}
 %   \item https://github.com/itoshkov/nand2tetris-emu
@@ -48,22 +49,22 @@ For this reason, each library used in this project has a clear purpose and provi
 This section summarizes the rationale for including each crate.
 Rust does not currently allow static constants that require runtime code for initialization.
 This is however a very useful feature, for example to use hashmaps for defining lookup tables.
-The lazy\_static crate is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic}, because it provides exactly this functionality in the form of a single macro.
+The \verb+lazy_static+ crate is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic}, because it provides exactly this functionality in the form of a single macro.
 Among other things, it is used for the lookup table in the keyboard handler that maps special symbols like the escape key to the corresponding key codes in the emulator.
-Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts~\ref{test-scripts} for the emulator. Rust does not provide regular expressions in its standard library, so the regex crate was used.
+Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts~\ref{test-scripts} for the emulator. Rust does not provide regular expressions in its standard library, so the \verb+regex+ crate was used.
 \label{web-sys}
-The two most important libraries when it comes to the value of Rust for this project are wasm-bindgen and web-sys.
+The two most important libraries when it comes to the value of Rust for this project are \verb+wasm-bindgen+ and \verb+web-sys+.
 While the former is responsible for creating bindings between Rust and JavaScript so that the two can call each other as if they were the same language, the latter provides implementations for common JavaScript APIs in Rust.
-It builds directly on top of wasm-bindgen to provide most of the functionality that users would normally have to manually write bindings for.
-These two libraries are further complemented by console\_error\_panic\_hook and wasm-pack.
+It builds directly on top of \verb+wasm-bindgen+ to provide most of the functionality that users would normally have to manually write bindings for.
+These two libraries are further complemented by \verb+console_error_panic_hook+ and \verb+wasm-pack+.
 The former simply prints the stack trace of any unrecoverable Rust error~\ref{error-handling} to the JavaScript console.
-Wasm-pack, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command line utility which automatically builds Rust applications and packages them into Wasm modules.
+\verb+Wasm-pack+, on the other hand, is a build tool that simplifies working with Rust in the context of Wasm by providing a command line utility which automatically builds Rust applications and packages them into Wasm modules.
 This tool is only used at compile time and is therefore only needed to compile the application, not to run it.
 
 The above dependencies are all that is needed for the web version of the emulator. If the native version is used instead, two different dependencies are used instead of the Wasm-focused dependencies.
-The first is SDL2, a library for building native desktop applications and games.
+The first is \verb+SDL2+, a library for building native desktop applications and games.
 It is included only if the application was compiled with the desktop flag enabled~\ref{conditional-compilation}.
-Finally, there is clap, an easy-to-use parsing library for command line arguments.
+Finally, there is \verb+clap+, an easy-to-use parsing library for command line arguments.
 
 % \begin{itemize}
 % \item lazy\_static (hack um rust weniger nervig zu machen)

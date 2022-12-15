@@ -81,8 +81,8 @@ They will cause the program to abort immediately and should be used only when ab
 % The only errors of this kind are in the native interfaces to the application, for example, if the window could not be initialized in desktop mode because the application is running on a server without graphical capabilities.
 
 \subsubsection{Using conditional compilation in Rust} \label{conditional-compilation}
-Rust has the ability to compile certain parts of the code only under certain conditions.
-This not only allows parts of the code to be included only in certain builds of the application, but also allows the programmer to mark some dependencies as conditional.
+Rust has the ability to compile parts of the code only under certain conditions.
+This not only allows those parts to be included in just some builds of the application, but also allows the programmer to mark some dependencies as conditional.
 These dependencies will only be downloaded and compiled if the corresponding feature is enabled during compilation.
 A perfect example of the usefulness of this ability is the desktop feature in the new emulator.
 When compiled with this feature enabled, the VM emulator can run in a native window that uses the SDL2 library for rendering and user interaction.

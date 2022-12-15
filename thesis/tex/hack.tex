@@ -37,22 +37,23 @@ The entire pipeline with many of the relevant terms that will be used throughout
 % \end{itemize}
 %
 \subsection{Hack assembly} \label{hack-assembly}
-There are three different languages in the Nand to Tetris course, which are important for this work.
-The first and least complex of the three is the assembly language.
-Assembly in this case simply means that the language has a direct mapping to the machine language which the CPU can actually understand.
-Each assembly instruction can be mapped to a single number which can be understood by the hardware of the machine.
-Assembly in modern systems is often complicated with a plethora of instructions~\cite{guide2011intel}, but Hack assembly only has two different instructions.
+There are three different languages in the Nand to Tetris course that are important for this work.
+The first and least complex of the three languages is assembly language.
+Assembly language in this case simply means that the language has a direct mapping to machine language that the CPU can actually understand.
+Each assembly instruction can be mapped to a single number that can be understood directly by the machine's hardware.
+Assembly in modern systems is often complicated with a plethora of instructions~\cite{guide2011intel}, but hack assembly has only two.
 These two instructions are used to manipulate two physical registers called A and D.
-In addition, there is a third register, called M, which is actually just the memory cell pointed to by the address in the A register.
+In addition, there is a third register called M, which is actually just the memory cell pointed to by the address in the A register.
 This allows the assembly to work without any dedicated instructions for memory manipulation.
-The first instruction is called the A instruction because its sole purpose is to write a constant value to the A register.
-In the assembly code it is written as ``@value'', so for example ``@42'' would write the value 42 into the A register.
-The C Instruction, on the other hand, can perform a multitude of different functions.
-These range from negating the value of a single register to performing a binary-or operation on two registers and jumping to another instruction when that value is greater than zero.
-The target of that jump would be determined by the value inside the A register.
-C Instructions consist of one or multiple target registers, an equals sign, an expression, such as D-A and optionally a jump.
-Understanding the functionality of Hack assembly on a deeper level than this is not required to understand the following sections.
-\cref{lst:hack-assembly} shows a simple assembly program, which checks if the value in memory at address 3 is equal to 5 and if it is, jumps to address instruction 100.
+Every register and memory cell has a width of two bytes.
+The first instruction is called the A instruction because its only purpose is to write a constant value into the A register.
+In assembly code it is written as \verb+@value+, so for example \verb+@42+ would write the value 42 into the A register.
+The C instruction, on the other hand, can perform a plethora of different functions.
+These range from negating the value of a single register to performing a binary-or operation on two registers and jumping to another instruction if that value is greater than zero.
+The destination of that jump would be determined by the value inside the A register.
+C instructions consist of one or more destination registers, an equal sign, an expression, e.g. D-A, and a jump if necessary.
+A deeper understanding of how hack-assembly works is not required to understand the following sections.
+\cref{lst:hack-assembly} shows a simple assembly program, which checks if the value in memory at address 3 is equal to 5 and if so, jumps to instruction 100.
 
 \begin{lstlisting}[
   language=HackAsm,
@@ -60,7 +61,7 @@ Understanding the functionality of Hack assembly on a deeper level than this is 
   label={lst:hack-assembly},
   captionpos=b]
 @3
-D=M   // D == RAM[3]
+D=M   // D := RAM[3]
 @5
 D=D-A // D := D - 5
 @100
@@ -101,7 +102,7 @@ To translate the program above into something that can be interpreted by the Hac
 % The push operation adds an element to the top of the stack, while the pop operation removes the top element.
 % This means that the element that was pushed onto the stack last is removed first when a pop is performed.
 % For this reason, the stack model is called last-in-first-out (LIFO)~\cite{nisan2005}.
-This model is simple but powerful and allows a very elegant description of calculations.
+This stack model is simple but powerful and allows a very elegant description of calculations.
 For example, to perform an addition, first both operands are pushed onto the stack, then the addition instruction pops these two numbers from the stack and pushes the result of the addition onto it instead.
 This is illustrated in~\cref{fig:stack-add}, where 2 is pushed on top of 1 before adding both.
 % The stack is often represented as growing downward, but in the Hack architecture it actually grows upward, so this representation is more appropriate.
@@ -135,7 +136,7 @@ To do this, it first puts the value of \(i\) on the stack and then jumps out of 
 If the aforementioned check was false, the loop body is executed.
 This means that the actual implementation of a loop condition works the other way around than in the C example, where we enter the loop if the condition was true.
 This inversion is done because the code does not perform a jump when the loop is executed.
-Since most loops are run more than once, this saves a lot of jumps in the program flow, which are often quite expensive.
+Since most loops are run more than once, this saves a lot of jumps in the program flow.
 To update \(sum\), the VM loads the current value of \(sum\) onto the stack, then the current value of \(i\), and after adding the two, the result is written back to \(sum\).
 Updating \(i\) works basically the same way, but with a constant value of one instead of another local variable being added.
 Then we simply jump back to the beginning of the loop, where the next check for the exit condition is performed, and continue this process until that condition is met.
@@ -214,26 +215,26 @@ TOS is an abbreviation for top of stack, the value which was pushed last.
 
 \subsection{Hack test scripts} \label{test-scripts}
 The third and last language relevant to this thesis, is the test script language.
-This script language is special, because students participating in the course usually do not interact with it directly, which is also why the scripts do not appear in~\cref{fig:hack-pipeline}.
+This language is special, because students participating in the course usually do not interact with it directly, which is also why the scripts do not appear in~\cref{fig:hack-pipeline}.
 Instead, Schocken and Nisan already supplied test scripts for most of the exercises in the book themselves.
 These scripts are used both by students, to determine if they solved the exercise correctly, but also by the teachers grading the project submissions.
 Test scripts can automatically load a program, initialize values in the emulator's memory, run the program, and compare the memory after running for a certain number of ticks with a set of expected values.
 An example of such a script can be seen in~\cref{lst:hack-test-script}.
 All the commands, which are specific to a single simulator, in this case the VM emulator, are highlighted in red.
 The script starts by loading the program it is supposed to test, in this case \verb+MyProgram.vm+.
-Loading behaves differently for each emulator, as the VM emulator is able to load an entire directory, while the CPU emulator can only load a single file.
+Loading behaves differently for each emulator, as the VM emulator is also able to load an entire directory, while the CPU emulator can only load a single file.
 In order to test the functionality of a program, it is necessary to specify the memory addresses which should be compared and their respective expected values.
 This is done in the next three lines.
 After executing the program, the values specified in output-list will be written in the format dictated after the \%-Symbol into the output-file.
-In the case of~\cref{lst:hack-test-script}, this means writing the values behind the addresses 256 and 300 into \verb+MyProgram.out+, each with one byte of padding on the left and right and a length of six for the value itself.
-The format here will be decimal, as specified by the \verb+D+.
-Before any of this can happen, however, the program has to first be executed.
-To do this, the test script can first set any value in the emulator's memory to a constant value.
+In the case of~\cref{lst:hack-test-script} this means that the values at addresses 256 and 300 are written to \verb+MyProgram.out+, each with one byte of padding left and right and a length of six for the value itself.
+The format here is decimal, as specified by the \verb+D+.
+Before this can happen, however, the program must be executed.
+For this purpose, the test script can first set any value in the emulator's memory to a constant value.
 This is done with the set command, which is specific to each emulator, since each emulator has different requirements.
-The CPU emulator, for example, does not understand the meaning of \verb+sp+ (stack pointer) or \verb+local+, because these terms are specific to the VM emulator.
+For example, the CPU emulator does not understand the meaning of \verb+sp+ (stack pointer) or \verb+local+ because these terms are specific to the VM emulator.
 When everything is set up, the emulator is interpreted step by step inside the repeat statement.
 In this case 42 VM ticks are executed.
-The instruction to drive the emulator has a different name for each, but basically behaves the same.
+The instruction to drive the emulator has a different name for each one, but behaves basically the same.
 Finally, the output command writes all values from the output-list into the output-file, which is then compared to the compare-to file.
 These two files should be identical if the program was executed correctly.
 Otherwise an error is reported.
@@ -246,7 +247,7 @@ Otherwise an error is reported.
 load MyProgram.vm,
 output-file MyProgram.out,
 compare-to MyProgram.cmp,
-output-list RAM[256]%D1.6.1 RAM[300]%D1.6.1
+output-list RAM[256]%D1.6.1 RAM[300]%D1.6.1;
 
 // this is the segment setup required for the bytecode example to work
 set sp 256,        // sp contains the address of the top of the stack

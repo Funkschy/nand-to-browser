@@ -129,7 +129,7 @@
   \gdef\thesection{\@Alph\c@section}
   \let\section\appendix@section
 }
-\newcommand{\appendixpagename}{\iflanguage{ngerman}{Anhang}{Appendices}}
+\newcommand{\appendixpagename}{\iflanguage{ngerman}{Appendices}{Appendices}}
 \newcommand\appendix@section[1]{%
   \refstepcounter{section}%
   \orig@section*{\appendixname{}~\thesection\hspace{1em}#1}%
