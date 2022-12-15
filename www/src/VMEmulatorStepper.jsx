@@ -188,7 +188,7 @@ export function VMEmulatorStepper({app}) {
               activeLine={offset}/>
         }
 
-        <div className="screen-wrapper">
+        <div className={`screen-wrapper ${running ? 'running': ''}`}>
           <Screen
             app={app}
             width="512"

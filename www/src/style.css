@@ -149,7 +149,7 @@ body {
   width: 54%;
   display: inline-block;
   text-align: center;
-  overflow: clip;
+  overflow-x: clip;
 }
 
 .btn {
@@ -284,6 +284,10 @@ input[type=range]::-ms-track {
         width: 98%;
         height: 100%;
         outline: black 3px solid;
+    }
+
+    .screen-wrapper.running {
+      margin: auto;
     }
 
     .screen {
