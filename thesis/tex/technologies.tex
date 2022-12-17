@@ -16,7 +16,7 @@ Just like C and C++, Rust does not use garbage collection at runtime by default,
 It instead relies on its compiler to automatically insert the necessary cleanup code. This is made possible by the ownership system, which tracks the lifetime of every reference in the program and ensures that nothing can be used after it has been deallocated.
 To achieve this, the compiler must enforce a set of rules whose violation results in a compilation error~\cite[Chapter~4]{klabnik2019rust}.
 With this unique approach, the same performance as C/C++ can be achieved without compromising memory safety~\cite{medin2021performance}.
-There are drawbacks to it, however: When more rules are imposed on the programmer, writing and especially refactoring code tends to become more tedious, since a simple change from an owned object to a reference in Rust often requires inserting explicit lifetimes into large portions of the code base.
+There are drawbacks to it, however: When more rules are imposed on the programmer, writing and especially refactoring code tends to become more tedious, since a simple change from an owned object to a reference in Rust frequently requires inserting explicit lifetimes into large portions of the code base.
 Despite this, Rust is the most popular language in the annual Stack Overflow developer survey for the seventh year in a row, suggesting that programmers are willing to trade some ease of use in writing for fewer memory-related bugs and vulnerabilities~\cite{sosurvey}.
 
 \subsubsection{The advantages of Rust and WebAssembly over JavaScript}
@@ -65,9 +65,9 @@ The combination of a language that is inherently suited to Wasm development, and
 % This is very similar to C, where it is impossible to pass the \verb*=+= operator to a function, but it can be passed to a macro.
 % Another advantage of macros is that, unlike functions, they have no runtime overhead, since the code is only inserted at the position of the caller, without an actual function call at runtime.
 
-Some of the code examples in later sections contain lines that end with a question mark.
+Some code examples in later sections contain lines that end with a question mark.
 This is a direct consequence of the fact that Rust does not support exceptions.
-Instead it groups errors into two major categories: recoverable and unrecoverable~\cite[Chapter~9]{klabnik2019rust}.
+Instead, it groups errors into two major categories: recoverable and unrecoverable~\cite[Chapter~9]{klabnik2019rust}.
 Functions that have recoverable errors, such as a file not found error, return an explicit result value that can either be an error or the expected return value.
 To simplify the handling of recoverable errors, Rust offers the question mark operator.
 This operator can be placed after any expression that has a result type.
@@ -89,15 +89,15 @@ When compiled with this feature enabled, the VM emulator can run in a native win
 But there is no need to include SDL2 in a build that runs in the browser.
 By using conditional compilation, we can compile the SDL2-related code and the library itself only when it is actually needed.
 Another use case for conditional compilation is logging.
-Logging has a significant performance overhead if done for every command that runs in the emulator, while being rarely needed.
-It is therefore logical to hide it behind a compilation feature that can be activated when needed and has no other drawbacks.
+Logging has a significant performance overhead if done for every command that runs in the emulator, while being rarely necessary.
+It is therefore logical to hide it behind a compilation feature that can be activated when required and has no other drawbacks.
 Features are declared in the \verb+Cargo.toml+ file, which contains all project-related configuration such as the binaries built by the project, dependencies, or optimization flags.
 In the code, these features can be checked with a single line of code above the block of code to be conditionally compiled~\ref{lst:conditional-compilation}.
 
 \begin{lstlisting}[
   language=Rust,
   label={lst:conditional-compilation},
-  caption={A function which is only compiled in desktop mode},
+  caption={A function which is only compiled in desktop mode.},
   captionpos=b
   ]
   #[cfg(feature = "desktop")]
@@ -115,9 +115,9 @@ Using ReactJS in this project allows for a simplified and streamlined front-end 
 The declarative nature of React also ensures that the user interface (UI) always displays the most up-to-date data, without the need to manually update all the required HTML elements. This makes the final application more reliable and easier to maintain.
 There are several other JavaScript frameworks that offer similar features, such as Angular and VueJS, but none of them are as widely used as React~\cite{webframework}.
 Using the most widely used framework should make it easier for developers to contribute to the new implementation, as it is likely that a developer with experience in JavaScript will also have experience with ReactJS.
-For these reasons, ReactJS is a good choice for this application. It is mature, well supported, and easy to use.
+For these reasons, ReactJS is a good choice for this application. It is mature, well-supported, and easy to use.
 
-Yet, the nature of this project would have allowed for an implementation without hand-written JavaScript.
+Yet, the nature of this project would have allowed for an implementation without handwritten JavaScript.
 Since large portions of the project are written in Rust and compiled to WebAssembly, it would have been possible to simply render the entire application, including the interactive user interface, into a single canvas that also contains the screen.
 However, this is not optimal, because many features that the web browser inherently offers would not have been available, such as rearranging components to fit the width of the window, zooming into content to increase font size, supporting screen readers, etc.
 An alternative approach would have been to use the features provided by the browser, but interact with them directly from Rust.

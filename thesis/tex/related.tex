@@ -2,7 +2,7 @@
 
 This project builds on much existing material by being both a modern rewrite of an existing tool and a case study about the viability of a number of technologies for porting complex desktop applications to the browser.
 
-It naturally is closely related to the Nand to Tetris~\cite{n2tweb} course. All of the high-level functionality was designed and specified by Nisan and Schocken.
+It naturally is closely related to the Nand to Tetris~\cite{n2tweb} course. All the high-level functionality was designed and specified by Nisan and Schocken.
 Since the goal of this project is to develop an alternative emulator implementation, care was taken to follow the specifications described in the companion book, specifically the sections 4.2, 7.2, 8.2 and 9.2.7~\cite{nisan2005}.
 In addition, many of the integration tests are direct ports of test cases from the Nand to Tetris course.
 
@@ -21,10 +21,10 @@ One of these is pynand, which aims to provide a better experience by eliminating
 However, the developer made several decisions that limit its usefulness.
 It does little to improve the performance of the emulator and also severely limits the programs that can be run.
 This limitation of possible programs is a direct consequence of its architecture, which translates the VM bytecode~\ref{hack-bytecode} into machine code for the hack architecture~\ref{hack-architecture} instead of interpreting it directly.
-At first glance this may seem reasonable, since it is closer to a theoretical implementation of the system in hardware, but it severely limits the possibilities of the VM emulator, since each VM instruction corresponds to several assembly instructions.
+At first glance this may seem reasonable, since it is closer to a theoretical implementation of the system in hardware, but it severely limits the possibilities of the VM emulator, since each VM instruction corresponds to multiple assembly instructions.
 This causes more complex VM programs to quickly overflow the available memory for instructions, limiting the emulator to relatively short programs.
 Since the goal of this project was to partially replace the official VM emulator implementation, which allows for larger programs than should theoretically be possible, this approach is not an option here.
-It also doesn't provide a user interface outside of the display, which makes debugging complex programs difficult.
+It also doesn't provide a user interface outside the display, which makes debugging complex programs difficult.
 Besides, the user still has to install software on their computer, just Python instead of Java.
 
 % \begin{itemize}
@@ -33,7 +33,7 @@ Besides, the user still has to install software on their computer, just Python i
 % \end{itemize}
 
 % \subsection{Emulators in WebAssembly}
-In recent years, there have been several projects that implemented other emulators in WebAssembly. Notably, an emulator for Intel's 8086 microprocessor~\cite{9824078}, also written in Rust and using a ReactJS front-end. This already demonstrates the viability of these technologies for creating web-based emulators.
+In recent years, there have been multiple projects that implemented other emulators in WebAssembly. Notably, an emulator for Intel's 8086 microprocessor~\cite{9824078}, also written in Rust and using a ReactJS front-end. This already demonstrates the viability of these technologies for creating web-based emulators.
 
 % \begin{itemize}
 %   \item https://ieeexplore.ieee.org/abstract/document/9824078
@@ -79,7 +79,7 @@ Finally, there is \verb+clap+, an easy-to-use parsing library for command line a
 
 % \subsubsection{JavaScript Dependencies}
 ReactJS is the only JavaScript dependency for the web-based user interface.
-Since most of the logic is implemented in Rust, the code needed for the user interface is mainly focused on displaying the internal state of the emulator.
+Since most of the logic is implemented in Rust, the code required for the user interface is mainly focused on displaying the internal state of the emulator.
 There are no complex UI components or procedures that would justify the use of separate libraries.
 The entire front-end simply uses React hooks for all state handling.
 In addition, the interface was intentionally kept minimalist to match the emulator's black-and-white display, so no external CSS libraries are required.

@@ -1,7 +1,7 @@
 \section{Implementation} \label{implementation}
 In this project, both the VM emulator and the CPU emulator were implemented.
 However, the decision to also implement the CPU emulator was made relatively late in the implementation process, as it was difficult to accurately estimate the time required to implement the VM.
-The CPU emulator is also much simpler than the VM and can reuse some of the code from the VM implementation.
+The CPU emulator is also much simpler than the VM and can reuse some code from the VM implementation.
 Accordingly, most of this section focuses only on the VM emulator.
 If no emulator is explicitly specified, the text always refers to the VM.
 
@@ -9,7 +9,7 @@ If no emulator is explicitly specified, the text always refers to the VM.
 With any project, one must first decide on a course of action.
 Due to the relatively unique requirements of this project, the order in which the features are to be implemented is not immediately obvious.
 There are basically two possible approaches.
-A top-down approach would begin with the user interface (UI) implementation first and fill in the gaps later.
+A top-down approach would begin with the user interface (UI) implementation and fill in the gaps later.
 But since the application has different user interfaces depending on the intended use, it makes more sense to develop from the bottom up.
 This allows for a more test-driven approach, where the internal logic of the emulator is developed first and only later integrated into the UI.
 In order to be able to test the VM properly, it made sense to implement the bytecode parser first~\ref{parser-dev}, as it would significantly reduce the effort required to write unit tests for the VM.
@@ -33,8 +33,8 @@ This approach unfortunately leads to performance issues, which is why the standa
 The general architecture of the application is outlined in \cref{fig:arch}.
 Every box in this diagram represents a Rust module, which can either be a single file or an entire directory.
 The architecture is divided into three major areas: the actual simulators, the parsers, and the interfaces that serve as entry points into the application.
-Although the CPU and VM are commonly referred to as emulators, the module is called simulators because this is a more general term that also applies to the hardware simulator, which was not implemented as part of this work~\ref{future-work}.
-This is the naming convention used by the official tools, where the emulators are also part of the simulators package~\cite{n2tsimulators}.
+Although the CPU and VM are commonly referred to as emulators, the module is called \verb+simulators+ because this is a more general term that also applies to the hardware simulator, which was not implemented as part of this work~\ref{future-work}.
+This is the naming convention used by the official tools, where the emulators are also part of the \verb+simulators+ package~\cite{n2tsimulators}.
 The two terms are therefore used interchangeably in the following sections.
 
 \begin{center}
@@ -47,7 +47,7 @@ The two terms are therefore used interchangeably in the following sections.
 \end{center}
 
 \subsubsection{Interfaces} \label{interfaces}
-There are three possible entry points for the application, listed in the ``Interfaces'' section of the figure.
+There are three possible entry points for the application, listed in the \verb+interfaces+ section of the figure.
 Two of them are intended for use via the command line.
 Both provide the ability to use the test scripts included in the project within the new emulator, but work in slightly different ways, as the VM emulator can run without a test script, while the CPU emulator does not currently have this capability.
 For this reason, the VM emulator can either accept a path to such a test script or a path to a directory containing bytecode, while the CPU emulator accepts only a file path for a test script as input.
@@ -55,25 +55,26 @@ If the user passes a path to a directory, the application loads all files with t
 If a test script is passed instead, that script is executed as described in~\cref{test-script-workflow}.
 In the first case, a window is displayed if the application was compiled with the desktop function enabled.
 Otherwise, a message is printed telling the user that the application is running in headless mode.
-Other options are also available to the user, such as the ability to set the tick speed or print the output of the test script to stdout instead of writing it into the output file described in the test script.
+Other options are also available to the user, such as the ability to set the tick speed or print the output of the test script to \verb+stdout+ instead of writing it into the output file described in the test script.
 There is also the possibility to use the bytecode implementation of the whole standard library instead of the one written in Rust.
-All of these options can be listed with the ``-h'' flag.
+All of these options can be listed with the \verb+-h+ flag.
 
 The third entry point is the most important for the majority of users.
 The Web UI, a JavaScript application that calls the emulator implementations as a WebAssembly library, is easily accessible in any standard web browser.
-Unlike the other two entry points, which can only use one of the emulators at a time, the Web UI can use both, indicated in the diagram by an arrow pointing to the outer simulator module.
+Unlike the other two entry points, which can only use one of the emulators at a time, the Web UI can use both, indicated in the diagram by an arrow pointing to the outer \verb+simulators+ module.
 Though test scripts are currently not supported here~\ref{future-work}.
 This entry point can be used without the need to install additional software on the user's system by simply launching a web page in the browser.
 The current address of this web page is given in the readme file in the root directory of the project.
 
 \subsubsection{Simulators and Parsers}
-The two emulators in the Simulators module are structurally very similar. Both have a command module that contains the instruction enum~\ref{rust-vm-dev}, an error module that contains the error enum for the respective emulator and a script module that handles the emulators execution if run via a test script~\ref{test-script-workflow}.
-The VM is more complex, however, and also includes the stdlib module, which contains the Rust implementation of the Jack standard library~\ref{jack-stdlib-in-rust}.
+The two emulators in the \verb+simulators+ module are structurally very similar.
+Both have a command module that contains the instruction enum~\ref{rust-vm-dev}, an \verb+error+ module that contains the error enum for the respective emulator, and a script module that controls the emulator's execution when run from a test script~\ref{test-script-workflow}.
+The VM is more complex, however, and also includes the \verb+stdlib+ module, which contains the Rust implementation of the Jack standard library~\ref{jack-stdlib-in-rust}.
 
-Unlike the simulators module, the parsing module actually contains three different submodules, as the script parsing is mostly independent from the emulator implementation used.
-All of the parsers share a lot of common code, so it makes sense to combine them into one module.
+Unlike the \verb+simulators+ module, the \verb+parsing+ module actually contains three different submodules, as the script parsing is mostly independent of the emulator implementation used.
+All parsers share a lot of common code, so it makes sense to combine them into one module.
 Having said that, there are some emulator specific instructions in the scripts, which were already highlighted in~\cref{test-scripts}.
-The code to parse these special instructions is contained in the script module of the respective emulator, instead of the module with the shared code.
+The code to parse these special instructions is contained in the \verb+script+ module of the respective emulator, instead of the module with the shared code.
 This division was done intentionally, because parsing those instructions is only a small part of the whole script parsing process and is closely linked to the way the script is interpreted by the emulator.
 
 \subsection{VM development in Rust} \label{rust-vm-dev}
@@ -92,7 +93,7 @@ In the original emulator implementation, a very inefficient representation was c
 This class contains a field for the opcode and several fields for possible arguments, as well as another integer that determines the number of arguments.
 Using the example of \verb+push constant 3+, the opcode would be an integer that means \verb+push+, while \verb+constant+ and \verb+3+ would be the arguments, so the number of arguments would be two.
 On top of that, it also contains a string argument that is used for call instructions, because functions are actually called by their name at runtime.
-This design has several disadvantages from a performance standpoint.
+This design has multiple disadvantages from a performance standpoint.
 Each instruction must be allocated on the heap and therefore requires pointer indirection during execution, which is known to have a drastic impact on performance as it reduces spatial locality~\cite{6498541}.
 Furthermore, using strings to dispatch call instructions is a lot less efficient than just jumping to the correct bytecode position directly.
 
@@ -119,10 +120,10 @@ Assigning multiple indexes to each instruction increases the index of each eleme
 As a result, the index of an instruction in the program at runtime is often significantly larger than the line number of the same instruction in the input.
 % The first and less important is that additional metadata is required to determine the line number in the input from the current instruction in the runtime representation, which drastically increases the complexity needed to implement the code view in the UI.
 For example, in the fixed-size representation in~\cref{fig:instruction-size} the add instruction has index two, but in the variable-size vector its index is actually six.
-This is a problem because jump instructions in hack bytecode are absolute, i.e.\ a jump must know the index of its target instruction in the program vector, not just the position relative to itself.
+This is problematic because jump instructions in hack bytecode are absolute, i.e.\ a jump must know the index of its target instruction in the program vector, not just the position relative to itself.
 Since the number of possible indices is limited, this leads to a significant reduction in the amount of available jump locations, making it impossible to load larger projects like Hackenstein~\ref{fig:hackenstein-official}.
 % Alternatively, we could dispense with the one-to-one mapping of addresses and bytecode indices, but that would further complicate the VM implementation.
-A similar problem has already been discussed in~\cref{pynand} to explain why translating bytecode to assembly is not a good solution for this project.
+A similar issue has already been discussed in~\cref{pynand} to explain why translating bytecode to assembly is not a good solution for this project.
 
 For these reasons, the new emulator uses the fixed-size bytecode representation instead, similar to the official emulator but with some improvements.
 It is not implemented with heap-allocated objects, but with enums~\ref{lst:enum-bytecode}.
@@ -154,7 +155,7 @@ Analysis of various Jack programs~\ref{table:tested} and the Jack standard libra
 Not storing the function name in a call instruction has the added advantage that the call instruction, which would otherwise be the largest variant, becomes the same size as the push and pop commands~\ref{lst:enum-bytecode}.
 Since these instructions have the same maximum size and account for 80\% of all instructions, only 20\% of the instructions need to be padded at all.
 Accordingly, the padding caused by the use of enums is not really relevant for the memory requirements and cache efficiency of actual programs.
-Compared to the bytecode representation in the official emulator, this enum-based approach is still more efficient, since it does not contain any pointers and thus no indirections.
+Compared to the bytecode representation in the official emulator, this enum-based approach is still more efficient, since it does not contain any pointers and thus no indirection.
 The enums are stored directly inside the vector, not in separate heap allocations.
 Not resolving functions by their name at runtime should also improve performance significantly.
 
@@ -191,7 +192,7 @@ The exclamation mark in \verb+tos_binary!+ marks this expression as a call to a 
 % \subsubsection{Step by step execution with pattern matching}
 \label{step-by-step}
 The architecture with its different entry points and ways to use the emulators~\ref{fig:arch} places unique demands on the VM implementation.
-In order to satisfy all those requirements, the VM runs in a way that executes one step at a time and is able to be suspended after each of those steps.
+To meet all these requirements, the VM runs in such a way that it executes one step at a time and can be suspended after each of these steps.
 This constraint will be especially important for the interaction with native rust code in the standard library~\ref{jack-stdlib-in-rust}.
 In each step, the VM first fetches the current instruction from the loaded program, then performs pattern matching to extract all the required data and finally executes the instruction.
 The matching process can be seen in \cref{lst:bytecode-pattern-matching}, where the segment and index of a push instruction are extracted and then used to first load the value with another method and then push it onto the stack.
@@ -213,11 +214,11 @@ Taking characters based on a condition and then combining them with location inf
 This is why this functionality is implemented in a generic lexer, which is used by all three parsers.
 The generic lexer offers a method \verb+take_chars_while+, which again takes a higher order predicate function as its argument.
 This predicate function is evaluated for each character, starting from the current position of the lexer, until it returns false for the first time.
-Then all characters that evaluated true when applied to the predicate are returned as a single string with information about the strings's position in the entire source code.
+Then all characters that evaluated true when applied to the predicate are returned as a single string with information about the string's position in the entire source code.
 A possible predicate might be \verb+char::is_numeric+ which tests if a given character is a digit.
 So calling \verb+generic_lexer.take_chars_while(char::is_numeric)+ would consume an entire number from the input string and return it wrapped in a span.
 \label{spans}
-The span is a structure that can wrap any generic inner type with information about its position in the source code, e.g.\ the line where the element occured.
+The span is a structure that can wrap any generic inner type with information about its position in the source code, e.g.\ the line where the element occurred.
 This information can later be used to improve error messages for the programmer by indicating not only what went wrong, but also where the error happened.
 
 % \subsubsection{Peekable as an example for the usefulness of traits}
@@ -248,7 +249,7 @@ When such a symbol is referenced in the code, the parser tries to find it in the
 If the symbol is already declared, the instruction is inserted into the result vector as a fully resolved instruction.
 However, if the instruction references an undeclared symbol, the instruction is inserted with a placeholder and another string with the name of the missing symbol.
 These placeholders are then replaced with the correct indices in the second stage.
-Here the parser iterates over the previous result vector and handles any instructions with placeholders.
+Here the parser iterates over the previous result vector and handles any instructions with placeholders~\cite{aho2006compilers}.
 \begin{center}
   \begin{figure}[ht]
     \centering
@@ -285,7 +286,7 @@ But it does offer a powerful system of type parameters and traits to specify con
 Methods can be implemented not only directly on types, but also conditionally if a combination of types matches certain properties.
 The generic test script parser expects an emulator-specific command parser as its type parameter.
 All methods of the generic parser are not actually implemented directly on this parser.
-They are instead only implemented if the combination of the generic base parser and the simulator-specific parser together implement the ScriptParser trait.
+They are instead only implemented if the combination of the generic base parser and the simulator-specific parser together implement the \verb+ScriptParser+ trait.
 The actual implementation of the parser interface is therefore not part of the module containing the generic parser.
 Rather, it is implemented in the simulator-specific modules.
 This process is more complicated than the object-oriented solution, but has the advantage of working without dynamic dispatch.
@@ -313,8 +314,8 @@ In the real program, this code is more complicated due to some details of the Ru
   }
 \end{lstlisting}
 
-The ScriptParser implementation block only becomes relevant if there is an emulator-specific parser that implements the missing parts, as shown for the VM emulator parser in~\cref{lst:vm-parser}.
-Here the SimulatorCommandParser trait is implemented for the ScriptParser in combination with the specific VMEmulatorCommandParser, neither of which would implement the trait on their own.
+The \verb+ScriptParser+ implementation block only becomes relevant if there is an emulator-specific parser that implements the missing parts, as shown for the VM emulator parser in~\cref{lst:vm-parser}.
+Here the \verb+SimulatorCommandParser+ trait is implemented for the \verb+ScriptParser+ in combination with the specific \verb+VMEmulatorCommandParser+, neither of which would implement the trait on their own.
 This implementation has to contain the missing parse function for VM specific commands.
 \begin{lstlisting}[
   language=Rust,
@@ -352,7 +353,7 @@ A simple multiplication therefore requires hundreds of VM ticks to execute.
 In the native Rust implementation, it requires only a single tick.
 Other, more complicated functions may be executed less frequently, but the performance impact here is even greater.
 Providing a native implementation of these functions is therefore one of the most important possible performance improvements.
-Unfortunately, it is not trivial to provide such an implementation for several reasons.
+Unfortunately, it is not trivial to provide such an implementation for various reasons.
 
 \subsubsection{The issues with native functions in the virtual machine} \label{stdlib-issues}
 There are several problems with integrating native code with bytecode.
@@ -363,7 +364,7 @@ It is also not possible to simply run the entire function to completion within a
 Some functions in the standard library run in an infinite loop, such as \verb+Keyboard.readLine+, which does not return until the user presses the Enter key on their keyboard.
 Another difficult function is \verb+Sys.wait+, which takes a number as input and waits approximately that many milliseconds.
 Targeting the web browser makes this function difficult to implement, as WebAssembly does not support multiple threads at the time of writing.
-\verb+Sys.wait+ cannot block the only available thread, because this would cause the entire application to become unreponsive.
+\verb+Sys.wait+ cannot block the only available thread, because this would cause the entire application to become unresponsive.
 The implementation is further complicated by the fact that the communication is bidirectional.
 Jack's standard library may only be partially implemented natively and partially as VM bytecode.
 This is especially likely in Project 12, where students are expected to implement the standard library themselves.
@@ -402,7 +403,7 @@ Continuing the function in the correct place is then as simple as putting the co
 In addition to the state, the native function receives the VM as a mutable reference and the formal arguments as a vector of words.
 Mutable access to the VM is needed for several functions, e.g.\ drawing to the display memory to display something on the screen.
 
-This system is powerful enough to solve all of the aforementioned problems if applied correctly, which is not trivial for every function, as can be seen in~\cref{complex-example}.
+This system is powerful enough to solve all aforementioned problems if applied correctly, which is not trivial for every function, as can be seen in~\cref{complex-example}.
 % \begin{itemize}
 %   \item args passed as vector
 %   \item vm is also passed mutably
@@ -456,8 +457,8 @@ At the moment, however, this is not possible because WebAssembly does not provid
 % or Keyboard.readLine (also shows why you can't just execute the entire native function)
 \cref{lst:output.printstring} shows a more complicated function which uses the system described above.
 This function can be used to output an entire string to the emulator's screen.
-It does not implement all of the functionality itself, instead relying on the string module to iterate over the characters, and the output module's printChar function to print just a single character.
-In theory, this function would be trivial, a simple for loop from zero to the length of the string, with only a single call to the printChar function as the loop body.
+It does not implement all the functionality itself, instead relying on the string module to iterate over the characters, and the output module's \verb+printChar+ function to print just a single character.
+In theory, this function would be trivial, a simple for loop from zero to the length of the string, with only a single call to the \verb+printChar+ function as the loop body.
 Yet it is not trivial in practice due to the limitations described in~\cref{stdlib-issues}.
 \begin{center}
   \begin{figure}[ht]
@@ -468,13 +469,13 @@ Yet it is not trivial in practice due to the limitations described in~\cref{stdl
   \end{figure}
 \end{center}
 Each time a function is called within a standard native library function, the latter must be stopped, since the former might be a function written in bytecode, and therefore subject to the user interface's stepwise debugger.
-For example, if the native output implementation is used in combination with a string implementation in bytecode, the user might reasonably expect to step through the charAt function called by the printString function in the user interface.
+For example, if the native output implementation is used in combination with a string implementation in bytecode, the user might reasonably expect to step through the \verb+charAt+ function called by the \verb+printString+ function in the user interface.
 This is indeed possible with this system.
 Features like this necessitate the complexity of these native implementations, as they cannot be implemented with a normal for loop.
 In the future, it may be possible to implement this in Rust in a more idiomatic way using the planned yield statement, however this is still a proposal at the time of writing~\cite{rustyield}.
 Most of the logic is explained in the comments of~\cref{lst:output.printstring}, but the basic idea is simply to use the state argument both as an index for the loop and to store the length of the string.
 This is possible because the state type is a 32-bit integer, whereas the VM emulator uses only 16-bit integers, so the state can contain two different values.
-Depending on whether the state is even or odd, we alternately call the charAt or printChar function until everything has been printed.
+Depending on whether the state is even or odd, we alternately call the \verb+charAt+ or \verb+printChar+ function until everything has been printed.
 Although the function is actually rather simple, it appears quite complicated in the code, so it is shown again in~\cref{fig:printstring-dfa}, but this time in a graphical representation of the state machine.
 Each state transition in the graphical representation is a suspension point for the function, with the transition to state \(3\) representing the final return in line 28 of the code.
 
@@ -530,7 +531,7 @@ So far, all sections have dealt with the internals of the emulator.
 The primary goal of the project, however, is to provide the user with a web-based interface.
 Integrating the emulator into a web page is done by first compiling the Rust code into a Wasm library, which is then used by a ReactJS application~\ref{react-js}.
 The exact boundary between JavaScript and Rust is arbitrary and has actually changed during the development of the application.
-In the finished version, the JavaScript code requests the current frame of the screen from the Rust code, which then renders the pixel data into a JavaScript ImageData buffer, a type provided by the web-sys crate~\ref{web-sys}, and returns it.
+In the finished version, the JavaScript code requests the current frame of the screen from the Rust code, which then renders the pixel data into a JavaScript \verb+ImageData+ buffer, a type provided by the \verb+web-sys+ crate~\ref{web-sys}, and returns it.
 The JavaScript code then simply displays the data inside a normal canvas element.
 In fact, the Rust code doesn't do anything by itself, it just provides functions that can be used by the ReactJS application.
 Another example of this principle is the handling of keyboard events, which are received by JavaScript, then passed to Rust and processed accordingly inside the emulator.
@@ -572,6 +573,7 @@ In contrast, the button row at the top and the screen are always visible.
     \label{fig:ui-demo-desktop}
   \end{figure}
 \end{center}
+\subsection{Hosting the application}
 One of the biggest advantages of web-based applications is the ability to use them without a local installation, simply by opening a link in the user's web browser.
 This only works if the application is hosted on a public web server.
 For many applications, this means renting or operating an expensive server infrastructure for the backend of their service.
