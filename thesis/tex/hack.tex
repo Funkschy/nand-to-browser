@@ -1,12 +1,12 @@
 \section{Nand to Tetris and the Hack Architecture} \label{hack-architecture}
 Nand to Tetris is divided into several sections that can be worked on or skipped more or less independently of each other.
 Each section describes a higher level of abstraction in the hack architecture, the computer system designed to be implemented throughout the course.
-In the beginning, the students create the necessary chips and logic gates, starting with only a nand gate.
+In the beginning, the students create the necessary chips and logic gates to build a full CPU, starting with only a not-and (NAND) gate.
 This section is not part of this thesis, but it may become relevant in future additions to the application~\ref{future-work}.
-After that, students work with the hack assembly language~\ref{hack-assembly} and create their own assembler whose generated code targets the CPU from the previous section.
+After that, students work with the Hack assembly language~\ref{hack-assembly} and create their own assembler whose generated code targets the CPU created in the previous section.
 The application created as part of this work contains an emulator that can run that assembly directly without further compilation.
 This allows students to run their assembly code in the same application as their VM code from the later sections.
-In the next section, students work closely with VM bytecode, first writing a translator from bytecode to assembly, and later writing a complete game using the high-level programming language Jack, which was designed for this course.
+Next, students work closely with VM bytecode, first writing a translator from bytecode to assembly, and later writing a complete game using the high-level programming language Jack, which was designed for this course.
 At the end, students create their own compiler for said high-level language.
 They will also implement a standard library for it that abstracts many of the direct interactions with the platform, such as printing text to the screen.
 The last two parts are relevant to this project because students can run both the VM code and their compiled assembly in the emulator.
@@ -40,7 +40,7 @@ The entire pipeline with many of the relevant terms that will be used throughout
 There are three different languages in the Nand to Tetris course that are relevant for this work.
 The first and least complex of the three languages is assembly language.
 Assembly language in this case simply means that the language has a direct mapping to machine language that the CPU can actually understand.
-Each assembly instruction can be mapped to a single number that can be understood directly by the machine's hardware.
+Each assembly instruction can be mapped to a single number that can be interpreted directly by the machine's hardware.
 Assembly in modern systems is often complicated with a plethora of instructions~\cite{guide2011intel}, but hack assembly has only two.
 These two instructions are used to manipulate two physical registers called A and D.
 In addition, there is a third register called M, which is actually just the memory cell pointed to by the address in the A register.

@@ -51,7 +51,9 @@ Rust does not currently allow static constants that require runtime code for ini
 This is however a very useful feature, for example to use hashmaps for defining lookup tables.
 The \verb+lazy_static+ crate is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic}, because it provides exactly this functionality in the form of a single macro.
 Among other things, it is used for the lookup table in the keyboard handler that maps special symbols like the escape key to the corresponding key codes in the emulator.
+
 Regular expressions are a very handy tool for simple parsing tasks. They are used to parse some tokens in the test scripts~\ref{test-scripts} for the emulator. Rust does not provide regular expressions in its standard library, so the \verb+regex+ crate was used.
+
 \label{web-sys}
 The two most important libraries when it comes to the value of Rust for this project are \verb+wasm-bindgen+ and \verb+web-sys+.
 While the former is responsible for creating bindings between Rust and JavaScript so that the two can call each other as if they were the same language, the latter provides implementations for common JavaScript APIs in Rust.
