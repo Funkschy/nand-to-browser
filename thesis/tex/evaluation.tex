@@ -8,7 +8,7 @@ Then again, projects do not exist in a vacuum, so the following sections contain
 It is impossible to test every existing program for the Hack VM, both due to the sheer volume of existing applications and the fact that many of these applications are not available to the public.
 However, this is also not necessary, since the expected behavior of the emulators is clearly described in the book accompanying the course.
 By following the specification and testing the new implementation with a reasonable number of representative programs, one can determine the degree of compatibility.
-Those programs are listed in the appendix~\ref{table:tested}.
+Those programs are listed in the appendix~[\ref{table:tested}].
 The number of possible instructions in the VM is also manageable, so a sufficiently complex program will use every single available instruction, which further supports this claim.
 Additionally, the course materials include a variety of test cases to help users implement the Jack compiler.
 These tests were used to further verify the correct behavior of the new VM implementation.
@@ -31,7 +31,7 @@ That is the implementation of the \verb+Sys.wait+ function, which was already di
 
 \subsection{Comparison with the official Emulator based on UI} \label{ui-compatibility}
 The new emulator does not implement all the features of the official emulator.
-Some of these missing features are missing due to time constraints, such as test script support in the WebUI~\ref{future-work}.
+Some of these missing features are missing due to time constraints, such as test script support in the web UI~[\ref{future-work}].
 On the other hand, some features have been deliberately omitted because they serve little purpose but complicate the user interface.
 One such feature is the ability to animate the running program.
 When this option is enabled, the information about the internal memory and the current instruction is updated after each tick.
@@ -42,7 +42,7 @@ Instead of offering every possible feature, the new user interface is intentiona
 This is also the reason why most of the UI elements are completely hidden while the game is running.
 For the compiler development that is part of projects 10 and 11, it may be advantageous to continue using the official emulators for their advanced debugging features.
 In contrast, when it comes to playing and testing full games, the new emulators offer a superior experience.
-They also open up these games and programs to additional platforms, because the new emulators also work on phones and tablets, as long as a physical keyboard is connected or the application does not require user input~\ref{fig:ui-demo-mobile}.
+They also open up these games and programs to additional platforms, because the new emulators also work on phones and tablets, as long as a physical keyboard is connected or the application does not require user input~[\ref{fig:ui-demo-mobile}].
 Another benefit of the new user interface is the unification of the VM and CPU emulators.
 The new emulator handles both types of applications within a single application, distinguishing between them based on their respective file extensions.
 % \begin{itemize}
@@ -81,7 +81,7 @@ Also, in the ``Official (no wait)'' column of the ~\cref{table:gaschunky}, the o
 The new emulator was run both from the web UI and in desktop mode.
 For the ``Native'' and ``Linux 10x Firefox'' columns, the tick rate has been set to one million, instead of the default maximum tick rate of one hundred thousand in the web UI.
 This normal maximum of 100,000 is arbitrarily chosen and therefore does not reflect the true performance of the system.
-At a tick rate of one million, the viewer can still see the animation clearly, which allows for a fair comparison~\ref{fig:gachunky-plot}.
+At a tick rate of one million, the viewer can still see the animation clearly, which allows for a fair comparison~[\ref{fig:gachunky-plot}].
 That said, the other four columns for both Linux and Windows use this arbitrary limit because that is the experience users will have by default.
 This limit was decided upon to ensure that games developed for the official emulator run at a reasonable speed by default and are neither too fast nor too slow.
 All benchmarks were run consecutively on the same computer.

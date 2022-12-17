@@ -44,7 +44,7 @@ Complex runtime environments such as the Java Virtual Machine (JVM) would conseq
 Languages that can run in constrained environments without virtual machines are therefore more suitable for this use case.
 That being said, Rust also offers advantages over other low-level languages such as C. Thanks to its emphasis on compiler-checked security guarantees, it offers a lower barrier of entry than C, while providing users with the same or even better performance~\cite{medin2021performance}.
 Like C++, Rust contains a more feature-rich standard library than C, with commonly used collections such as Vectors, equivalent to Java's ArrayList, and HashMaps.
-Rust is therefore very well suited for Wasm development and as a result has developed a strong ecosystem of libraries to support it in this area~\ref{rust-deps}.
+Rust is therefore very well suited for Wasm development and as a result has developed a strong ecosystem of libraries to support it in this area~[\ref{rust-deps}].
 The combination of a language that is inherently suited to Wasm development, and the strong community behind it, gives Rust several important advantages over its competitors for this project.
 
 % \begin{itemize}
@@ -92,7 +92,7 @@ Another use case for conditional compilation is logging.
 Logging has a significant performance overhead if done for every command that runs in the emulator, while being rarely necessary.
 It is therefore logical to hide it behind a compilation feature that can be activated when required and has no other drawbacks.
 Features are declared in the \verb+Cargo.toml+ file, which contains all project-related configuration such as the binaries built by the project, dependencies, or optimization flags.
-In the code, these features can be checked with a single line of code above the block of code to be conditionally compiled~\ref{lst:conditional-compilation}.
+In the code, these features can be checked with a single line of code above the block of code to be conditionally compiled~[\ref{lst:conditional-compilation}].
 
 \begin{lstlisting}[
   language=Rust,

@@ -2,8 +2,8 @@
 Nand to Tetris is divided into several sections that can be worked on or skipped more or less independently of each other.
 Each section describes a higher level of abstraction in the hack architecture, the computer system designed to be implemented throughout the course.
 In the beginning, the students create the necessary chips and logic gates to build a full CPU, starting with only a not-and (NAND) gate.
-This section is not part of this thesis, but it may become relevant in future additions to the application~\ref{future-work}.
-After that, students work with the Hack assembly language~\ref{hack-assembly} and create their own assembler whose generated code targets the CPU created in the previous section.
+This section is not part of this thesis, but it may become relevant in future additions to the application~[\ref{future-work}].
+After that, students work with the Hack assembly language~[\ref{hack-assembly}] and create their own assembler whose generated code targets the CPU created in the previous section.
 The application created as part of this work contains an emulator that can run that assembly directly without further compilation.
 This allows students to run their assembly code in the same application as their VM code from the later sections.
 Next, students work closely with VM bytecode, first writing a translator from bytecode to assembly, and later writing a complete game using the high-level programming language Jack, which was designed for this course.
@@ -15,7 +15,7 @@ It may seem strange to develop a whole new emulator mainly to improve a single p
 Although Project 9 is not the final project, for many it is the highlight of the course.
 This is illustrated by the fact that nine of the twelve examples listed under the ``Cool Stuff''~\cite{n2tweb} tab on the official website are Jack programs that would qualify as Project 9 solutions.
 So if the goal is to improve the overall student experience, it makes sense to focus on this part.
-Nevertheless, the emulators created as part of this thesis can also improve the experience for other projects~\ref{evaluation}.
+Nevertheless, the emulators created as part of this thesis can also improve the experience for other projects~[\ref{evaluation}].
 It is important to keep in mind that both the bytecode and the assembly are theoretically intended as intermediate steps for compiling Jack code into machine language, even though this project is about interpreting them directly.
 The entire pipeline with many of the relevant terms that will be used throughout the thesis is shown in~\cref{fig:hack-pipeline}.
 
@@ -126,9 +126,9 @@ So a \verb+pop local 3+ would perform the following operation: \(RAM[RAM[1]+3] =
 In contrast, the constant segment differs from all other segments in that it does not add anything to the index before treating the result as an address, but simply pushes the index directly onto the stack without performing a memory read.
 This means that the constant segment cannot be used with the pop instruction.
 
-With this knowledge the bytecode~\ref{lst:hack-bytecode} becomes readable.
+With this knowledge the bytecode~[\ref{lst:hack-bytecode}] becomes readable.
 It is important to note that the bytecode presented assumes that the segments have already been initialized and therefore will not work if executed as a standalone program.
-The code starts by initializing \(i\) and \(sum\) to one and zero respectively, just like the C code~\ref{lst:c-add-123}.
+The code starts by initializing \(i\) and \(sum\) to one and zero respectively, just like the C code~[\ref{lst:c-add-123}].
 Afterwards, a label is declared, which is simply a position in the bytecode that can be used as a target for goto instructions.
 The loop is implemented between this label and the label on the last line and can be divided into three parts.
 The first part performs the exit condition check to determine if the loop body should be executed.
