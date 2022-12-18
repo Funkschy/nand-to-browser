@@ -86,7 +86,7 @@ This not only allows those parts to be included in just some builds of the appli
 These dependencies will only be downloaded and compiled if the corresponding feature is enabled during compilation.
 A perfect example of the usefulness of this ability is the desktop feature in the new emulator.
 When compiled with this feature enabled, the VM emulator can run in a native window that uses the SDL2 library for rendering and user interaction.
-But there is no need to include SDL2 in a build that runs in the browser.
+But there is no need to include it in a build that runs in the browser.
 By using conditional compilation, we can compile the SDL2-related code and the library itself only when it is actually needed.
 Another use case for conditional compilation is logging.
 Logging has a significant performance overhead if done for every command that runs in the emulator, while being rarely necessary.

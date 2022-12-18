@@ -126,7 +126,7 @@ So a \verb+pop local 3+ would perform the following operation: \(RAM[RAM[1]+3] =
 In contrast, the constant segment differs from all other segments in that it does not add anything to the index before treating the result as an address, but simply pushes the index directly onto the stack without performing a memory read.
 This means that the constant segment cannot be used with the pop instruction.
 
-With this knowledge the bytecode~[\ref{lst:hack-bytecode}] becomes readable.
+With this knowledge~\cref{lst:hack-bytecode} becomes readable.
 It is important to note that the bytecode presented assumes that the segments have already been initialized and therefore will not work if executed as a standalone program.
 The code starts by initializing \(i\) and \(sum\) to one and zero respectively, just like the C code~[\ref{lst:c-add-123}].
 Afterwards, a label is declared, which is simply a position in the bytecode that can be used as a target for goto instructions.
@@ -193,19 +193,19 @@ TOS is an abbreviation for top of stack, the value which was pushed last.
     \centering
     \begin{tabular}{@{}lllll@{}}
       \toprule
-      Name     & Purpose                                                        & Arguments \\
+      Name     & Purpose                                                      & Arguments \\
       \midrule
-      add      & Add the two numbers on top of the stack                        & - \\
-      not      & Bit-invert the value on TOS                                    & - \\
-      neg      & Multiply the TOS with -1                                       & - \\
-      push     & Push \(RAM[offset(segment)+index]\) onto the stack             & segment, index \\
-      pop      & Pop the TOS and write it to \(RAM[offset(segment)+index]\)     & segment, index \\
-      label    & Declare a label, i.e., a name referring to a line of code       & label \\
-      goto     & Jump to the specified label                                    & label \\
-      if-goto  & Jump to the label, which is passed as an argument if TOS != 0  & label \\
-      function & Declare a new function and push \(n_{local}\) zeros to the stack & function name, \(n_{local}\) \\
-      call     & Call a function with \(n_{args}\) arguments                     & function name, \(n_{args}\) \\
-      return   & Return from a function                                         &         - \\
+      add      & Add the two numbers on top of the stack                      & - \\
+      not      & Bit-invert the TOS                                           & - \\
+      neg      & Multiply the TOS with -1                                     & - \\
+      push     & Push \(RAM[offset(segment)+index]\) onto the stack           & segment, index \\
+      pop      & \(RAM[offset(segment)+index] = pop()\)                       & segment, index \\
+      label    & Declare a label, i.e., a name referring to a line of code    & label \\
+      goto     & Jump to the specified label                                  & label \\
+      if-goto  & if TOS != 0: Jump to the label                               & label \\
+      function & Declare a new function and push \(n_{local}\) 0s to the stack & function name, \(n_{local}\) \\
+      call     & Call a function with \(n_{args}\) arguments                   & function name, \(n_{args}\) \\
+      return   & Return from a function                                        &         - \\
       \bottomrule
     \end{tabular}
     \caption{The Hack VM bytecode instructions.}

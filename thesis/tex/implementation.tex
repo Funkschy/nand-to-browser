@@ -32,7 +32,7 @@ This approach unfortunately leads to performance issues, which is why the standa
 \subsection{Architectural overview}
 The general architecture of the application is outlined in \cref{fig:arch}.
 Every box in this diagram represents a Rust module, which can either be a single file or an entire directory.
-The architecture is divided into three major areas: the actual simulators, the parsers, and the interfaces that serve as entry points into the application.
+The architecture is divided into three major areas: the actual \verb+simulators+, the \verb+parsers+, and the \verb+interfaces+ that serve as entry points into the application.
 Although the CPU and VM are commonly referred to as emulators, the module is called \verb+simulators+ because this is a more general term that also applies to the hardware simulator, which was not implemented as part of this work~[\ref{future-work}].
 This is the naming convention used by the official tools, where the emulators are also part of the \verb+simulators+ package~\cite{n2tsimulators}.
 The two terms are therefore used interchangeably in the following sections.
@@ -60,8 +60,8 @@ There is also the possibility to use the bytecode implementation of the whole st
 All of these options can be listed with the \verb+-h+ flag.
 
 The third entry point is the most important for the majority of users.
-The Web UI, a JavaScript application that calls the emulator implementations as a WebAssembly library, is easily accessible in any standard web browser.
-Unlike the other two entry points, which can only use one of the emulators at a time, the Web UI can use both, indicated in the diagram by an arrow pointing to the outer \verb+simulators+ module.
+The \verb+Web UI+, a JavaScript application that calls the emulator implementations as a WebAssembly library, is easily accessible in any standard web browser.
+Unlike the other two entry points, which can only use one of the emulators at a time, the \verb+Web UI+ can use both, indicated in the diagram by an arrow pointing to the outer \verb+simulators+ module.
 Though test scripts are currently not supported here~[\ref{future-work}].
 This entry point can be used without the need to install additional software on the user's system by simply launching a web page in the browser.
 The current address of this web page is given in the readme file in the root directory of the project.
@@ -116,7 +116,7 @@ In contrast, the variable size vector wastes no space, but each instruction is n
 The instructions have essentially been split into bytes with no higher-level structure.
 This leads to a significant problem.
 A single instruction in the textual representation of the bytecode can now correspond to multiple entries in the instruction vector, e.g., \verb+push constant 3+ requires three entries in the program vector.
-Assigning multiple indexes to each instruction increases the index of each element in the vector.
+Assigning multiple indexes to each instruction increases the index of each opcode in the vector.
 As a result, the index of an instruction in the program at runtime is often significantly larger than the line number of the same instruction in the input.
 % The first and less important is that additional metadata is required to determine the line number in the input from the current instruction in the runtime representation, which drastically increases the complexity needed to implement the code view in the UI.
 For example, in the fixed-size representation in~\cref{fig:instruction-size} the add instruction has index two, but in the variable-size vector its index is actually six.
@@ -165,7 +165,7 @@ With this approach, an entire instruction with all of its arguments is now conta
 \cref{lst:bytecode-pattern-matching} shows how pattern matching can be used in combination with enums to implement the decoding phase of the VM cycle in a clear and concise way by directly extracting the arguments of, for example, push and function instructions and binding them to new local names.
 For the above reasons, the fixed-size enum-based representation is a good choice, both for performance and usability during development.
 
-The exclamation mark in \verb+tos_binary!+ marks this expression as a call to a macro rather than a function, so the operator \verb*=+= can be passed as an argument.
+The exclamation mark in \verb+tos_binary!+ marks this expression as a call to a macro rather than a function, so the \verb*=+= operator can be passed as an argument.
 \begin{lstlisting}[
   language=Rust,
   label={lst:bytecode-pattern-matching},
@@ -302,7 +302,7 @@ In the real program, this code is more complicated due to some details of the Ru
   ]
   // P is the simulator specific parser
   // C is the simulator specific command
-  // contains fields like the peekable lexer
+  // this struct contains the lexer as a field
   pub struct ScriptParser<P, C> { [...] }
 
   impl ScriptParser<P, C>

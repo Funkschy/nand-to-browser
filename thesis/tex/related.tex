@@ -45,8 +45,8 @@ One of the main reasons why Rust was chosen as the language for this project is 
 Therefore, it is not surprising that several other Rust projects were used here to be both more efficient and to produce a more stable and reliable final program.
 At the same time, it is also important to use as few dependencies as possible, as any dependency could become a future liability if that library is ever abandoned or compromised by malicious actors.
 For this reason, each library used in this project has a clear purpose and provides enough value to justify its inclusion. Libraries are often referred to as crates in Rust, so these terms are used interchangeably throughout the text.
-
 This section summarizes the rationale for including each crate.
+
 Rust does not currently allow static constants that require runtime code for initialization.
 This is however a very useful feature, for example to use hashmaps for defining lookup tables.
 The \verb+lazy_static+ crate is one of the most used libraries in the Rust ecosystem~\cite[Downloads all time]{lazystatic}, because it provides exactly this functionality in the form of a single macro.
