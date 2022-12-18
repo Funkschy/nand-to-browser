@@ -20,7 +20,10 @@ For this reason, the new emulator also only passes uppercase letters to the VM, 
 All keys are converted directly to uppercase after being read.
 In the future, it might be useful to add a compatibility setting to allow users to process lowercase letters as well, but due to the time constraints of this project, it was decided to prioritize compatibility over correctness.
 There is only a single part of the new emulator that is known to behave at least partially differently to the official implementation.
-That is the implementation of the \verb+Sys.wait+ function, which was already discussed in~\cref{sys.wait-example}.
+That is the implementation of the \verb+Sys.wait+ function discussed earlier in~\cref{sys.wait-example}.
+The new \verb+Sys.wait+ behaves like the bytecode implementation, which also counts ticks to approximate time.
+This differs from the Java implementation, which internally uses the \verb+Thread.sleep+ function.
+Due to the limitations of Wasm mentioned previously, it is not possible to do the same here.
 
 % \begin{itemize}
 %   \item every program working. systematic approach because there are tons of non public programs. Example programs that use every instruction/stdlib-function
@@ -31,7 +34,7 @@ That is the implementation of the \verb+Sys.wait+ function, which was already di
 
 \subsection{Comparison with the official Emulator based on UI} \label{ui-compatibility}
 The new emulator does not implement all the features of the official emulator.
-Some of these missing features are missing due to time constraints, such as test script support in the web UI~[\ref{future-work}].
+Some of these missing features are missing due to time constraints, such as test script support in the Web UI~[\ref{future-work}].
 On the other hand, some features have been deliberately omitted because they serve little purpose but complicate the user interface.
 One such feature is the ability to animate the running program.
 When this option is enabled, the information about the internal memory and the current instruction is updated after each tick.
@@ -65,7 +68,7 @@ Since the number of instructions and standard library functions is relatively sm
 In order to turn it into a proper benchmark, the loop was removed, leaving only a single iteration of the animation to be played.
 \cref{fig:gaschunky-screenshot} shows a frame of the generated animation.
 Additionally, to make the comparisons fair, all \verb+Sys.wait+ calls have been removed from the program.
-The reason why this is important was discussed at the end of \cref{sys.wait-example}.
+The reason why this is important was discussed at the end of \cref{sys.wait-example} and~\cref{compatibility}.
 \begin{center}
   \begin{figure}[ht]
     \centering
@@ -78,8 +81,8 @@ There were also some changes made to the emulators themselves.
 Two statements have been added to the code for both the official and the new emulator.
 Both print the current system time in milliseconds and get executed when the start button is pressed and when the program returns from the main function respectively.
 Also, in the ``Official (no wait)'' column of the ~\cref{table:gaschunky}, the one millisecond wait instruction in the \verb+FastforwardTask+ of the \verb+HackController.java+ was removed to ensure that the official emulator could run at its maximum speed.
-The new emulator was run both from the web UI and in desktop mode.
-For the ``Native'' and ``Linux 10x Firefox'' columns, the tick rate has been set to one million, instead of the default maximum tick rate of one hundred thousand in the web UI.
+The new emulator was run both from the Web UI and in desktop mode.
+For the ``Native'' and ``Linux 10x Firefox'' columns, the tick rate has been set to one million, instead of the default maximum tick rate of one hundred thousand in the Web UI.
 This normal maximum of 100,000 is arbitrarily chosen and therefore does not reflect the true performance of the system.
 At a tick rate of one million, the viewer can still see the animation clearly, which allows for a fair comparison~[\ref{fig:gachunky-plot}].
 That said, the other four columns for both Linux and Windows use this arbitrary limit because that is the experience users will have by default.
