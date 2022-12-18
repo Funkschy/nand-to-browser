@@ -297,21 +297,16 @@ In the real program, this code is more complicated due to some details of the Ru
 \begin{lstlisting}[
   language=Rust,
   label={lst:generic-parser},
-  caption={The generic base parser for test scripts},
+  caption={The generic base parser for test scripts.},
   captionpos=b
   ]
   // P is the simulator specific parser
   // C is the simulator specific command
-  pub struct ScriptParser<P, C> {
-    // fields like the peekable lexer
-    [...]
-  }
+  // contains fields like the peekable lexer
+  pub struct ScriptParser<P, C> { [...] }
 
   impl ScriptParser<P, C>
-  where ScriptParser<P, C>: SimulatorCommandParser<C>,
-  {
-    [...]
-  }
+  where ScriptParser<P, C>: SimulatorCommandParser<C> { [...] }
 \end{lstlisting}
 
 The \verb+ScriptParser+ implementation block only becomes relevant if there is an emulator-specific parser that implements the missing parts, as shown for the VM emulator parser in~\cref{lst:vm-parser}.
@@ -320,16 +315,14 @@ This implementation has to contain the missing parse function for VM specific co
 \begin{lstlisting}[
   language=Rust,
   label={lst:vm-parser},
-  caption={The VM emulator specific parser for test scripts},
+  caption={The VM emulator specific parser for test scripts.},
   captionpos=b
   ]
+  // this parser does not need any fields of its own
   pub struct VMEmulatorCommandParser {}
 
   impl SimulatorCommandParser<VMEmulatorCommand>
-  for ScriptParser<VMEmulatorCommandParser, VMEmulatorCommand>
-  {
-    [...]
-  }
+  for ScriptParser<VMEmulatorCommandParser, VMEmulatorCommand> { [...] }
 \end{lstlisting}
 
 % \subsubsection{Compile time check for the combination of parser and executor}
@@ -433,15 +426,16 @@ When this happens, the original first argument is returned inside the special fi
 The multiplication by 1000 is relatively arbitrary here, since the actual duration depends on the current tick rate, which is a feature of the user interface and therefore unknown to the emulator~[\ref{step-by-step}].
 It would be theoretically better to first set the status to the current system time and then decrement it until it reaches zero again.
 At the moment, however, this is not possible because WebAssembly does not provide an API for accessing the system time.
+% \begin{minipage}{\linewidth}
 \begin{lstlisting}[
   language=Rust,
   label={lst:sys.wait},
-  caption={Implementation of the Sys.wait function},
+  caption={Implementation of the Sys.wait function.},
   captionpos=b
   ]
   pub fn wait(_vm: &mut VM, state: State, params: &[Word]) -> StdResult {
     if params[0] < 0 {
-        return Err(StdlibError::SysWaitNegativeDuration);
+      return Err(StdlibError::SysWaitNegativeDuration);
     }
 
     let duration = params[0] as State * 1000;
@@ -452,7 +446,7 @@ At the moment, however, this is not possible because WebAssembly does not provid
     Ok(StdlibOk::Finished(params[0]))
   }
 \end{lstlisting}
-
+% \end{minipage}
 \subsubsection{Example: Output.printString} \label{complex-example}
 % or Keyboard.readLine (also shows why you can't just execute the entire native function)
 \cref{lst:output.printstring} shows a more complicated function which uses the system described above.
