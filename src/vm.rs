@@ -195,7 +195,7 @@ fn find_files(dir: &PathBuf) -> Result<HashMap<String, String>, Box<dyn std::err
     Ok(vm_files)
 }
 
-pub fn execute_dir<'w>(
+pub fn execute_dir(
     use_vm_stdlib: bool,
     steps_per_tick: usize,
     vm_files: HashMap<String, String>,

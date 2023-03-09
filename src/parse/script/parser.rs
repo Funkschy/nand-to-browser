@@ -67,7 +67,7 @@ where
                 self.consume_token_exact(Token::Symbol(Symbol::OpenBrace))?;
 
                 let mut block = vec![];
-                while self.lexer.peek() != None {
+                while self.lexer.peek().is_some() {
                     if self.peek_expect_token(Token::Symbol(Symbol::CloseBrace))? {
                         break;
                     }

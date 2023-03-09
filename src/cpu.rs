@@ -34,7 +34,7 @@ fn main() {
     let tst_name = matches.get_one::<PathBuf>("file").unwrap();
     let use_stdout = *matches.get_one::<bool>("print-outfile").unwrap();
 
-    let tst_content = fs::read_to_string(&tst_name).unwrap();
+    let tst_content = fs::read_to_string(tst_name).unwrap();
 
     let mut out = io::stdout();
     let writer = if use_stdout {
