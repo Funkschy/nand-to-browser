@@ -129,20 +129,10 @@ impl BuiltinFunction {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Stdlib {
     by_name: HashMap<&'static str, Symbol>,
     by_address: HashMap<Symbol, BuiltinFunction>,
-}
-
-// for some weird reason, the derive implementations weren't recognized by the compiler
-impl Clone for Stdlib {
-    fn clone(&self) -> Self {
-        Self {
-            by_name: self.by_name.clone(),
-            by_address: self.by_address.clone(),
-        }
-    }
 }
 
 impl Stdlib {
