@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Felix Schoeller <felix.schoeller@protonmail.com>"]
 description = "A Nand to Tetris Emulator implementation that can run in the browser"
 license-file = "LICENSE"
+repository = "https://github.com/Funkschy/nand-to-browser"
 
 [[bin]]
 name = "vm"
